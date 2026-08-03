@@ -47,3 +47,112 @@ mocks, per the prompt's "no mocks or stubs" rule).
 - Any UI beyond the default scaffold page — Phase 2/3
 - Dexie, Serwist, service worker, manifest — Phase 3
 - `googleapis`, Resend — Phase 4
+
+## Phase 1 — Schema, auth, RLS
+
+**Schema and RLS migrations applied verbatim from `PROMPT.md`**, split across
+`supabase/migrations/`: `20260102000000_schema.sql` (enums/tables/indexes,
+copied as specified — no column renames), `20260103000000_rls.sql` (policies),
+`20260104000000_auth_trigger.sql` (see below), `20260105000000_grants.sql`
+(see below). Also added one thing not in the spec: a `set_updated_at()`
+trigger on `jobs`, since the column exists but nothing was defined to
+maintain it — trivial, and the alternative is a dead column.
+
+**Supabase CLI pinned as a devDependency** (`pnpm add -D supabase`), so
+`pnpm db:*` scripts don't depend on `npx` resolving a version on every run.
+
+**`edge_runtime` disabled in `supabase/config.toml`.** In this sandbox,
+`supabase start` failed outright on the edge-runtime container (`error
+setting rlimit type 7: operation not permitted` — a container-nesting
+limitation of this environment, not a real Docker or Supabase bug). Disabling
+it isn't just a workaround, though: this build has no Supabase Edge
+Functions in its plan (Next.js Route Handlers and Server Actions do that
+work instead), so there was nothing lost. Revisit only if a later phase
+actually wants Deno edge functions specifically.
+
+**Explicit `GRANT`s were required and are not optional** —
+`20260105000000_grants.sql`. This Supabase CLI version stopped
+auto-exposing new `public` schema tables to the `anon`/`authenticated`/
+`service_role` Data API roles (see the `auto_expose_new_tables` comment in
+`supabase/config.toml`: the legacy auto-expose flag is deprecated and its
+removal is scheduled for 2026-10-30). Without the explicit grants, every
+query — including from the *service-role* key, which bypasses RLS but still
+needs table privileges — fails with `permission denied for table X` before
+RLS is ever evaluated. This is exactly the kind of platform breaking change
+`AGENTS.md` warns about, just in Supabase rather than Next.js. Granted
+`authenticated` and `service_role` only; `anon` gets nothing, because no
+real request path in this app queries tables as `anon` (magic-link sign-in
+elevates to `authenticated`; the public share-link route in Phase 4 will use
+the service-role client server-side, not direct anon table access).
+
+**`handle_new_auth_user` trigger** (`20260104000000_auth_trigger.sql`)
+inserts a `public.users` row, defaulted to the least-privileged `engineer`
+role, whenever a row is inserted into `auth.users`. Needed so a real
+magic-link sign-in from someone outside the seed data still gets a usable
+account; an admin promotes their role afterwards. The seed script upserts
+over these rows for the three seeded accounts (`on conflict (id) do update`)
+since the trigger fires for them too.
+
+**RLS policy assumptions**, where `PROMPT.md`'s RLS section didn't spell out
+every table (the reasoning is repeated as SQL comments in
+`20260103000000_rls.sql`, summarized here):
+- `projects`/`sites`/`assets` are readable by every authenticated role
+  (engineers need site/access-note context for their jobs) but writable
+  only by admin/manager.
+- `users`: everyone reads their own row; admin/manager read everyone; only
+  admin writes — mirrors the AppSheet role model, where only Admin gets "app
+  editing."
+- `status_events` has no UPDATE/DELETE policy for any role at all, including
+  admin — enforcing the "append-only, never overwritten" non-negotiable
+  constraint at the database level, not just by convention.
+- `install_forms`/`survey_forms`: admin/manager can always write; engineers
+  only while the parent job isn't submitted/under_review/approved/closed.
+- `share_links` has no SELECT policy whatsoever — Phase 4's public share
+  route is expected to read it via the service-role client server-side, per
+  spec ("no authenticated access needed").
+
+**RLS is proved with a real Postgres + GoTrue instance, not mocks**
+(`tests/rls.test.ts`, `tests/helpers/rls-test-client.ts`), per the "no mocks
+or stubs" rule — a mocked Postgres client couldn't actually exercise `USING`/
+`WITH CHECK` clauses. Each seeded role (admin/manager/engineer) signs in for
+real via Supabase's admin `generateLink` + `verifyOtp({ token_hash, type:
+"magiclink" })`, which mints a genuine session/JWT without needing to
+actually receive an email. **Important RLS-testing gotcha discovered while
+writing these tests:** a Postgres RLS `USING` clause that evaluates to
+`false` for every row doesn't raise an error on UPDATE/DELETE — it just
+matches zero rows, so Postgrest returns `error: null` with an empty result.
+The "deliberately failing" assertions therefore check `.select()` returns
+`[]` and that the row is unchanged, not that `error` is set. Coverage
+includes: admin and manager each read all 60 seeded jobs; the engineer
+reads exactly the 20 assigned to them inside the date window (seed data is
+split 20 in-window/20 out-of-window/20 unassigned specifically to prove the
+filter cuts both ways); a manager cannot write `users`; an engineer cannot
+escalate their own role; nobody (including admin) can mutate a
+`status_events` row after insert; an engineer cannot edit a submitted
+`install_form`.
+
+**CI now provisions a local Supabase stack** (`supabase start` inside the
+existing `checks` job, env exported into `$GITHUB_ENV` under the app's own
+variable names) before running tests. GitHub-hosted runners have Docker
+running by default, so this doesn't need the `edge_runtime`-disabling
+workaround above to matter there — it matters regardless, since this repo
+still doesn't use edge functions.
+
+**`src/proxy.ts`, not `src/middleware.ts`.** Next.js 16 deprecated the
+`middleware` file convention in favour of `proxy` (same `NextRequest` →
+`NextResponse` shape, just renamed — see
+`node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`).
+Built it as `middleware.ts` first, saw the build's deprecation warning, and
+moved it — per `AGENTS.md`'s instruction to heed deprecation notices rather
+than build on a convention already on its way out. `src/lib/supabase/
+middleware.ts` (the actual session-refresh logic, following the
+`@supabase/ssr` Next.js pattern) was renamed to `proxy.ts` to match; nothing
+about ssr's cookie-handling API itself changed, only the file/export name at
+the Next.js integration point.
+
+**Not done in Phase 1, deliberately deferred:**
+- Any office/field UI — Phase 2/3 build on top of this schema and auth
+- Enforcing job-status *transition* legality (e.g. you can't jump `draft` →
+  `closed`) — that's application/business logic, not a row-visibility
+  concern, and belongs with the actions that trigger transitions in Phase 2
+- `share_links` Phase 4 public route and its service-role read path

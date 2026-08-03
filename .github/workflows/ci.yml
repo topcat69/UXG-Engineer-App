@@ -23,5 +23,21 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
+
+      # RLS tests hit a real local Postgres + GoTrue instance, per the
+      # project's "no mocks or stubs" rule — there's no fake to substitute.
+      - run: pnpm exec supabase start
+      - name: Export local Supabase URL/keys for tests
+        run: |
+          eval "$(pnpm exec supabase status -o env | sed 's/^/export /')"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+
       - run: pnpm test
       - run: pnpm build
+
+      - if: always()
+        run: pnpm exec supabase stop
