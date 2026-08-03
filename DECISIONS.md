@@ -156,3 +156,122 @@ the Next.js integration point.
   `closed`) — that's application/business logic, not a row-visibility
   concern, and belongs with the actions that trigger transitions in Phase 2
 - `share_links` Phase 4 public route and its service-role read path
+
+## Phase 2 — Office UI
+
+**Role gate is two layers, not one.** `src/proxy.ts` requires *any*
+authenticated user for non-public paths; `requireOfficeUser()`
+(`src/lib/auth/current-user.ts`), called from `src/app/office/layout.tsx`,
+additionally requires admin/manager and redirects engineers to `/`. RLS is
+the real security boundary (Phase 1) — this is a UX gate so an engineer
+never sees office screens that would just render empty/error, not a second
+security mechanism.
+
+**`/` and `/my-jobs` now do real role-based routing.** `/` redirects
+admin/manager to `/office/jobs` and engineers to `/my-jobs`, a placeholder
+page that says Phase 3 builds the field app — an honest stub, not a fake
+"done" feature.
+
+**Job list, bulk assign, bulk schedule** (`/office/jobs`): filters are a
+plain GET form (shareable/bookmarkable URLs, zero client JS needed for
+filtering) rendering server-fetched, paginated (50/page) results. Bulk
+actions are plain server actions invoked directly from a client component
+via `useTransition` — no extra form-state library needed for two buttons.
+**Bulk-scheduling a `draft` job now logs a `status_events` row** (fixed
+after noticing the gap: the non-negotiable "status changes are append-only"
+rule applies to *every* status transition, not just the ones with dedicated
+office actions) — same fix applied to the QA and scheduler actions below.
+
+**Job detail** (`/office/jobs/[id]`): status timeline, form data
+(`install_forms`/`survey_forms`, whichever the job has), a media grid, an
+issue list + raise-issue form, and a site map. The map is `react-leaflet` +
+OpenStreetMap tiles behind a `next/dynamic(..., { ssr: false })` wrapper
+(Leaflet touches `window` at import time, so it can never be part of the
+server render) — the standard, boring choice over a paid maps API for an
+internal 8-user tool. Media rows render as metadata cards (slot, captured
+date), not `<img>` tags: Phase 1's seed only stores fake `storage_path`
+values, since no upload pipeline exists yet (that's Phase 3's camera-capture
+work) — real thumbnails will just work once real files land at those paths,
+same convention.
+
+**CSV import + bulk job generation** (`/office/import`): a pure
+`parseSitesCsv()` (`src/lib/csv/sites.ts`, unit-tested) separates CSV
+parsing/validation from the Supabase call, so validation logic doesn't need
+a database to test. Job numbering (`src/lib/jobs/job-number.ts`) mirrors the
+AppSheet build's scheme exactly, including its stated non-concurrency-safety
+tradeoff — deliberate parity, not an oversight. The generate-jobs step
+defaults to "sites from the CSV I just imported" (kept in client state) with
+an "all sites" alternative, rather than a scalable multi-select — reasonable
+at this scale (import → generate is normally one motion) and matches the
+Phase 2 acceptance test's own shape.
+
+**QA queue** (`/office/qa`): lists `submitted`/`under_review` jobs with an
+inline Approve / Reject-with-reason per row (linking to job detail for full
+photo/form review, rather than duplicating that view here). Approve sets
+`qa_status = 'approved'`, `status = 'closed'`, and logs a `status_events`
+row. Reject sets `qa_status = 'rejected'` + `qa_notes = <reason>` **and**
+creates a linked revisit job (`parent_job_id`, `status = 'draft'`) per the
+AppSheet "Reject → Revisit" action spec — but does *not* log a
+`status_events` row against the rejected job itself, because that job's
+`status` column doesn't actually change on rejection (only `qa_status`
+does); the new revisit job gets its own creation event instead.
+
+**Scheduler** (`/office/scheduler`): a Monday-start week grid, one lane per
+active engineer plus an "Unassigned" lane, native HTML5 drag-and-drop
+(`draggable` + `dragstart`/`dragover`/`drop` — no DnD library; a handful of
+event handlers is simpler than a dependency for this). Dropping a card sets
+*both* the target day and the target lane's engineer in one server action
+(`rescheduleJob`), which also runs `detectConflicts()`
+(`src/lib/scheduler/conflicts.ts`, unit-tested pure function) and surfaces
+overlap / daily-max-jobs warnings — **warnings, never blocks**, per the
+spec's own wording ("conflict warnings", not "conflict prevention").
+**Playwright gotcha worth flagging for Phase 3:** `locator.dragTo()`
+doesn't reliably trigger native HTML5 drag events in this stack (confirmed
+by direct comparison — a manually-dispatched `DragEvent` sequence worked
+every time, `dragTo()` sometimes moved the wrong card). Any future
+drag-and-drop E2E test should dispatch `dragstart`/`dragover`/`drop`
+manually via `page.evaluate()` rather than relying on `dragTo()`.
+
+**Testing:** unit tests for every pure function introduced this phase
+(`parseSitesCsv`, `nextJobNumber`, `detectConflicts`, the week-math
+helpers) — logic that doesn't need a database gets tested without one.
+**Playwright arrives one phase earlier than planned** (Phase 0's DECISIONS
+said it'd wait for Phase 3): Phase 2's own "Done when" criterion is an E2E
+workflow (import → generate → bulk assign/schedule), so it needs a real
+browser to prove, not just unit tests. The E2E test
+(`tests/e2e/phase2-office-workflow.spec.ts`) drives the actual login flow
+through the local Mailpit inbox (no session-shortcut helpers, unlike the
+Phase 1 RLS tests which legitimately need the shortcut to test *as* three
+different roles) and verifies outcomes via a service-role admin client
+rather than assuming exact row counts, so it's safe to run against a DB
+that already has other data in it. CI now installs Chromium
+(`playwright install --with-deps chromium`) and runs it alongside the
+existing Supabase-backed test step. Also fixed along the way: **vitest's
+default include glob matches `*.spec.ts` too**, which collided with
+Playwright's own `test()` — `vitest.config.ts` now explicitly excludes
+`tests/e2e/**`.
+
+**Real bug caught by testing, not by review:** `src/lib/supabase/env.ts`
+originally read `NEXT_PUBLIC_*` vars through a generic `process.env[name]`
+helper. That works server-side but Next.js only inlines `process.env.X` as
+a *static* member-access expression into the browser bundle — the dynamic
+form silently evaluated to `undefined` client-side, breaking the login
+button. Caught by actually driving the login form in a browser, not by
+typecheck or lint (both stayed green throughout). Fixed by writing out each
+public accessor's property access literally.
+
+**Also fixed:** Supabase's local auth `additional_redirect_urls` needed
+`http://localhost:3000/auth/callback` (and the `127.0.0.1` equivalent)
+added explicitly — GoTrue silently falls back to the bare `site_url` if the
+requested redirect isn't allow-listed, which otherwise made magic-link
+sign-in land on `/` with no session instead of erroring loudly.
+
+**Not done in Phase 2, deliberately deferred:**
+- Offline behaviour, the PWA shell, and the field UI itself — Phase 3
+- The `/share/{token}` public route — Phase 4, alongside Calendar/Gmail
+- Real media upload/thumbnails — Phase 3's camera-capture pipeline
+- Enforcing job-status transition legality beyond what specific actions do
+  (e.g. nothing stops a raw API caller from setting an illegal status) —
+  still an app-layer concern, now partially addressed by the specific
+  actions built this phase (bulk-schedule, approve, reject, drag-reschedule)
+  rather than a general state-machine guard

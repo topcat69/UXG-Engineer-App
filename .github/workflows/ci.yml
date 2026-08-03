@@ -37,6 +37,10 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - run: pnpm test
+
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test
+
       - run: pnpm build
 
       - if: always()
