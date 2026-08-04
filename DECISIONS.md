@@ -464,3 +464,206 @@ to maximize repetitions in the time available.
   Supabase stack, run repeatedly enough to catch two genuine concurrency
   bugs that a single manual pass on a phone would have had no better odds
   of catching than a single automated run did.
+
+## Phase 4 — Calendar and email
+
+**Credentials situation, stated up front.** This phase's spec assumes a
+real Google Workspace domain (a service account with domain-wide
+delegation) and a real Resend account. Neither exists in this sandbox —
+setup was attempted with the user (a personal Gmail account was offered
+first, which can't receive domain-wide delegation at all since there's no
+Workspace admin console behind it; a real work domain followed, but no
+service-account JSON or Resend key ever arrived). Per the user's own
+direction once that became clear ("sandbox" — build for real, verify
+later), every integration in this phase is **real, production-shaped code
+that no-ops safely when unconfigured**, not a stub: the same `googleapis`
+and `resend` SDKs a live deployment would use, the same request shapes,
+the same create-vs-patch/threading logic — just never actually reaching
+Google or Resend's servers in this environment, because
+`GOOGLE_SERVICE_ACCOUNT_KEY`/`RESEND_API_KEY` are unset. **Live delivery is
+therefore unverified and remains so until real credentials exist** — that
+gap is real and is being stated plainly here, not glossed over. Everything
+that *doesn't* need those credentials (ICS feed, the DB webhook → email
+trigger's full request/response cycle, share links, ICS/email content
+generation) was verified for real against the local stack, not mocked.
+
+**"Best-effort, never blocking" is the load-bearing design decision of
+this whole phase.** Every integration point — `syncCalendarForJob`,
+`removeCalendarForJob`, `sendJobEmail`/`sendStandaloneEmail` — returns a
+`{ status: "skipped" }` result and logs rather than throwing when its
+credential is absent, and every call site awaits it without checking for
+failure. This isn't a shortcut for the sandbox: PROMPT.md's own spec says
+Calendar is "one-way" and email is "transactional" — neither is meant to
+be able to stop a job being scheduled, assigned, submitted, or approved,
+in production either. A misconfigured Resend key should never be the
+reason a job can't be marked submitted.
+
+**Calendar: `event-payload.ts` (pure) vs `sync-logic.ts` (pure,
+dependency-injected client) vs `calendar.ts` (the real, `server-only`
+googleapis wrapper).** Three files, three trust levels. `server-only`
+throws unconditionally when imported outside Next.js's bundler (it's not
+an environment check — it's a bare `throw` that Next.js's build
+config swaps out per-bundle), so anything under it can't be unit tested at
+all, ever, in Vitest. Splitting the actual create-vs-patch *decision*
+into `sync-logic.ts` — typed against a minimal `CalendarClientLike`
+interface rather than googleapis's real (overload-heavy, untestable
+without a live client) `calendar_v3.Calendar` type — means the branch that
+matters most (`calendar_event_id` present → patch, absent → insert; this
+one branch is called out in PROMPT.md itself as "the most common failure
+of this integration") is fully unit tested with a fake client object, no
+mocking framework or live credentials needed. `calendar.ts` becomes a
+10-line wrapper whose only job is constructing the real client and handing
+it to the tested logic.
+
+**Same split, different reason, for email:** `templates.ts` and
+`threading.ts` have no `server-only` guard and are pure by construction
+(inputs in, `{subject, html, text}` out) — no client to inject at all,
+since there's nothing to fake. `resend.ts` (the actual `Resend` SDK call)
+and `send-job-emails.ts` (the per-trigger DB fetches) stay `server-only`
+and untested directly, same tradeoff as Calendar.
+
+**Email threading via a deterministic root Message-ID, not the previous
+email's id.** `emailThreadRootId(jobId)` computes `<job-{id}@opoc.local>`
+from the job id alone — no lookup required. The first email about a job
+*is* the root (its own Message-ID); every later one sets
+`References`/`In-Reply-To` to that same root. `jobs.email_thread_id` is
+still persisted on first send, per spec ("store email_thread_id") — it's a
+record of what was used, not the only way to reconstruct it, which matters
+because a lookup-based scheme breaks threading entirely the one time the
+lookup misses.
+
+**`media_pending`'s delta-counter lesson, reapplied: `media_pending`
+never gets an absolute `SET`, and neither does this phase's
+`syncCalendarForJob`/`submitJob`-adjacent design — every "did this
+already happen" question is answered by reading `calendar_event_id` or
+`email_thread_id` off the row itself, never by a separate flag that could
+drift out of sync with what was actually sent/created.** Direct
+continuation of the two bugs fixed at the end of Phase 3.
+
+**status_events → "submitted" email via a `pg_net` Database Webhook, not
+a Next.js server action.** The field app's outbox writes `status_events`
+rows directly against PostgREST from the browser (`src/lib/offline/outbox.ts`,
+built in Phase 3) — there is no Next.js server action in that path at all,
+so no office-side code can "notice" a submission that happened offline and
+synced later. Postgres itself is the only place guaranteed to see every
+submission regardless of which client caused it. `pg_net` was already
+enabled in the local Postgres image (confirmed directly:
+`select * from pg_available_extensions`) — this is the same mechanism
+Supabase's own "Database Webhooks" dashboard feature is built on, not a
+bespoke invention. The trigger fires `net.http_post` asynchronously and
+never blocks or fails the `status_events` insert itself, matching the
+non-negotiable rule that submission can't be blocked by a downstream
+integration. **Verified for real, not just unit-tested**: with the dev
+server running, `insert into status_events (...) values (..., 'submitted', ...)`
+run directly via `psql` was observed reaching
+`POST /api/webhooks/status-submitted` in the Next.js dev log and returning
+`{"notified": N}`; a non-`submitted` transition was confirmed to fire no
+webhook at all; wrong/missing shared-secret was confirmed to get a 401.
+
+**Webhook config lives in a plain `app_settings` table, not a Postgres
+GUC.** The first attempt used `current_setting('app.settings.webhook_url')`
++ `alter database postgres set app.settings.webhook_url = ...` in
+`seed.sql` — the idiomatic pattern from Supabase's own docs — but the
+seed connection in this local CLI setup doesn't have the
+superuser/database-owner privilege `ALTER DATABASE ... SET` requires,
+and reset failed outright (`permission denied to set parameter`). Switched
+to a plain table with RLS enabled and *zero* policies (not even for
+`authenticated`) — nothing reaches it through the API at all; only the
+`security definer` trigger function and direct migration/seed access as
+the `postgres` role can touch it. No less secure, and it sidesteps the
+privilege problem entirely. The real URL/secret for a deployment go in via
+that deployment's own migration or an authenticated `update`, never
+committed — `seed.sql`'s values (`host.docker.internal:3000`, a
+plainly-labeled local-dev secret) are meaningless outside this sandbox by
+construction.
+
+**ICS feed: HMAC-signed URL, not a `share_links` row.** Deliberately
+stateless, unlike share links — an engineer's calendar subscription is a
+standing thing with no natural expiry or revocation event, so there's
+nothing worth storing a row for. `signIcsToken(engineerId)` is an
+HMAC-SHA256 over the id; `verifyIcsToken` recomputes and compares with
+`timingSafeEqual`. Engineer ids aren't secret, so the token isn't gating
+*discovery* the way a share link's random token does — it's proving "this
+request was actually handed a link by the app," which is all a calendar
+subscription URL needs. **Verified for real**: signed a token by hand,
+hit `/api/ics/{engineerId}?token=...` against the running dev server, got
+back well-formed `VCALENDAR`/`VEVENT` text with real seed-data jobs;
+confirmed a wrong token gets 403.
+
+**Share links: unlike the ICS feed, these need to be revocable and
+expire, so they're a real `share_links` row with a random (not
+HMAC-derived) 48-hex-char token** — `randomBytes(24)`, not a UUID (more
+entropy, and there's no need for it to be parseable as anything). Added a
+`share_links_select` RLS policy scoped to admin/manager (there was
+previously *only* insert/update, per Phase 1's own note that the public
+route "uses the service-role client, which bypasses RLS entirely") so the
+office UI's own share-link management panel can read existing links
+through the normal RLS-scoped client like everything else in that UI,
+instead of reaching for the admin client from an already-authenticated
+context just to avoid writing one more policy. The public `/share/[token]`
+page itself still uses the admin client, unconditionally, on purpose — no
+RLS policy exists (or should exist) that would let an anonymous visitor
+read `share_links` directly; the token match *is* the authorization, and
+the query only executes after that check.
+
+**Approved photos, not all photos.** The spec's "approved photos only" has
+no per-photo review workflow anywhere in this app to hang off — approval
+is a whole-job QA decision (`qa_status`). Photos on the public share page
+only render once `qa_status = 'approved'`; before that, the page shows a
+one-line "will appear once this job passes QA" placeholder instead of
+photos that might still get rejected or replaced. Signed URLs (1-hour TTL)
+are generated per request from the private `media` bucket — nothing on the
+public page is a stored, reusable link to storage.
+
+**Schema gap found and fixed: no client email address existed anywhere.**
+`sites` had `contact_name`/`contact_phone` but no `contact_email`, and
+`projects` only has `client_name` — there was genuinely nowhere to send
+the "approved" email specified in PROMPT.md. Added `sites.contact_email`
+(a site's on-site contact is the natural recipient for that site's own
+completion report) rather than inventing a client-contacts table this app
+doesn't otherwise need, and threaded it through the CSV importer
+(`parseSitesCsv`) for consistency with every other site field.
+
+**Testing.** Pure logic (event payload building, ICS RFC5545 formatting,
+email templates, threading headers, share-link expiry/revocation, the
+day-before date check, weekly-summary status tallying) is unit tested with
+no network — 101 unit tests total by the end of this phase, up from 77 at
+the end of Phase 3. The Calendar create-vs-patch branch specifically is
+unit tested against a fake client (see `sync-logic.ts` above) rather than
+left as "trust the code review," since PROMPT.md calls that exact branch
+out by name as the integration's most common failure mode. The Playwright
+share-link test (`tests/e2e/phase4-share-link.spec.ts`) drives the actual
+office UI as a signed-in manager to create the link, then opens it from a
+**second, cookie-less browser context** (`browser.newContext()`) — the
+closest real proxy for "a phone that's never touched this app" available
+in this sandbox — and asserts three things a leak could fail on
+independently: the target job's own content renders, two different
+kinds of secret (`qa_notes` text, a second unrelated job's number) are
+absent from the page body, and the same unauthenticated context still
+gets redirected to `/login` for `/office/jobs`. A second test drives
+expired and revoked tokens through the real page and confirms neither
+shows the job. Full suite (office + offline + both share-link specs)
+run three times consecutively against a freshly reset database with zero
+failures.
+
+**Not done in Phase 4, deliberately deferred:**
+- Live Calendar/Resend delivery — blocked on real credentials, see above.
+  Everything up to that boundary (request construction, auth flow,
+  create/patch/delete branching, threading, no-op-when-unconfigured
+  behavior) is real and tested; the actual network call to Google/Resend's
+  servers has never been exercised.
+- Google Calendar free/busy reads for conflict warnings — PROMPT.md
+  mentions this alongside the one-way event sync, but Phase 2's
+  `detectConflicts` already covers same-day/max-jobs conflicts from OPOC's
+  own data, and free/busy needs the same missing service-account
+  credentials as event sync, so it's deferred with everything else that does.
+- Actual cron scheduling for day-before-reminders/weekly-summary — both
+  routes exist, are shared-secret-authenticated, and were verified by
+  hand against the real database; nothing in this sandbox runs them on a
+  schedule (no pg_cron job installed, no platform cron). A real deployment
+  wires either to Vercel Cron or a `pg_cron` job calling `pg_net` the same
+  way the status-submitted webhook does.
+- The completion PDF itself (Phase 5) — the "approved" email and the
+  share page both have a code path for it (`completion_pdf_url`) that
+  degrades to "will follow separately" while it's null, rather than being
+  half-built.

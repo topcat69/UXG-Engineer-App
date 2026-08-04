@@ -61,6 +61,7 @@ export function parseSitesCsv(text: string): ParsedSitesCsv {
       access_notes: raw.access_notes?.trim() || undefined,
       contact_name: raw.contact_name?.trim() || undefined,
       contact_phone: raw.contact_phone?.trim() || undefined,
+      contact_email: raw.contact_email?.trim() || undefined,
       organisation: raw.organisation?.trim() || undefined,
     });
   });

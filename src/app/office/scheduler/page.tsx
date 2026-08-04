@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { addDays, isoDate, mondayOf } from "@/lib/scheduler/week";
 import { createClient } from "@/lib/supabase/server";
+import { appBaseUrl } from "@/lib/app-url";
+import { icsFeedUrl } from "@/lib/ics/sign";
 import { SchedulerBoard } from "./scheduler-board";
 
 export default async function SchedulerPage({
@@ -32,6 +34,9 @@ export default async function SchedulerPage({
   const prevWeek = isoDate(addDays(monday, -7));
   const nextWeek = isoDate(addDays(monday, 7));
 
+  const base = appBaseUrl();
+  const engineersWithFeed = (engineers ?? []).map((e) => ({ ...e, icsUrl: icsFeedUrl(e.id, base) }));
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -49,7 +54,7 @@ export default async function SchedulerPage({
         </div>
       </div>
 
-      <SchedulerBoard days={days} engineers={engineers ?? []} jobs={(jobs ?? []) as never} />
+      <SchedulerBoard days={days} engineers={engineersWithFeed} jobs={(jobs ?? []) as never} />
     </div>
   );
 }

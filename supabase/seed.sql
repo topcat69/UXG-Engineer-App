@@ -137,3 +137,16 @@ begin
     end if;
   end loop;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Phase 4, local dev only: points the status_events "submitted" webhook
+-- (20260109000000_status_submitted_webhook.sql) at the Next.js dev server
+-- as seen from inside the Postgres container. host.docker.internal is only
+-- meaningful in this local Docker setup — a real deployment sets these same
+-- two rows with its actual URL and secret via its own ops process, never by
+-- committing them here. The secret below exists nowhere but this local
+-- sandbox's own .env.local and this file.
+-- ---------------------------------------------------------------------------
+insert into app_settings (key, value) values
+  ('webhook_url', 'http://host.docker.internal:3000/api/webhooks/status-submitted'),
+  ('webhook_secret', 'local-dev-webhook-secret-not-for-production-use');

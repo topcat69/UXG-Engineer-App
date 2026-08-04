@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { nextJobNumber } from "@/lib/jobs/job-number";
+import { sendApprovedEmail } from "@/lib/email/send-job-emails";
 import type { ActionResult } from "../jobs/actions";
 
 export async function approveJob(jobId: string): Promise<ActionResult> {
@@ -11,7 +12,11 @@ export async function approveJob(jobId: string): Promise<ActionResult> {
   if (!user) return { ok: false, message: "Not signed in." };
 
   const supabase = await createClient();
-  const { data: job } = await supabase.from("jobs").select("status").eq("id", jobId).single();
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("status, site:sites(contact_email, contact_name)")
+    .eq("id", jobId)
+    .single();
   if (!job) return { ok: false, message: "Job not found." };
 
   const { error } = await supabase.from("jobs").update({ qa_status: "approved", status: "closed" }).eq("id", jobId);
@@ -24,6 +29,12 @@ export async function approveJob(jobId: string): Promise<ActionResult> {
     user_id: user.id,
     reason: "QA approved",
   });
+
+  // Best-effort, per sendApprovedEmail's own contract — sites without a
+  // contact_email on file just don't get one; that's not a QA failure.
+  if (job.site?.contact_email) {
+    await sendApprovedEmail(supabase, jobId, job.site.contact_email, job.site.contact_name ?? "there");
+  }
 
   revalidatePath("/office/qa");
   revalidatePath(`/office/jobs/${jobId}`);

@@ -3,7 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "./database.types";
 import { supabaseAnonKey, supabaseUrl } from "./env";
 
-const PUBLIC_PATHS = ["/login", "/auth", "/share"];
+// /api is public at the proxy layer because it has no browser session to
+// check anyway — its routes (ICS feed, cron triggers, DB webhooks) are
+// called by calendar apps, external schedulers, and Postgres itself, and
+// each authenticates itself its own way (HMAC token, shared secret header).
+const PUBLIC_PATHS = ["/login", "/auth", "/share", "/api"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

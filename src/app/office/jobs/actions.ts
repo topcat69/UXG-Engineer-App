@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
+import { sendJobAssignedEmail } from "@/lib/email/send-job-emails";
 
 export type ActionResult = { ok: true; message: string } | { ok: false; message: string };
 
@@ -12,6 +14,10 @@ export async function bulkAssignJobs(jobIds: string[], engineerId: string): Prom
   const supabase = await createClient();
   const { error } = await supabase.from("jobs").update({ assigned_to: engineerId }).in("id", jobIds);
   if (error) return { ok: false, message: error.message };
+
+  // Best-effort, per sendJobAssignedEmail's own contract — a Resend/config
+  // failure never blocks the assignment itself from succeeding.
+  await Promise.all(jobIds.map((id) => sendJobAssignedEmail(supabase, id)));
 
   revalidatePath("/office/jobs");
   return { ok: true, message: `Assigned ${jobIds.length} job(s).` };
@@ -59,6 +65,11 @@ export async function bulkScheduleJobs(
     );
     if (eventsError) return { ok: false, message: eventsError.message };
   }
+
+  // Calendar sync is per-job (each gets its own event) and best-effort —
+  // see syncCalendarForJob's own contract for why a Calendar failure never
+  // surfaces as a scheduling failure.
+  await Promise.all(jobIds.map((id) => syncCalendarForJob(supabase, id)));
 
   revalidatePath("/office/jobs");
   return { ok: true, message: `Scheduled ${jobIds.length} job(s).` };

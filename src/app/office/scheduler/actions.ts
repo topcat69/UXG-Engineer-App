@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { detectConflicts } from "@/lib/scheduler/conflicts";
+import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
+import { sendJobAssignedEmail } from "@/lib/email/send-job-emails";
 
 export type RescheduleResult = { ok: true; message: string; warning?: string } | { ok: false; message: string };
 
@@ -21,7 +23,7 @@ export async function rescheduleJob(
 
   const { data: job } = await supabase
     .from("jobs")
-    .select("scheduled_start, scheduled_end, status")
+    .select("scheduled_start, scheduled_end, status, assigned_to")
     .eq("id", jobId)
     .single();
   if (!job || !job.scheduled_start) return { ok: false, message: "Job not found or has no schedule yet." };
@@ -85,6 +87,17 @@ export async function rescheduleJob(
       user_id: user?.id,
       reason: "Scheduled via drag-and-drop",
     });
+  }
+
+  // Reschedule must PATCH the same calendar event, not create a second one —
+  // syncCalendarForJob's create-vs-patch branch on calendar_event_id handles
+  // that; this is the "most common failure of this integration" per spec if skipped.
+  await syncCalendarForJob(supabase, jobId);
+
+  // Only a genuine reassignment gets an email — dragging a job to a new day
+  // within the same engineer's lane shouldn't spam them.
+  if (targetEngineerId && targetEngineerId !== job.assigned_to) {
+    await sendJobAssignedEmail(supabase, jobId);
   }
 
   revalidatePath("/office/scheduler");

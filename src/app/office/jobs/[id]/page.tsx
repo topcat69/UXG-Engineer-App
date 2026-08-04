@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import SiteMap from "@/components/site-map-loader";
 import { createClient } from "@/lib/supabase/server";
+import { appBaseUrl } from "@/lib/app-url";
+import { isShareLinkValid } from "@/lib/share-links/validity";
 import { IssueForm } from "./issue-form";
+import { CancelJobButton } from "./cancel-job-button";
+import { ShareLinkPanel } from "./share-link-panel";
 
 const INSTALL_PHOTO_SLOTS = [
   "photo_before",
@@ -18,29 +22,42 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: job, error }, { data: statusEvents }, { data: installForm }, { data: surveyForm }, { data: media }, { data: issues }] =
-    await Promise.all([
-      supabase
-        .from("jobs")
-        .select(
-          "*, site:sites(*), project:projects(name), assigned:users!jobs_assigned_to_fkey(name, email)",
-        )
-        .eq("id", id)
-        .single(),
-      supabase
-        .from("status_events")
-        .select("*, user:users(name)")
-        .eq("job_id", id)
-        .order("occurred_at", { ascending: false }),
-      supabase.from("install_forms").select("*").eq("job_id", id).maybeSingle(),
-      supabase.from("survey_forms").select("*").eq("job_id", id).maybeSingle(),
-      supabase.from("media_assets").select("*").eq("job_id", id).order("slot"),
-      supabase.from("issues").select("*, raised_by_user:users(name)").eq("job_id", id).order("created_at", { ascending: false }),
-    ]);
+  const [
+    { data: job, error },
+    { data: statusEvents },
+    { data: installForm },
+    { data: surveyForm },
+    { data: media },
+    { data: issues },
+    { data: shareLinks },
+  ] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select(
+        "*, site:sites(*), project:projects(name), assigned:users!jobs_assigned_to_fkey(name, email)",
+      )
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("status_events")
+      .select("*, user:users(name)")
+      .eq("job_id", id)
+      .order("occurred_at", { ascending: false }),
+    supabase.from("install_forms").select("*").eq("job_id", id).maybeSingle(),
+    supabase.from("survey_forms").select("*").eq("job_id", id).maybeSingle(),
+    supabase.from("media_assets").select("*").eq("job_id", id).order("slot"),
+    supabase.from("issues").select("*, raised_by_user:users(name)").eq("job_id", id).order("created_at", { ascending: false }),
+    supabase.from("share_links").select("token, expires_at, revoked").eq("job_id", id).order("created_at", { ascending: false }),
+  ]);
 
   if (error || !job) notFound();
 
   const mediaBySlot = new Map((media ?? []).map((m) => [m.slot, m]));
+  const base = appBaseUrl();
+  const now = new Date().toISOString();
+  const activeShareLinks = (shareLinks ?? [])
+    .filter((link) => isShareLinkValid(link, now))
+    .map((link) => ({ token: link.token, expires_at: link.expires_at, url: `${base}/share/${link.token}` }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -58,11 +75,14 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             </Link>
           </p>
         </div>
-        <div className="text-right text-sm">
-          <p>Assigned: {job.assigned?.name ?? "Unassigned"}</p>
-          <p className="text-muted-foreground">
-            {job.scheduled_start ? new Date(job.scheduled_start).toLocaleString() : "Not scheduled"}
-          </p>
+        <div className="flex flex-col items-end gap-2">
+          <div className="text-right text-sm">
+            <p>Assigned: {job.assigned?.name ?? "Unassigned"}</p>
+            <p className="text-muted-foreground">
+              {job.scheduled_start ? new Date(job.scheduled_start).toLocaleString() : "Not scheduled"}
+            </p>
+          </div>
+          <CancelJobButton jobId={job.id} status={job.status} />
         </div>
       </div>
 
@@ -197,6 +217,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </ul>
         {job.site_id && <IssueForm jobId={job.id} siteId={job.site_id} />}
       </section>
+
+      <ShareLinkPanel jobId={job.id} links={activeShareLinks} />
     </div>
   );
 }

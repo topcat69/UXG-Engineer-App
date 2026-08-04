@@ -15,7 +15,7 @@ type JobRow = {
   site: { name: string } | null;
 };
 
-type Engineer = { id: string; name: string; max_jobs_per_day: number | null };
+type Engineer = { id: string; name: string; max_jobs_per_day: number | null; icsUrl: string };
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -33,9 +33,9 @@ export function SchedulerBoard({
   const [message, setMessage] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
-  const lanes: { key: string; label: string; engineerId: string | null }[] = [
+  const lanes: { key: string; label: string; engineerId: string | null; icsUrl?: string }[] = [
     { key: "unassigned", label: "Unassigned", engineerId: null },
-    ...engineers.map((e) => ({ key: e.id, label: e.name, engineerId: e.id })),
+    ...engineers.map((e) => ({ key: e.id, label: e.name, engineerId: e.id, icsUrl: e.icsUrl })),
   ];
 
   function jobsFor(laneKey: string, day: string): JobRow[] {
@@ -99,7 +99,7 @@ function FragmentRow({
   handleDrop,
   isPending,
 }: {
-  lane: { key: string; label: string; engineerId: string | null };
+  lane: { key: string; label: string; engineerId: string | null; icsUrl?: string };
   days: string[];
   jobsFor: (laneKey: string, day: string) => JobRow[];
   dragOverKey: string | null;
@@ -109,7 +109,18 @@ function FragmentRow({
 }) {
   return (
     <>
-      <div className="flex items-center text-sm font-medium">{lane.label}</div>
+      <div className="flex flex-col justify-center text-sm font-medium">
+        <span>{lane.label}</span>
+        {lane.icsUrl && (
+          <a
+            href={lane.icsUrl}
+            className="text-muted-foreground text-[10px] font-normal underline"
+            title="Subscribe in any calendar app"
+          >
+            📅 ICS feed
+          </a>
+        )}
+      </div>
       {days.map((day) => {
         const cellKey = `${lane.key}:${day}`;
         const cellJobs = jobsFor(lane.key, day);

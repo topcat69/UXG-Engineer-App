@@ -34,6 +34,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          key: string
+          value: string
+        }
+        Insert: {
+          key: string
+          value: string
+        }
+        Update: {
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
       assets: {
         Row: {
           asset_type: string | null
@@ -530,6 +545,7 @@ export type Database = {
           access_notes: string | null
           address_line1: string | null
           address_line2: string | null
+          contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
           created_at: string | null
@@ -545,6 +561,7 @@ export type Database = {
           access_notes?: string | null
           address_line1?: string | null
           address_line2?: string | null
+          contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string | null
@@ -560,6 +577,7 @@ export type Database = {
           access_notes?: string | null
           address_line1?: string | null
           address_line2?: string | null
+          contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string | null
