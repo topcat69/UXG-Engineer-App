@@ -667,3 +667,136 @@ failures.
   share page both have a code path for it (`completion_pdf_url`) that
   degrades to "will follow separately" while it's null, rather than being
   half-built.
+
+## Phase 5 — Issues, revisits, reports
+
+**Issue automation reuses the Phase 3 outbox and Phase 4 webhook patterns
+wholesale — no new sync mechanism.** "Raise issue manually or
+automatically from a `fail` answer" turned out to be a two-line addition
+once the actual submit path was traced: `player_boot_test`/
+`content_displaying` already exist as pass/fail fields on the install
+form, and `issue_insert` was already a defined outbox operation type from
+Phase 3 (present but never actually triggered by anything). `detectAutoIssues`
+(pure, unit tested) inspects the submitted form values and
+`submitJob` — the one place both the field app's Dexie transaction and the
+completed form values are simultaneously in scope — queues an
+`issue_insert` per failure through the existing durable outbox, so it
+survives offline exactly the same way every other Phase 3 mutation does,
+with no new code path to get wrong.
+
+**A failed boot test blocks completion; the engineer's own "issues found"
+note doesn't, on its own.** A player that won't boot or content that
+won't display means the install genuinely isn't working — that's not a
+judgment call, so those two checks always raise a `blocks_completion: true`
+issue. The engineer's free-text "issues found" note is informational by
+comparison (something worth flagging, not necessarily something that
+undoes the whole job) and raises a non-blocking issue instead. The same
+distinction now exists in the office `IssueForm` too — added a
+"blocks completion" checkbox there, so a manually-raised office issue
+gets the identical automatic-revisit treatment as one raised in the field.
+
+**"Blocks completion" → automatic revisit, via a `pg_net` DB trigger on
+`issues` insert — the same architecture as Phase 4's status-submitted
+webhook, for the same underlying reason.** Field-raised issues land via
+the outbox straight against PostgREST; there's no Next.js server action in
+that path to hang "and also create a revisit" off. Postgres is the only
+place guaranteed to see every insert regardless of source, so
+`notify_issue_blocks_completion()` fires an async `net.http_post` to
+`/api/webhooks/issue-blocks-completion`, which creates the revisit (via a
+`createRevisitJob` helper extracted from what used to be QA-reject-only
+logic — reject and blocking-issue revisits are now visibly the same
+operation, not two copies that could drift) and links
+`issues.revisit_job_id`. **Verified for real, twice**: once by hand via
+`psql` (`insert into issues (...) values (..., true)` → webhook fires,
+revisit job appears, `revisit_job_id` gets set; a `blocks_completion: false`
+issue confirmed to fire nothing), and once end-to-end through the full
+Playwright test — a real field-app fail answer, submitted through the
+real UI, produces a real linked revisit job.
+
+**Completion PDF: `pdfkit`, chosen for one reason — it needs no headless
+browser.** `@react-pdf/renderer` was the other realistic option, but
+`pdfkit`'s imperative, low-level drawing API is the more direct fit for
+what this document actually needs: photos with text burned on top at
+exact positions (GPS + timestamp), which is closer to "draw an image, then
+draw text over it" than to a React component tree. No Puppeteer/Chromium
+bundling weight either, which matters for a document that's generated
+synchronously inside a server action.
+
+**Real, sandbox-caught bug: pdfkit's bundled font files break under
+Turbopack's server bundle.** First attempt at generating a PDF failed with
+`ENOENT: no such file or directory, open '/ROOT/node_modules/.../Helvetica.afm'`
+— pdfkit reads its standard-14-font metrics off disk via
+`__dirname`-relative paths at runtime, and Turbopack's bundled server
+output rewrites `__dirname` into a virtual module-graph path that doesn't
+correspond to a real file, so the read fails. Fixed with Next's
+`serverExternalPackages: ["pdfkit"]` config, which tells Next to load it
+as a plain CommonJS `require` against the real `node_modules` on disk
+instead of bundling it — the standard, documented fix for this exact class
+of "a dependency reads its own asset files at runtime" problem. **Confirmed
+fixed under both `next dev` and a real `next build` + `next start`** (the
+dev-mode-only fix would have been worth nothing — Turbopack's dev and
+build bundlers don't necessarily hit identical bundling edge cases, so
+this was verified against an actual production build on a second port,
+not assumed from the dev server working).
+
+**Every hash in the manifest is computed from bytes downloaded fresh at
+report-generation time, never from `media_assets.sha256`** (which is
+client-computed at capture time, Phase 3, and already used for a different
+purpose — detecting corruption in the offline upload pipeline). This
+makes the manifest a claim about the PDF's own contents ("these are the
+exact bytes embedded on the page above"), not a pass-through of an
+unverified upstream value from a different trust boundary — the stronger
+property for something meant to, per spec, "stand up as evidence."
+
+**The PDF is stored in the existing `media` bucket, at
+`jobs/{job_id}/completion-report.pdf`, not a new bucket.** That path
+matches the existing `jobs/{job_id}/...` convention every
+`storage.objects` RLS policy from Phase 3 already keys off
+(`(storage.foldername(name))[2]::uuid in (select id from jobs)`), so the
+report inherits correct access control for free — no new bucket, no new
+policy, one less thing that could be configured inconsistently.
+`jobs.completion_pdf_url` stores that path, not a URL — the bucket is
+private, so every reader (the approved email, the share page) mints its
+own fresh signed URL at read time, the same pattern Phase 4 established
+for photos.
+
+**Generated synchronously inside `approveJob`, not queued.** Approval is a
+deliberate, infrequent office action, not a hot path — a couple of seconds
+of latency for the office user is a reasonable tradeoff against building a
+background job queue this app doesn't otherwise need. A generation failure
+doesn't undo the approval (same "downstream step never blocks the core
+action" contract as Calendar/email), but — unlike those — it does surface
+in the action's own return message, since regenerating a report is
+something the office user can and should be able to notice and retry, not
+purely fire-and-forget.
+
+**Testing.** `detectAutoIssues` and the GPS/timestamp overlay formatter are
+pure and unit tested with no network. The Playwright test
+(`tests/e2e/phase5-issue-revisit-report.spec.ts`) drives literally every
+step of PROMPT.md's own "Done when" sentence for real: a field engineer
+answers "fail" on the boot test through the real form UI and submits
+offline-outbox-style; the test polls (not sleeps) for the webhook-created
+revisit to link; a manager approves through the real QA queue UI; the test
+then downloads the actual generated PDF via a signed URL and parses it
+with `pdf-parse` (added as a test-only dependency) to assert real
+content — the job number, the submitted form answer, the exact issue
+description, and a genuine 64-hex-character SHA-256 digest in the hash
+manifest — rather than just checking that some bytes exist. Full suite
+(all five specs) run three times consecutively against a freshly reset
+database with zero failures, plus a separate manual verification against
+an actual `next build && next start` production server (not just `next dev`)
+specifically because the pdfkit bug above was a bundler-specific failure
+that a dev-only check could have missed entirely.
+
+**Not done in Phase 5, deliberately deferred:**
+- QA approval isn't blocked by an open `blocks_completion` issue on the
+  same job — a manager can approve a job that still has an unresolved
+  blocking issue against it (the revisit job exists to track that
+  separately). PROMPT.md doesn't ask for approval to be gated on this, and
+  adding that gate wasn't invented speculatively.
+- Video capture (60s/720p cap, mentioned in the media capture rules) — no
+  form slot in this app requests video yet, so there's nothing to attach
+  the cap to.
+- Issue resolution workflow (marking an issue's `status` from `open` to
+  `resolved`, setting `resolved_at`) — issues exist and are visible on the
+  job detail page, but nothing in the UI transitions that field yet.

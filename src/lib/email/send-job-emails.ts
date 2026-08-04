@@ -74,6 +74,12 @@ export async function sendSubmittedEmail(supabase: AnySupabaseClient, jobId: str
 }
 
 /** "Approved" (to client) — completion_pdf_url is null until Phase 5 builds the report; the email still sends. */
+// A week is long enough for a recipient to actually open the email without
+// the link being live indefinitely — completion_pdf_url is a private-bucket
+// storage path, not a URL, so every reader (this email, the share page)
+// signs its own fresh link rather than one being generated once and reused.
+const PDF_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7;
+
 export async function sendApprovedEmail(supabase: AnySupabaseClient, jobId: string, clientEmail: string, clientName: string): Promise<SendResult> {
   const { data: job } = await supabase
     .from("jobs")
@@ -82,12 +88,18 @@ export async function sendApprovedEmail(supabase: AnySupabaseClient, jobId: stri
     .single();
   if (!job?.site) return SKIPPED;
 
+  let pdfUrl: string | null = null;
+  if (job.completion_pdf_url) {
+    const { data } = await supabase.storage.from("media").createSignedUrl(job.completion_pdf_url, PDF_SIGNED_URL_TTL_SECONDS);
+    pdfUrl = data?.signedUrl ?? null;
+  }
+
   const content = buildApprovedEmail({
     jobNumber: job.job_number,
     siteName: job.site.name,
     clientName,
     deepLink: `${appBaseUrl()}/office/jobs/${jobId}`,
-    pdfUrl: job.completion_pdf_url,
+    pdfUrl,
   });
   return sendJobEmail(supabase, jobId, clientEmail, content);
 }

@@ -35,6 +35,10 @@ export function IssueForm({ jobId, siteId }: { jobId: string; siteId: string }) 
         </select>
       </div>
       <Textarea name="description" placeholder="What's wrong?" required rows={2} />
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="blocks_completion" value="true" className="h-4 w-4" />
+        Blocks completion (creates a linked revisit job automatically)
+      </label>
       <div className="flex items-center gap-2">
         <Button type="submit" size="sm" disabled={isPending}>
           Raise issue

@@ -16,6 +16,8 @@ export async function raiseIssue(jobId: string, siteId: string, formData: FormDa
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Not signed in." };
 
+  const blocksCompletion = formData.get("blocks_completion") === "true";
+
   const supabase = await createClient();
   const { error } = await supabase.from("issues").insert({
     job_id: jobId,
@@ -23,6 +25,7 @@ export async function raiseIssue(jobId: string, siteId: string, formData: FormDa
     raised_by: user.id,
     severity,
     description,
+    blocks_completion: blocksCompletion,
   });
   if (error) return { ok: false, message: error.message };
 

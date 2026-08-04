@@ -18,6 +18,7 @@ import {
   PHOTO_SLOTS,
   POWER_SOURCES,
   WIFI_SIGNALS,
+  installFormRowToValues,
   showIssueDetail,
   showWifiSignal,
   validateInstallForm,
@@ -29,24 +30,6 @@ import { SignatureCapture } from "./signature-capture";
 
 const AUTOSAVE_INTERVAL_MS = 15_000;
 const NOT_YET_ON_SITE: readonly string[] = ["draft", "scheduled", "dispatched", "accepted", "travelling"];
-
-function toValues(row: InstallFormRow | undefined): InstallFormValues {
-  if (!row) return EMPTY_INSTALL_FORM;
-  return {
-    player_serial: row.player_serial ?? "",
-    screen_serial: row.screen_serial ?? "",
-    mount_type: row.mount_type ?? "",
-    power_source: row.power_source ?? "",
-    network_type: row.network_type ?? "",
-    wifi_signal: row.wifi_signal ?? "",
-    player_boot_test: row.player_boot_test ?? "",
-    content_displaying: row.content_displaying ?? "",
-    issues_found: row.issues_found ?? false,
-    issue_detail: row.issue_detail ?? "",
-    engineer_notes: row.engineer_notes ?? "",
-    client_name: row.client_name ?? "",
-  };
-}
 
 export function JobWorkflow({
   jobId,
@@ -79,7 +62,7 @@ export function JobWorkflow({
   }, [jobId]);
   useEffect(() => {
     if (!hydrated.current && formRow !== undefined) {
-      setValues(toValues(formRow));
+      setValues(installFormRowToValues(formRow));
       hydrated.current = true;
     }
   }, [formRow]);
@@ -172,6 +155,7 @@ export function JobWorkflow({
         jobId,
         currentFormRow(),
         position ? { latitude: position.coords.latitude, longitude: position.coords.longitude } : null,
+        currentUser.id,
       );
       onMutated?.();
     } finally {

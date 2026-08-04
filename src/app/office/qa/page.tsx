@@ -31,7 +31,7 @@ export default async function QaQueuePage() {
           const form = (job.install_forms as { issues_found: boolean | null; player_boot_test: string | null; content_displaying: string | null }[] | null)?.[0];
           const hasFailure = form && (form.player_boot_test === "fail" || form.content_displaying === "fail" || form.issues_found);
           return (
-            <div key={job.id} className="flex flex-col gap-2 rounded-md border p-4">
+            <div key={job.id} data-testid="qa-row" className="flex flex-col gap-2 rounded-md border p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Link href={`/office/jobs/${job.id}`} className="font-medium underline-offset-2 hover:underline">

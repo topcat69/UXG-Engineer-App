@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { nextJobNumber } from "@/lib/jobs/job-number";
+import { createRevisitJob } from "@/lib/jobs/create-revisit";
 import { sendApprovedEmail } from "@/lib/email/send-job-emails";
+import { generateAndStoreCompletionReport } from "@/lib/pdf/completion-report";
 import type { ActionResult } from "../jobs/actions";
 
 export async function approveJob(jobId: string): Promise<ActionResult> {
@@ -30,6 +31,21 @@ export async function approveJob(jobId: string): Promise<ActionResult> {
     reason: "QA approved",
   });
 
+  // Generated synchronously here (not queued) — approval is a deliberate,
+  // infrequent office action, not a hot path, so making the office user
+  // wait a couple of seconds for the report is a reasonable tradeoff for
+  // not needing a background job queue. A report failure doesn't undo the
+  // approval itself, matching the "downstream integration never blocks the
+  // core action" contract used throughout this app; it does still show up
+  // in the returned message so the office user knows to retry.
+  const report = await generateAndStoreCompletionReport(supabase, jobId);
+  let reportNote = "";
+  if ("path" in report) {
+    await supabase.from("jobs").update({ completion_pdf_url: report.path }).eq("id", jobId);
+  } else {
+    reportNote = ` Report generation failed: ${report.error}`;
+  }
+
   // Best-effort, per sendApprovedEmail's own contract — sites without a
   // contact_email on file just don't get one; that's not a QA failure.
   if (job.site?.contact_email) {
@@ -38,7 +54,7 @@ export async function approveJob(jobId: string): Promise<ActionResult> {
 
   revalidatePath("/office/qa");
   revalidatePath(`/office/jobs/${jobId}`);
-  return { ok: true, message: "Approved and closed." };
+  return { ok: true, message: `Approved and closed.${reportNote}` };
 }
 
 export async function rejectJob(jobId: string, reason: string): Promise<ActionResult> {
@@ -63,31 +79,16 @@ export async function rejectJob(jobId: string, reason: string): Promise<ActionRe
   // Reject -> Revisit: create a linked follow-up job, per the AppSheet action
   // spec. The rejected job's own `status` doesn't change (qa_status does) —
   // it stays as the historical record of what was reviewed and rejected.
-  const { count } = await supabase.from("jobs").select("id", { count: "exact", head: true });
-  const { data: revisit, error: revisitError } = await supabase
-    .from("jobs")
-    .insert({
-      job_number: nextJobNumber(count ?? 0, new Date().getFullYear(), 1),
-      project_id: job.project_id,
-      site_id: job.site_id,
-      job_type: job.job_type,
-      status: "draft",
-      parent_job_id: jobId,
-    })
-    .select("id")
-    .single();
-  if (revisitError) return { ok: false, message: revisitError.message };
-
-  await supabase.from("status_events").insert({
-    job_id: revisit.id,
-    from_status: null,
-    to_status: "draft",
-    user_id: user.id,
-    reason: `Revisit created from ${job.job_number} (rejected: ${reason})`,
-  });
+  const revisit = await createRevisitJob(
+    supabase,
+    { id: jobId, job_number: job.job_number, project_id: job.project_id, site_id: job.site_id, job_type: job.job_type },
+    `rejected: ${reason}`,
+    user.id,
+  );
+  if ("error" in revisit) return { ok: false, message: revisit.error };
 
   revalidatePath("/office/qa");
   revalidatePath("/office/jobs");
   revalidatePath(`/office/jobs/${jobId}`);
-  return { ok: true, message: `Rejected. Revisit ${revisit ? "created" : ""}.` };
+  return { ok: true, message: "Rejected. Revisit created." };
 }

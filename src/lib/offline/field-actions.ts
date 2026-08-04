@@ -1,6 +1,7 @@
 "use client";
 
 import { db, type InstallFormRow, type JobStatus } from "./db";
+import { detectAutoIssues, installFormRowToValues } from "@/lib/forms/install-form";
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -93,16 +94,29 @@ export async function saveInstallFormDraft(row: InstallFormRow): Promise<void> {
  * upload eagerly and can finish — and decrement — before Submit is even
  * tapped, so assigning an absolute count here could stomp those decrements.
  */
-export async function submitJob(jobId: string, formRow: InstallFormRow, point: GeoPoint | null): Promise<void> {
+export async function submitJob(
+  jobId: string,
+  formRow: InstallFormRow,
+  point: GeoPoint | null,
+  raisedBy: string,
+): Promise<void> {
   const job = await db.jobs.get(jobId);
   if (!job) throw new Error("Job not found locally");
   const now = new Date();
   const nowIso = now.toISOString();
   const submittedForm = { ...formRow, submitted_at: nowIso };
+  // Per spec: raise issue manually (the engineer's own issues_found note)
+  // or automatically (a failed pass/fail check) — both surface here since
+  // this is the one place the completed form values are known.
+  const autoIssues = detectAutoIssues(installFormRowToValues(formRow));
   // install_form_upsert must be replayed before status_event: once the
   // latter lands, the job's status is "submitted" and RLS blocks any
-  // further install_forms write from this engineer.
-  const [formCreatedAt, patchCreatedAt, eventCreatedAt] = batchTimestamps(now, 3);
+  // further install_forms write from this engineer. Issue inserts have no
+  // such dependency, so they're just appended after.
+  const [formCreatedAt, patchCreatedAt, eventCreatedAt, ...issueCreatedAts] = batchTimestamps(
+    now,
+    3 + autoIssues.length,
+  );
 
   await db.transaction("rw", [db.jobs, db.installForms, db.outbox], async () => {
     await db.installForms.put(submittedForm);
@@ -139,5 +153,28 @@ export async function submitJob(jobId: string, formRow: InstallFormRow, point: G
       createdAt: eventCreatedAt,
       attempts: 0,
     });
+
+    for (const [index, issue] of autoIssues.entries()) {
+      await db.outbox.add({
+        id: uuid(),
+        type: "issue_insert",
+        row: {
+          id: uuid(),
+          job_id: jobId,
+          site_id: job.site_id,
+          raised_by: raisedBy,
+          severity: issue.severity,
+          category: "install",
+          description: issue.description,
+          blocks_completion: issue.blocksCompletion,
+          status: "open",
+          resolved_at: null,
+          revisit_job_id: null,
+          created_at: nowIso,
+        },
+        createdAt: issueCreatedAts[index],
+        attempts: 0,
+      });
+    }
   });
 }

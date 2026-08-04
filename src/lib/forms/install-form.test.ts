@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   EMPTY_INSTALL_FORM,
   PHOTO_SLOTS,
+  detectAutoIssues,
   showIssueDetail,
   showWifiSignal,
   validateInstallForm,
@@ -69,5 +70,42 @@ describe("validateInstallForm", () => {
     expect(errors).toContain("Photo required: screen mounted.");
     expect(errors).toContain("Photo required: wide shot.");
     expect(errors).not.toContain("Photo required: before.");
+  });
+});
+
+describe("detectAutoIssues", () => {
+  it("raises nothing for a fully passing form with no issues noted", () => {
+    expect(detectAutoIssues(completeValues)).toEqual([]);
+  });
+
+  it("raises a blocking issue when the player boot test fails", () => {
+    const issues = detectAutoIssues({ ...completeValues, player_boot_test: "fail" });
+    expect(issues).toEqual([{ severity: "high", description: "Player boot test failed.", blocksCompletion: true }]);
+  });
+
+  it("raises a blocking issue when content isn't displaying", () => {
+    const issues = detectAutoIssues({ ...completeValues, content_displaying: "fail" });
+    expect(issues).toEqual([
+      { severity: "high", description: "Content not displaying on screen.", blocksCompletion: true },
+    ]);
+  });
+
+  it("raises both when both checks fail", () => {
+    const issues = detectAutoIssues({ ...completeValues, player_boot_test: "fail", content_displaying: "fail" });
+    expect(issues).toHaveLength(2);
+    expect(issues.every((i) => i.blocksCompletion)).toBe(true);
+  });
+
+  it("raises a non-blocking issue from the engineer's manual issues_found note", () => {
+    const issues = detectAutoIssues({ ...completeValues, issues_found: true, issue_detail: "Loose cable trunking" });
+    expect(issues).toEqual([{ severity: "medium", description: "Loose cable trunking", blocksCompletion: false }]);
+  });
+
+  it("does not raise a manual issue when issues_found is true but the detail is blank", () => {
+    expect(detectAutoIssues({ ...completeValues, issues_found: true, issue_detail: "   " })).toEqual([]);
+  });
+
+  it("treats 'na' the same as 'pass' — not a failure", () => {
+    expect(detectAutoIssues({ ...completeValues, player_boot_test: "na", content_displaying: "na" })).toEqual([]);
   });
 });

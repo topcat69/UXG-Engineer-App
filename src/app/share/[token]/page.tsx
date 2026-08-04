@@ -44,10 +44,16 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
 
   const { data: job } = await supabase
     .from("jobs")
-    .select("job_number, job_type, status, qa_status, scheduled_start, site:sites(name)")
+    .select("job_number, job_type, status, qa_status, scheduled_start, completion_pdf_url, site:sites(name)")
     .eq("id", link.job_id)
     .single();
   if (!job) notFound();
+
+  let reportUrl: string | null = null;
+  if (job.completion_pdf_url) {
+    const { data } = await supabase.storage.from("media").createSignedUrl(job.completion_pdf_url, SIGNED_URL_TTL_SECONDS);
+    reportUrl = data?.signedUrl ?? null;
+  }
 
   let photos: { slot: string; url: string }[] = [];
   if (job.qa_status === "approved" && job.job_type === "install") {
@@ -81,22 +87,32 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
       </div>
 
       {job.qa_status === "approved" ? (
-        photos.length > 0 && (
-          <section className="flex flex-col gap-2">
-            <h2 className="font-medium">Completion photos</h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {photos.map((photo) => (
-                // eslint-disable-next-line @next/next/no-img-element -- signed, time-limited URLs; not worth Next/Image's remote-pattern config for a public one-off page.
-                <img
-                  key={photo.slot}
-                  src={photo.url}
-                  alt={photo.slot.replace("photo_", "").replace(/_/g, " ")}
-                  className="aspect-square rounded-md border object-cover"
-                />
-              ))}
-            </div>
-          </section>
-        )
+        <>
+          {reportUrl && (
+            <a
+              href={reportUrl}
+              className="border-input w-fit rounded-md border px-3 py-1.5 text-sm underline hover:bg-accent"
+            >
+              Download completion report (PDF)
+            </a>
+          )}
+          {photos.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <h2 className="font-medium">Completion photos</h2>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {photos.map((photo) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- signed, time-limited URLs; not worth Next/Image's remote-pattern config for a public one-off page.
+                  <img
+                    key={photo.slot}
+                    src={photo.url}
+                    alt={photo.slot.replace("photo_", "").replace(/_/g, " ")}
+                    className="aspect-square rounded-md border object-cover"
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       ) : (
         <p className="text-muted-foreground text-sm">The completion report will appear here once this job passes QA.</p>
       )}
