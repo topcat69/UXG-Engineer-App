@@ -712,6 +712,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      adjust_media_pending: {
+        Args: { p_delta: number; p_job_id: string }
+        Returns: undefined
+      }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]

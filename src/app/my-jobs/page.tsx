@@ -1,17 +1,17 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { FieldApp } from "@/components/field/field-app";
 
-export default async function MyJobsPlaceholder() {
+// This is the field app's ONLY route. Everything inside it — job list, job
+// workflow, the outbox screen — is client-side view state, not separate
+// Next.js routes. That's deliberate: App Router soft-navigation fetches a
+// per-URL RSC payload over the network, which would fail offline for any
+// route not already cached. One page, cached once after the first online
+// visit (see public/sw.js), means the whole offline workflow never depends
+// on a second network round trip to the Next.js server.
+export default async function MyJobsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-2 p-4 text-center">
-      <h1 className="text-xl font-semibold">Hi {user.name}</h1>
-      <p className="text-muted-foreground max-w-sm">
-        The field app (offline job list, forms, photos, signatures) is built in Phase 3. Nothing
-        here yet.
-      </p>
-    </main>
-  );
+  return <FieldApp user={user} />;
 }

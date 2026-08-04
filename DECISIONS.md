@@ -275,3 +275,192 @@ sign-in land on `/` with no session instead of erroring loudly.
   still an app-layer concern, now partially addressed by the specific
   actions built this phase (bulk-schedule, approve, reject, drag-reschedule)
   rather than a general state-machine guard
+
+## Phase 3 — Field PWA, offline
+
+The build script itself calls this phase "the whole build" — offline sync
+either works or it doesn't — so it got the most scrutiny of any phase so
+far, including two real concurrency bugs found only by running the actual
+acceptance test (an airplane-mode Playwright run) repeatedly, not by a
+single pass.
+
+**Hand-rolled service worker, not a library.** `@serwist/next` (the
+Turbopack-compatible successor to `next-pwa`) still shells out to a
+webpack plugin under the hood, and Turbopack — Next 16's default bundler —
+doesn't support webpack plugins at all (confirmed against
+`node_modules/next/dist/docs/01-app/03-api-reference/08-turbopack.md`, per
+`AGENTS.md`'s instruction to check the vendored docs before assuming
+anything about this Next.js). `public/sw.js` is plain JS: install/activate
+precache the app shell, fetch does networkFirst for navigations,
+staleWhileRevalidate for static assets, and — critically — never
+intercepts cross-origin requests (`if (url.origin !== self.location.origin)
+return`), so every Supabase call (auth, REST, storage) reaches the network
+directly rather than through a cache layer that doesn't understand it.
+`/my-jobs` is deliberately excluded from the install-time precache list
+(it's auth-gated; precaching it would cache whatever an unauthenticated
+visitor's redirect produced) and relies on runtime networkFirst caching
+after the first authenticated visit instead. The manifest uses Next's
+built-in `app/manifest.ts` convention rather than a static JSON file.
+
+**`src/proxy.ts`'s matcher had to explicitly exclude `sw.js` and
+`manifest.webmanifest`** — both were being redirected to `/login` by the
+auth proxy, silently breaking service worker registration and PWA
+installability with no error in the console.
+
+**Single-page field app, not per-route navigation.** `/my-jobs` is a thin
+Server Component that resolves the user and hands off to one client
+component (`FieldApp`) that switches between list/job/outbox views via
+internal React state, never a Next.js route change. App Router route
+transitions fetch an RSC payload from the server; that fetch fails offline
+even with a service worker precaching the shell, because RSC payloads
+aren't static assets. A single client-rendered route sidesteps the
+question entirely — once the shell and its JS bundle are cached, every
+subsequent "navigation" is just a state update.
+
+**Dexie schema mirrors the server tables it syncs**, plus two
+offline-only tables: `outbox` (mutation queue) and `mediaQueue` (upload
+queue), kept separate per PROMPT.md's instruction that media must never
+block submission. `outbox` is typed as a plain `Table<OutboxOperation,
+string>` rather than Dexie's `EntityTable` — the latter's insert-type
+helper doesn't distribute over a discriminated union, which TypeScript
+surfaced immediately as a real type error, not a style complaint.
+
+**Sync-down protects in-flight local edits.** `syncDown()` refuses to
+overwrite any job that still has pending outbox operations, so a
+server pull triggered by, say, the 30s timer can't clobber a form the
+engineer is mid-way through filling in offline. `jobIdsSafeToOverwrite()`
+is a pure function specifically so this logic is unit-testable without a
+database.
+
+**Foreground retry loop, not Background Sync API.** Safari has no
+Background Sync API, and PROMPT.md's iOS section treats that as a hard
+constraint, not an edge case — so the retry loop (mount, `visibilitychange`,
+`online` event, 30s interval, **plus an eager trigger after every
+mutation** via an `onMutated` callback threaded through the component
+tree) has to be the baseline everywhere, not a fallback layered on top of a
+"real" background sync for Android. Background Sync as an
+Android-only progressive enhancement was considered and deliberately
+skipped — it would mean two different sync-triggering code paths to keep
+correct, for a benefit (sync while the tab is fully closed) PROMPT.md
+doesn't ask for.
+
+**`useSyncExternalStore`, not `useEffect` + `setState`,** for the
+install-prompt component's client-only browser state (`beforeinstallprompt`
+capture, standalone-display-mode detection) — reading browser-only state
+into React state via an effect is the exact anti-pattern
+`useSyncExternalStore` exists to replace, and the lint rule caught it.
+
+**`useWebWorker: false` for `browser-image-compression`.** With the
+worker enabled, photo capture hung indefinitely in this sandbox (no error,
+no timeout, just a permanently spinning capture button) — reproduced
+consistently, fixed immediately by disabling the worker. Kept as the
+permanent setting: compressing one photo at a time on the main thread is
+fast enough that the UI-blocking cost is imperceptible, and it removes an
+entire class of worker-environment flakiness for a benefit (not blocking
+the main thread) that doesn't matter at this scale.
+
+**GPS captured only at check-in, check-out, and media capture** — never
+on a timer, never in the background — per PROMPT.md's non-negotiable rule.
+There is no code path that calls `getCurrentPosition()` outside those three
+actions.
+
+### Two real concurrency bugs, found by repeated runs of the actual acceptance test
+
+PROMPT.md's Phase 3 "done when" is explicit: run the airplane-mode
+Playwright test, and also expect it to survive a force-quit and resync
+correctly on reconnect. The first full pass of that test went green — and
+then failed on the second run, and the third, in a way a single run would
+never have caught. Both root causes turned out to be genuine bugs in the
+sync design, not test flakiness, and both were found by adding temporary
+`console.log` tracing into the browser (captured via Playwright's
+`page.on("console")`) and reading the actual interleaving of events rather
+than guessing from the symptom.
+
+**Bug 1 — `media_pending`'s absolute `SET` raced against its own eager
+decrements.** `submitJob()` originally wrote `media_pending: N` (an
+absolute count) into a `job_patch` outbox operation. But photos upload —
+and decrement `media_pending` — as soon as they're captured, well before
+Submit is tapped, because uploads are eager by design. Whenever the outbox
+queue's `job_patch(submit)` and the media queue's per-photo decrements
+interleaved in the "wrong" order (which a reconnect mid-drain made easy to
+trigger), the absolute `SET` would stomp decrements that had already
+landed, permanently overcounting `media_pending` on the server. Fixed by
+making it a pure delta counter instead of ever assigning an absolute
+value: `enqueuePhoto`/`enqueueSignature` now queue a `+1`
+(`media_pending_delta` outbox op, applied via a new `adjust_media_pending`
+Postgres RPC) at capture time, and `drainMediaQueue` still applies `-1` at
+upload time; addition and subtraction commute regardless of arrival order,
+so the final total is correct no matter how the two independent queues
+interleave. (An intermediate fix — making just the decrement atomic via a
+single `UPDATE ... SET media_pending = media_pending - 1` RPC instead of a
+JS-level read-then-write — is still in place for the decrement side, and
+was a real improvement on its own, but wasn't sufficient by itself: it
+fixed decrement-vs-decrement races but not decrement-vs-`SET` races. Both
+migrations are kept, in order, in `supabase/migrations/`, as the honest
+record of how the fix evolved.) `media_pending` is deliberately allowed to
+go transiently negative between an early decrement and its matching
+increment arriving — clamping it at 0 (the first migration's approach) is
+exactly what discarded the "debt" that made the bug possible; nothing in
+the UI reads the raw server value, so a transient negative is invisible
+end-to-end.
+
+**Bug 2 — same-millisecond outbox operations have no defined replay
+order.** `submitJob()` builds three outbox operations
+(`install_form_upsert`, `job_patch`, `status_event`) from a single
+`now = new Date()`, and the drain loop replays them in `createdAt` order.
+Three ops built from the same timestamp collide on the same millisecond,
+and Dexie has no defined tiebreak for equal keys — it replayed them
+out of insertion order often enough to reproduce. When `status_event`
+(which flips the job to `status = 'submitted'`) landed before
+`install_form_upsert`, the RLS policy on `install_forms` — which
+correctly blocks engineers from writing forms on a submitted job — rejected
+the form write, permanently: the operation stayed queued, retried forever,
+and failed the same way every time, since the job's server-side status
+never reverts. Fixed by stamping causally-dependent ops within one batch
+with strictly increasing timestamps (`now`, `now+1ms`, `now+2ms` via a
+`batchTimestamps()` helper) instead of relying on wall-clock resolution to
+happen to be fine — the same fix was applied to `checkIn()`'s two ops for
+consistency, even though that pair doesn't have a causal dependency today.
+This is a sharper instance of the general lesson from Bug 1: anywhere the
+sync design relies on ordering, the ordering has to be *guaranteed*, not
+merely usual.
+
+**Verification:** after both fixes, the full Playwright suite (office +
+offline specs together, matching how the bugs actually surfaced) was run
+eight consecutive times against a freshly reset database with zero
+failures, including runs targeted specifically at the offline spec alone
+to maximize repetitions in the time available.
+
+**Also fixed along the way, smaller:**
+- A `fixed`-positioned storage-onboarding banner intercepted clicks on the
+  submit button rendered beneath it — found by a Playwright timeout
+  ("intercepts pointer events"), fixed by letting it flow in-line instead
+  of overlaying.
+- `drainMediaQueue` only decremented `media_pending` for photos, not
+  signatures, because the decrement call was originally inside the
+  photo-only branch of an if/else instead of after it.
+- `db.mediaQueue.orderBy("capturedAt")` threw a `DexieError` —
+  `capturedAt` isn't an indexed field in the schema. Fixed by fetching and
+  sorting in JS instead of asking Dexie to sort an unindexed column.
+- Clicking "Retry now" while a sync was already in flight silently did
+  nothing, because the `runningRef` guard just returned early. Fixed with
+  a `rerunRequestedRef` flag so a deliberate retry always gets a fresh
+  attempt once the in-flight run finishes, instead of being dropped.
+- Playwright's `page.mouse` API doesn't auto-scroll like locator actions
+  do — the signature canvas was below the fold, so raw mouse events at a
+  stale bounding box drew nothing. Fixed by calling
+  `canvas.scrollIntoViewIfNeeded()` before reading `boundingBox()`.
+
+**Not done in Phase 3, deliberately deferred:**
+- Background Sync API as an Android progressive enhancement (see above)
+- Survey form UI (only the install form was built out — `survey_forms` has
+  its Dexie table and outbox operation type ready, but no field UI yet)
+- Issue-raising UI in the field (the `issue_insert` outbox operation type
+  exists; nothing in the field app creates one yet)
+- Real on-device testing on a mid-range Android phone, which PROMPT.md
+  explicitly asks for and this sandbox cannot do. Substituted with the
+  closest available equivalent: real Chromium, real network-level offline
+  (`context.setOffline`, not request mocking), against the actual local
+  Supabase stack, run repeatedly enough to catch two genuine concurrency
+  bugs that a single manual pass on a phone would have had no better odds
+  of catching than a single automated run did.
