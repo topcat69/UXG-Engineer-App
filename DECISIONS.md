@@ -800,3 +800,134 @@ that a dev-only check could have missed entirely.
 - Issue resolution workflow (marking an issue's `status` from `open` to
   `resolved`, setting `resolved_at`) — issues exist and are visible on the
   job detail page, but nothing in the UI transitions that field yet.
+
+## Phase 6 — Dashboard
+
+**Realtime via `postgres_changes`, not a polling interval.** The publication
+(`supabase_realtime`) is empty by default in a fresh Supabase project, so
+`jobs` and `issues` are added to it explicitly, with `replica identity
+full` on both (`supabase/migrations/20260113000000_realtime.sql`) — without
+it, `UPDATE`/`DELETE` payloads only carry the primary key, not the changed
+columns the dashboard actually recomputes from. Every subscriber still
+goes through the same RLS policies as any other read (Realtime evaluates
+`postgres_changes` per-subscriber against their JWT), so this adds no new
+access surface — a subscriber only receives change events for rows they
+could already `select`.
+
+**On any change, the dashboard refetches in full rather than patching the
+changed row in place.** All six metrics are derived from the *whole*
+current job/issue set (rates, buckets, per-engineer counts), so a
+single-row patch would still require recomputing every metric from the
+full in-memory set regardless — the only thing a patch would save is one
+network round trip, and at this app's stated scale (500 jobs, 8 engineers)
+that round trip is comfortably inside the two-second budget PROMPT.md
+sets. Simpler code, no cost that matters here.
+
+**Metric functions are pure and colocated in one file
+(`src/lib/dashboard/metrics.ts`), independent of the Supabase fetch.**
+Same pattern as every prior phase's business logic (form validation,
+outbox conflict resolution, PDF hash manifest) — every rate, average, and
+bucket count is unit tested against plain in-memory arrays, no database
+required to prove the arithmetic is right.
+
+**Real bug, caught by the phase's own E2E test, not by code review:**
+`computeCompletedVsScheduled`'s first version counted "scheduled" as any
+job with a `scheduled_start` set and a non-terminal-looking status, but
+didn't exclude `status === "closed"`. A job keeps its `scheduled_start` on
+file after closing, so a job moving scheduled → closed was incrementing
+`completed` without decrementing `scheduled` — the two numbers weren't
+actually mutually exclusive despite the UI presenting them as two sides of
+one total. The Phase 6 E2E test (below) asserts the two counts move in
+*opposite* directions on a single status change, which is what caught it:
+first run showed the tile stuck on a stale reading for the full two-second
+window, and temporary debug logging showed Realtime itself was working
+fine (`channel status SUBSCRIBED`, the `UPDATE` event fired, a refetch
+happened) — the bug was purely in the metric's own math, not the pipeline
+around it. Fixed by making `completed` and `scheduled` explicitly
+exclusive (`scheduled` now also excludes `status === "closed"`), with two
+new unit tests pinning exactly this behavior so it can't regress silently.
+This is the fourth real bug this build has caught specifically by
+insisting on end-to-end verification against real infrastructure rather
+than trusting code review alone (after Phase 3's media-pending race,
+Phase 3's outbox ordering bug, and Phase 5's pdfkit/Turbopack bundling
+bug).
+
+**Drill-through uses a shared `ids` query param, computed client-side from
+data already in memory, not a server-side join-filter query.** Every chart
+click needs to land on the jobs list pre-filtered to exactly the rows
+behind that bar/segment (e.g. "these 6 issues' jobs" for a revisit-cause
+bar, or "issues open 8–14 days" for an age bucket). Expressing "jobs whose
+id is in this issue-derived set" as a single PostgREST query means
+filtering on a related table's aggregated result, which PostgREST's
+embedded-resource filters don't support cleanly. Since the dashboard
+already has the full job/issue set in memory to draw the chart in the
+first place, computing the exact matching job IDs client-side and passing
+them as `?ids=a,b,c` is simpler and exactly as correct — the jobs list
+page and the CSV export route both parse that `ids` param through the same
+shared filter module (below), so there's no second definition of "which
+jobs does this filter mean" to drift from the first.
+
+**Jobs-list filtering and CSV export share one parsing/query module
+(`src/lib/jobs/list-query.ts`)**, used identically by the interactive jobs
+list page and by `/api/export/jobs`. This guarantees "export this filtered
+list" always matches what's on screen — there is exactly one definition of
+what a given combination of filters means, not two that a future change
+could accidentally desync.
+
+**CSV export needed an explicit auth check that the page-level middleware
+doesn't give it.** `/api/*` routes are in `proxy.ts`'s public paths (by
+design — the webhook, cron, and ICS routes living there authenticate
+themselves some other way), so an unauthenticated request to
+`/api/export/jobs` doesn't get redirected to `/login` the way a page
+request would. Without a check, that request instead reached a real
+Postgres query, whose `anon` role has zero table grants by design (see
+`grants.sql`) — so access was never actually possible, but the response
+was a raw `"permission denied for table jobs"` 500, not a clean 401. Fixed
+with an explicit `getCurrentUser()` check at the top of the route. Not a
+security fix (RLS/grants already made the boundary correct); a correctness
+fix for what an unauthenticated caller sees.
+
+**Papa Parse quirk: `unparse()` silently drops the header row for an empty
+result set if given a plain array with a `columns` option** — its
+zero-length-input code path ignores `columns` entirely. Fixed by passing
+the `{fields, data}` object form instead, which does respect `fields` even
+when `data` is empty, so a filtered export with zero matching rows still
+downloads a CSV with just the header line rather than an empty file.
+
+**Testing.** All six metric functions are unit tested against plain
+in-memory arrays (`src/lib/dashboard/metrics.test.ts`), including the two
+tests added specifically to pin the completed-vs-scheduled fix above. The
+CSV builder and the filter-parsing module each have their own unit tests.
+The Playwright test (`tests/e2e/phase6-dashboard-realtime.spec.ts`) proves
+PROMPT.md's exact "Done when" sentence: a status change made directly via
+the admin client (standing in for "a phone" — the field app's own write
+path is already covered end-to-end by the Phase 3 and 5 specs) must appear
+on an already-open dashboard within two seconds with no page reload. The
+"no reload" half is checked with a JS global (`window.__noReload`) set
+after the page loads — a full reload would reset it, an in-place
+Realtime-driven re-render wouldn't. Full suite (all six specs) run
+multiple times consecutively against a freshly reset database with zero
+failures.
+
+**A genuine local-dev-only timing wrinkle, not an app bug:** immediately
+after a fresh `supabase db reset`, Realtime's replication connection for a
+tenant is created lazily on the first subscribe and takes a few seconds to
+come fully online (confirmed via `docker logs`: several seconds between
+"Starting stream replication" and the tenant reporting ready) — a one-time
+cold-start cost specific to a database that was just recreated from
+scratch, not something a real dashboard user, whose Realtime connection
+has been open for a while, would ever see. Firing a single untimed change
+before the timed assertion can still race that startup and get silently
+dropped, so the E2E test retries a harmless warm-up write every second
+until the dashboard visibly reacts, then proceeds to the real, strictly-timed
+assertion. This only affects test setup — it does not touch, and does not
+excuse, the two-second budget the actual assertion enforces.
+
+**Not done in Phase 6, deliberately deferred:**
+- No date-window scoping on the dashboard's queries (it fetches every
+  non-draft job and every issue). PROMPT.md's stated scale (500 jobs, 8
+  engineers) stays comfortably fast unscoped; adding a window would be
+  solving a performance problem this app doesn't have yet.
+- Metrics recompute from a full refetch on every change rather than a
+  true incremental/streaming update — see the rationale above. Revisit
+  if this app's scale assumptions ever change materially.

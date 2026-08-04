@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
+import { applyJobListFilters, hasAnyFilter, parseJobListFilters, type JobListSearchParams } from "@/lib/jobs/list-query";
 import { JobsTable, type JobRow } from "./jobs-table";
 
 const PAGE_SIZE = 50;
@@ -21,39 +22,30 @@ const JOB_STATUSES: Database["public"]["Enums"]["job_status"][] = [
 ];
 const JOB_TYPES = ["install", "survey"];
 
-type SearchParams = Record<string, string | string[] | undefined>;
-
-function param(searchParams: SearchParams, key: string): string {
+function param(searchParams: JobListSearchParams, key: string): string {
   const value = searchParams[key];
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
 
-export default async function JobsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+export default async function JobsPage({ searchParams }: { searchParams: Promise<JobListSearchParams> }) {
   const sp = await searchParams;
-  const status = param(sp, "status");
-  const jobType = param(sp, "job_type");
-  const projectId = param(sp, "project_id");
-  const assignedTo = param(sp, "assigned_to");
-  const q = param(sp, "q");
+  const filters = parseJobListFilters(sp);
+  const { status, jobType, projectId, assignedTo, q } = filters;
   const page = Math.max(1, Number(param(sp, "page")) || 1);
 
   const supabase = await createClient();
 
-  let query = supabase
-    .from("jobs")
-    .select(
-      "id, job_number, job_type, status, priority, scheduled_start, assigned_to, site:sites(name), project:projects(name), assigned:users!jobs_assigned_to_fkey(name)",
-      { count: "exact" },
-    )
-    .order("created_at", { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
-
-  if (status) query = query.eq("status", status as Database["public"]["Enums"]["job_status"]);
-  if (jobType) query = query.eq("job_type", jobType);
-  if (projectId) query = query.eq("project_id", projectId);
-  if (assignedTo === "unassigned") query = query.is("assigned_to", null);
-  else if (assignedTo) query = query.eq("assigned_to", assignedTo);
-  if (q) query = query.ilike("job_number", `%${q}%`);
+  const query = applyJobListFilters(
+    supabase
+      .from("jobs")
+      .select(
+        "id, job_number, job_type, status, priority, scheduled_start, assigned_to, site:sites(name), project:projects(name), assigned:users!jobs_assigned_to_fkey(name)",
+        { count: "exact" },
+      )
+      .order("created_at", { ascending: false })
+      .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
+    filters,
+  );
 
   const [{ data: jobs, count, error }, { data: projects }, { data: engineers }] = await Promise.all([
     query,
@@ -67,12 +59,22 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
 
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const exportParams = new URLSearchParams(sp as Record<string, string>);
+  exportParams.delete("page");
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Jobs</h1>
-        <span className="text-muted-foreground text-sm">{total} total</span>
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground text-sm">{total} total</span>
+          <a
+            href={`/api/export/jobs?${exportParams.toString()}`}
+            className="border-input rounded-md border px-3 py-1 text-sm hover:bg-accent"
+          >
+            Export CSV
+          </a>
+        </div>
       </div>
 
       <form className="flex flex-wrap items-end gap-2" method="get">
@@ -167,7 +169,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         >
           Filter
         </button>
-        {(status || jobType || projectId || assignedTo || q) && (
+        {hasAnyFilter(filters) && (
           <Link href="/office/jobs" className="text-sm text-muted-foreground underline">
             Clear
           </Link>

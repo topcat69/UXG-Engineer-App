@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireOfficeUser } from "@/lib/auth/current-user";
 
 const NAV = [
+  { href: "/office/dashboard", label: "Dashboard" },
   { href: "/office/jobs", label: "Jobs" },
   { href: "/office/scheduler", label: "Scheduler" },
   { href: "/office/qa", label: "QA Queue" },
