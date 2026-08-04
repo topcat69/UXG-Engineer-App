@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -53,7 +54,10 @@ export async function cancelJob(jobId: string, reason: string): Promise<ActionRe
     reason: reason.trim() || undefined,
   });
 
-  await removeCalendarForJob(supabase, jobId);
+  // Best-effort and scheduled via after(), not awaited — see bulkScheduleJobs
+  // in ../actions.ts for why a real Calendar API round trip shouldn't sit
+  // between a manager clicking "Cancel" and seeing it take effect.
+  after(() => removeCalendarForJob(supabase, jobId));
 
   revalidatePath(`/office/jobs/${jobId}`);
   revalidatePath("/office/jobs");

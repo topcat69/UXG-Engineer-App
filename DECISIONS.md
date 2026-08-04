@@ -668,6 +668,77 @@ failures.
   degrades to "will follow separately" while it's null, rather than being
   half-built.
 
+**Addendum, 2026-08-04 — live credential verification.** A real Google
+service-account key (`engineerapp-504512`) was provided for a final
+end-to-end review. Wiring it in (`GOOGLE_SERVICE_ACCOUNT_KEY` in
+`.env.local`, gitignored, never committed) surfaced two real things worth
+recording — one a genuine gap, one a genuine bug this phase's "no-op when
+unconfigured" design had been hiding.
+
+**1. Impersonation was made optional, not just required-or-absent.**
+`getCalendarClient`/`getDriveClient` originally required *both*
+`GOOGLE_SERVICE_ACCOUNT_KEY` and `GOOGLE_CALENDAR_IMPERSONATE_EMAIL` —
+domain-wide delegation was the only supported auth mode. The credentials
+provided came with no Workspace admin console access to authorize
+delegation, so there was no impersonation target to give it. Since a
+service account can authenticate as itself and act on its own
+`primary` calendar/Drive access with zero Workspace configuration,
+`subject: impersonate || undefined` now supports that mode too —
+`GOOGLE_SERVICE_ACCOUNT_KEY` alone is enough to attempt a real API call;
+`GOOGLE_CALENDAR_IMPERSONATE_EMAIL` upgrades that to domain-wide
+delegation against a real human's calendar when it's set. Both modes go
+through the identical `sync-logic.ts`/`syncEvent` code — this only
+changes how the JWT authenticates, not what it does afterward.
+
+**Result: real, end-to-end proof the integration code itself is
+correct.** Scheduling a real job through the real office UI reached
+`https://www.googleapis.com/calendar/v3/calendars/primary/events` with a
+correctly-signed JWT and a correctly-shaped event body (confirmed from
+the request body logged during the attempt: right summary, right
+location, right start/end). It failed with a real, specific, actionable
+403 — `Google Calendar API has not been used in project 747029768261 ...
+Enable it by visiting [console link]` — the *same* result for Drive
+(`... Google Drive API has not been used ...`). Both are a **Google Cloud
+project configuration gap** (the Calendar/Drive APIs haven't been
+enabled), not a code defect — the auth, request-shaping, and event
+lifecycle logic all did exactly what they were supposed to. Closing this
+gap needs the project owner to enable both APIs in that Cloud project's
+console (the exact links are in the error messages), and, for a real
+office deployment, either domain-wide delegation set up properly or a
+specific calendar/Drive folder explicitly shared with
+`engineering@engineerapp-504512.iam.gserviceaccount.com` as an editor.
+
+**2. Real bug, caught only because a real (slow) API call finally
+existed to catch it: bulk actions awaited Calendar/email sync before
+responding, contradicting their own documented "never blocking"
+contract.** `bulkAssignJobs`, `bulkScheduleJobs`, `cancelJob`, and
+`rescheduleJob` all `await`ed their `syncCalendarForJob`/
+`sendJobAssignedEmail`/`removeCalendarForJob` calls before returning to
+the browser. With no credentials configured, `getCalendarClient()`
+returned `null` instantly, so this was invisible — a no-op resolves in
+microseconds regardless of whether it's awaited. The instant real
+credentials existed, those calls became real, latent network round trips
+to Google, and bulk-scheduling 50 jobs at once (the Phase 2 E2E test's
+own scenario) pushed the response past the test's 15-second UI-timeout
+assertion — confirmed twice, not a flake, and confirmed *not* a
+correctness bug either: a direct query showed all 50 jobs had genuinely
+landed as `scheduled` in the database every time, just after the browser
+had already given up waiting for the toast. At PROMPT.md's stated scale
+(500 jobs), this would have meant an office user's browser sitting on a
+loading state for however long 500 real Google API round trips take —
+exactly the kind of degradation the phase's own "never blocking" design
+principle was written to prevent, and would have kept prevented for
+*correctness* while quietly failing to prevent for *latency*. Fixed with
+Next's `after()` (`next/server`) at all four call sites — schedules the
+same best-effort, already-self-error-handling functions to run once the
+response has already been sent, rather than gating the response on them.
+`after()` still guarantees the work actually completes (up to the
+platform's request-duration limit) rather than being a bare
+fire-and-forget that a serverless runtime could kill mid-flight.
+**Re-verified for real after the fix**: the same bulk-schedule of 50 jobs
+that previously blew the 15-second assertion now completes in 6–10
+seconds, run twice consecutively with no failures.
+
 ## Phase 5 — Issues, revisits, reports
 
 **Issue automation reuses the Phase 3 outbox and Phase 4 webhook patterns

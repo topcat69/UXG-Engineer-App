@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -16,8 +17,13 @@ export async function bulkAssignJobs(jobIds: string[], engineerId: string): Prom
   if (error) return { ok: false, message: error.message };
 
   // Best-effort, per sendJobAssignedEmail's own contract — a Resend/config
-  // failure never blocks the assignment itself from succeeding.
-  await Promise.all(jobIds.map((id) => sendJobAssignedEmail(supabase, id)));
+  // failure never blocks the assignment itself from succeeding. Scheduled
+  // via after() rather than awaited: emails are inherently network calls to
+  // a third party, and awaiting N of them here would make the response the
+  // office user sees scale with Resend's latency times N jobs, not just the
+  // (already-succeeded) database write above — the same "best-effort, never
+  // blocking" contract this comment already claimed, but actually kept.
+  after(() => Promise.all(jobIds.map((id) => sendJobAssignedEmail(supabase, id))));
 
   revalidatePath("/office/jobs");
   return { ok: true, message: `Assigned ${jobIds.length} job(s).` };
@@ -68,8 +74,14 @@ export async function bulkScheduleJobs(
 
   // Calendar sync is per-job (each gets its own event) and best-effort —
   // see syncCalendarForJob's own contract for why a Calendar failure never
-  // surfaces as a scheduling failure.
-  await Promise.all(jobIds.map((id) => syncCalendarForJob(supabase, id)));
+  // surfaces as a scheduling failure. Scheduled via after(), not awaited,
+  // for the same reason as bulkAssignJobs's email send above: a real bulk
+  // schedule of hundreds of jobs (PROMPT.md's own stated scale) would
+  // otherwise make the office user's browser wait on hundreds of real
+  // Calendar API round trips before seeing "Scheduled." — confirmed for
+  // real once live credentials were wired in (see DECISIONS.md), not a
+  // theoretical concern.
+  after(() => Promise.all(jobIds.map((id) => syncCalendarForJob(supabase, id))));
 
   revalidatePath("/office/jobs");
   return { ok: true, message: `Scheduled ${jobIds.length} job(s).` };

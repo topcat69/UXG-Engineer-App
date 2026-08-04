@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -92,13 +93,18 @@ export async function rescheduleJob(
   // Reschedule must PATCH the same calendar event, not create a second one —
   // syncCalendarForJob's create-vs-patch branch on calendar_event_id handles
   // that; this is the "most common failure of this integration" per spec if skipped.
-  await syncCalendarForJob(supabase, jobId);
+  // Scheduled via after(), not awaited — a drag-and-drop should feel instant,
+  // not wait on a real Calendar API round trip (confirmed real, not
+  // theoretical, once live credentials were wired in — see DECISIONS.md).
+  after(async () => {
+    await syncCalendarForJob(supabase, jobId);
 
-  // Only a genuine reassignment gets an email — dragging a job to a new day
-  // within the same engineer's lane shouldn't spam them.
-  if (targetEngineerId && targetEngineerId !== job.assigned_to) {
-    await sendJobAssignedEmail(supabase, jobId);
-  }
+    // Only a genuine reassignment gets an email — dragging a job to a new day
+    // within the same engineer's lane shouldn't spam them.
+    if (targetEngineerId && targetEngineerId !== job.assigned_to) {
+      await sendJobAssignedEmail(supabase, jobId);
+    }
+  });
 
   revalidatePath("/office/scheduler");
   revalidatePath("/office/jobs");
