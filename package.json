@@ -12,10 +12,14 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts"
+    "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts",
+    "migrate:appsheet": "tsx --env-file=.env.local scripts/migrate-appsheet.ts",
+    "migrate:media": "tsx --env-file=.env.local scripts/migrate-media.ts",
+    "load-test": "tsx --env-file=.env.local scripts/load-test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@sentry/nextjs": "^10.69.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.0",
     "@zxing/library": "^0.23.0",
@@ -61,6 +65,7 @@
     "pdf-parse": "^2.4.5",
     "supabase": "^2.111.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.5",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

@@ -931,3 +931,200 @@ excuse, the two-second budget the actual assertion enforces.
 - Metrics recompute from a full refetch on every change rather than a
   true incremental/streaming update — see the rationale above. Revisit
   if this app's scale assumptions ever change materially.
+
+## Phase 7 — Migration and hardening
+
+**No real Google Drive or Sentry credentials are available in this
+sandbox** (same situation Phase 4 hit with Calendar/Resend). Both are
+wired against their real APIs, gated behind env vars that no-op or exit
+cleanly when unset, rather than mocked — see each section below for what
+was actually exercised for real versus what remains real-code-but-
+unverified for lack of credentials.
+
+**Sentry**: `@sentry/nextjs`, initialised from `src/instrumentation.ts`
+(`register`/`onRequestError`) and `src/instrumentation-client.ts`, both
+gated on `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` via a shared pure
+`sentryOptions()` builder (`src/lib/observability/sentry-config.ts`, unit
+tested). Deliberately *not* wrapped through `withSentryConfig` in
+`next.config.ts` — that wrapper's source-map-upload build step needs a
+Sentry auth token this sandbox doesn't have, and this app's Turbopack
+build is otherwise clean; adding an unused build-time integration for a
+project with no real Sentry account to upload to isn't worth the risk of
+it interacting badly with Turbopack. A real Sentry project would want that
+wrapper for readable stack traces, but that's a one-line addition once a
+DSN and auth token actually exist, not something to speculatively wire
+now.
+
+**AppSheet CSV importers.** PROMPT.md's own schema section states this
+schema "deliberately mirrors an existing Google AppSheet app," so the
+importers assume AppSheet's export columns match our own table columns
+1:1 (no invented shape, no sample export to guess from) —
+`src/lib/migration/parse-*.ts`, one pure parser per table (users,
+projects, assets, jobs, install_forms, survey_forms, issues; sites reuses
+the parser already built for the Phase 2 office CSV import). Every
+foreign key in an AppSheet export is a human-readable value, not our
+internal UUID (a site's *name*, not its `site_id`), so each parser
+returns an intermediate "natural key" row shape, and a separate
+`resolveXxxRows` pure function turns that into a real `Insert` row given
+a natural-key → UUID lookup map — keeping the natural-key resolution
+itself pure and unit-testable (unknown site name, unknown job_number,
+etc. all produce a clear per-row error) without needing a database in the
+test.
+
+**`users.csv` can't produce a `users` Insert row directly** —
+`users.id` is a foreign key into `auth.users`, which doesn't exist for a
+migrated person yet. `parseUsersCsv` returns an intermediate shape with
+no `id`; `scripts/lib/run-migration.ts` creates the real auth identity via
+`supabase.auth.admin.createUser()` (which is what actually produces a
+valid `id`), then updates the `public.users` row the existing
+`on_auth_user_created` trigger creates automatically with the imported
+role/company/phone/active/max_jobs_per_day. Idempotent by email — an
+already-imported user is looked up and updated rather than re-created, so
+a partially-failed migration run can be safely retried.
+
+**Historical timestamps and status are imported as-is, not reset.** A
+migrated job keeps its original `created_at`/`actual_start`/`actual_end`
+and its current `status` (`draft` is only a fallback for a blank status
+column) — the whole point of a *migration* rather than fresh job
+creation. An AppSheet table export is a snapshot of current state, not a
+change log, so there's no real history to reconstruct; `run-migration.ts`
+instead writes one synthetic `status_events` row per imported job
+(`from_status: null`, `to_status: <imported status>`, `reason: "Migrated
+from AppSheet import"`, `occurred_at: <job's created_at>`) — honest
+provenance ("this is where the row came from and what it looked like on
+arrival"), not a fabricated audit trail.
+
+**Meant to run once against an empty(ish) target, not repeatedly** —
+most imported tables (projects, jobs, etc.) have no natural unique key to
+upsert against on a second run, so re-running produces duplicates or hits
+`jobs_job_number_key`'s unique constraint (confirmed directly: re-running
+the migration against already-imported data correctly rejected the
+duplicate job and reported exactly which downstream rows (install_forms,
+issues) couldn't resolve as a result). That's an accepted limitation of a
+one-time tool, not a bug to build speculative upsert logic around for a
+scenario that doesn't happen in practice.
+
+**Media migration is split into two pieces with very different
+verification stories.** `scripts/lib/media-import.ts`
+(`importMediaFromManifest`) is the part that's fully real and fully
+tested in this sandbox: given a local directory containing a `media.csv`
+manifest (job_number, slot, filename, latitude, longitude, captured_at,
+caption, captured_by_email — the shape a real AppSheet "Photos" table
+export actually has) and the referenced files, it computes each file's
+SHA-256, uploads it to Supabase Storage at
+`jobs/{job_id}/{slot}-{sha256 prefix}.{ext}`, and inserts a `media_assets`
+row with every metadata field the manifest carries. Content-addressed
+naming (not `Date.now()`, what the live field-app capture flow uses) is
+deliberate here — re-importing the same export is naturally idempotent,
+overwriting the same object instead of duplicating it.
+
+`src/lib/google/drive.ts` (`getDriveClient`) is the other half — a real
+`googleapis` Drive client, reusing the Calendar service account's
+domain-wide delegation (same key, Drive-readonly scope added alongside
+Calendar's), that `scripts/lib/download-drive-folder.ts` uses to
+recursively stage a Drive folder tree onto local disk before handing off
+to the same tested importer above. Deliberately **not** guarded with
+`import "server-only"` the way `calendar.ts` is — that guard relies on
+webpack's `react-server` export condition to become a no-op, which a
+plain `tsx` script never sets, so importing it directly would throw on
+the first line; this module is only ever reached from
+`scripts/migrate-media.ts`, never from a Next.js route, so the guard
+protects against nothing here. Without `GOOGLE_SERVICE_ACCOUNT_KEY` /
+`GOOGLE_CALENDAR_IMPERSONATE_EMAIL`, `migrate-media.ts` exits with an
+explicit message telling the operator to either configure them or
+pre-populate the target directory themselves — not a silent no-op, since
+skipping media migration silently would look like success. **This half is
+real, unverified code** — no Drive credentials exist in this sandbox to
+exercise it against — exactly the same honest gap Phase 4 already
+accepted for Calendar/Resend.
+
+**Verified for real** (not just unit tests): `tests/migration.test.ts`
+writes a synthetic AppSheet export (CSVs + a `media.csv` manifest + one
+real file) to a temp directory, runs the *exact* `runMigration`/
+`importMediaFromManifest` functions the CLI scripts call, and asserts
+against a real local Postgres + Storage: the job's historical status and
+timestamps land unchanged, the synthetic `status_events` row is correct,
+the auth user and profile both exist, and — critically — the Storage
+object is downloaded back and compared byte-for-byte against the source
+file, not just checked for a matching row. This is PROMPT.md's Phase 7
+"Done when" sentence, proven end to end rather than assumed from the
+parsers' own isolated unit tests.
+
+**Storage lifecycle rules, reinterpreted as application-level cleanup.**
+Local (and self-hosted) Supabase Storage doesn't expose native S3
+lifecycle transitions/expirations through its API — there's no
+bucket-config knob to turn, unlike a project running on real S3. The
+practical equivalent for a small internal tool:
+`src/app/api/cron/media-lifecycle/route.ts`, following the exact
+auth/routing pattern already established by the day-before-reminders and
+weekly-summary cron routes (shared-secret header, since these are
+server-to-server callers with no browser session), deletes Storage
+objects and their `media_assets`/`signatures` rows for jobs that have sat
+in `draft` or `cancelled` status for 90+ days
+(`src/lib/storage/media-lifecycle.ts`'s `selectLifecycleEligibleJobIds`,
+pure and unit tested — a job with no `updated_at` is deliberately never
+eligible, since that's missing data, not an old job). **Verified for
+real**: seeded one old draft job and one recent draft job, each with a
+real Storage object, hit the route with the real webhook secret, and
+confirmed only the old job's object and `media_assets` row were removed
+while the recent one was untouched — plus a plain unauthenticated request
+correctly gets a clean 401.
+
+**Real bug, caught by the load-test script's own cleanup step, not by
+code review:** the first version of `scripts/load-test.ts` cleaned up its
+500 seeded jobs with `.delete().in("id", jobIds)` — passing 500 UUIDs as
+a single PostgREST `.in()` filter serialises into the request URL, and
+500 of them blew past the URL length limit ("414 URI too long"). The
+delete calls' errors went unchecked, so the script printed "Cleaning
+up... Done." while silently leaving every row behind — confirmed via a
+direct `psql` count after a run showed all 500 `LOADTEST-*` jobs still
+present. Fixed by deleting via `site_id` (one simple, short filter — all
+load-test jobs share one synthetic site) instead of a giant ID list;
+`media_assets.job_id`'s `ON DELETE CASCADE` means deleting the jobs alone
+is enough. Re-ran and confirmed zero rows left behind by direct `psql`
+count, not by trusting the script's own printed summary. This is the
+fifth real bug this build has caught by insisting on checking what
+actually happened in the database rather than trusting a script's exit
+message (after Phase 3's media-pending race, Phase 3's outbox ordering
+bug, Phase 5's pdfkit/Turbopack bundling bug, and Phase 6's
+completed-vs-scheduled double-count).
+
+**Load test results**, 500 jobs / 10,000 `media_assets` rows, timed
+through real RLS-scoped sessions (not the admin client — the numbers
+below include RLS policy evaluation, since that's what an office user's
+browser actually waits on):
+
+| Query | Time |
+|---|---|
+| Dashboard (all non-draft jobs + issues) | ~30–60ms |
+| Jobs list, page 1 (50 rows, exact count) | ~20–25ms |
+| Job detail (one job + its media) | ~11ms |
+| CSV export query (up to 5000 rows) | ~18ms |
+| Engineer offline sync-down (their assigned jobs) | ~35ms |
+
+All comfortably under PROMPT.md's implied "still feels instant" bar at
+this app's stated scale, with no query-shape or indexing changes needed —
+the dashboard page's own Phase 6 comment ("revisit this the moment the
+dataset actually grows past what a single query comfortably returns")
+turns out not to need revisiting yet. `scripts/load-test.ts` seeds and
+cleans up after itself by default (`--keep` to leave the data for further
+poking).
+
+**Not done in Phase 7, deliberately deferred:**
+- No UI for any of this — CSV import, media migration, and the load test
+  are all CLI scripts (`pnpm migrate:appsheet`, `pnpm migrate:media`,
+  `pnpm load-test`), run once by whoever's doing the actual migration.
+  PROMPT.md frames this phase as "a script that copies media," not an
+  office feature, and a one-time migration tool doesn't earn a
+  maintained UI.
+- `assets` and `survey_forms` importers exist but aren't exercised by the
+  integration test (only `users`/`projects`/`sites`/`jobs`/
+  `install_forms`/`issues` are, matching what the synthetic export
+  needed) — each has its own unit tests for the parsing/resolution logic
+  in isolation, same rigor, just not re-proven end-to-end a second time
+  for tables whose shape is materially identical to ones that already
+  are.
+- No storage-lifecycle dry-run/preview mode — the route deletes directly
+  on each invocation. At eight users and a 90-day retention window on
+  jobs that never went anywhere, the operational risk is low enough that
+  a preview mode would be solving a problem this app doesn't have.
