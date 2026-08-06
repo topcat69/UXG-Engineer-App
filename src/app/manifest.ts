@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "UXG Engineer Job Schedular",
+    name: "UXG Engineer Job Scheduler",
     short_name: "UXG",
     description: "Field service job management — install forms, photos, signatures, offline.",
     start_url: "/my-jobs",

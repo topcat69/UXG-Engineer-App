@@ -90,5 +90,5 @@ async function sendWithHeaders(resend: Resend, to: string, content: EmailContent
 }
 
 function fromAddress(): string {
-  return process.env.RESEND_FROM_EMAIL || "UXG Engineer Job Schedular <notifications@uxgengineering.example.com>";
+  return process.env.RESEND_FROM_EMAIL || "UXG Engineer Job Scheduler <notifications@uxgengineering.example.com>";
 }

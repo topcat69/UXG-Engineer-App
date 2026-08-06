@@ -90,7 +90,7 @@ class OfflineDB extends Dexie {
   jobTasks!: EntityTable<JobTaskRow, "id">;
 
   constructor() {
-    super("uxg-engineer-job-schedular");
+    super("uxg-engineer-job-scheduler");
     this.version(1).stores({
       jobs: "id, status, assigned_to, scheduled_start, site_id",
       sites: "id",

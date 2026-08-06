@@ -65,7 +65,7 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
   const manifest: ManifestEntry[] = [];
 
   // --- Cover: job details ---
-  doc.fontSize(20).text("UXG Engineer Job Schedular — Completion Report", { align: "center" });
+  doc.fontSize(20).text("UXG Engineer Job Scheduler — Completion Report", { align: "center" });
   doc.moveDown();
   doc.fontSize(14).text(job.job_number);
   doc.fontSize(10).fillColor("#555");

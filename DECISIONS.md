@@ -1348,3 +1348,16 @@ driven `checked` prop lands a tick later, so `.check()` intermittently
 reported "did not change its state" even though it always did, a moment
 later. Fixed with a plain `.click()` followed by a polling
 `expect(...).toBeChecked()`.
+
+## Addendum, 2026-08-06 — "Schedular" → "Scheduler" typo fix
+
+The rebrand above mistakenly spelled the product name "Schedular"
+throughout — every user-visible string, the PWA manifest, the completion
+PDF header, the "from" email display name, the login card, install
+prompts, `package.json`'s `name`, and README. Corrected to "Scheduler"
+everywhere. This included the Dexie offline-database name
+(`uxg-engineer-job-schedular` → `uxg-engineer-job-scheduler`) — an
+identity key, not just a display string, per the note further up about
+what renaming it would mean once a real device has it installed. Same
+conclusion applies here: safe to change outright, since nothing has
+shipped to a real device yet.

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "UXG Engineer Job Schedular",
+  title: "UXG Engineer Job Scheduler",
   description: "Field service job management — install forms, photos, signatures, offline.",
   appleWebApp: {
     capable: true,

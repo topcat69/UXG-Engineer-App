@@ -42,7 +42,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <UxgLogo className="mb-2 h-9 w-auto" />
-          <CardTitle>Engineer Job Schedular</CardTitle>
+          <CardTitle>Engineer Job Scheduler</CardTitle>
           <CardDescription>Sign in with a magic link — no password needed.</CardDescription>
         </CardHeader>
         <CardContent>

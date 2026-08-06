@@ -1,4 +1,4 @@
-# UXG Engineer Job Schedular
+# UXG Engineer Job Scheduler
 
 Field service & job management platform. See `PROMPT.md` for the full spec
 and build phases, and `DECISIONS.md` for the architectural choices made along
