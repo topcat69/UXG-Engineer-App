@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "OPOC",
-    short_name: "OPOC",
+    name: "UXG Engineer Job Schedular",
+    short_name: "UXG",
     description: "Field service job management — install forms, photos, signatures, offline.",
     start_url: "/my-jobs",
     display: "standalone",

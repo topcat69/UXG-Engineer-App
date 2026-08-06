@@ -31,15 +31,15 @@ export function generateIcs(engineerName: string, jobs: IcsJob[]): string {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//OPOC//Field Schedule//EN",
+    "PRODID:-//UXG//Field Schedule//EN",
     "CALSCALE:GREGORIAN",
-    `X-WR-CALNAME:${escapeText(`${engineerName} — OPOC schedule`)}`,
+    `X-WR-CALNAME:${escapeText(`${engineerName} — UXG schedule`)}`,
   ];
 
   for (const job of jobs) {
     lines.push(
       "BEGIN:VEVENT",
-      `UID:job-${job.id}@opoc`,
+      `UID:job-${job.id}@uxgengineering`,
       `DTSTAMP:${now}`,
       `DTSTART:${toIcsDateTime(job.scheduled_start)}`,
       `DTEND:${toIcsDateTime(job.scheduled_end ?? job.scheduled_start)}`,

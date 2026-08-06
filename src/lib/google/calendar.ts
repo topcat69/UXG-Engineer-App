@@ -7,7 +7,7 @@ export type { CalendarJob, CalendarSite, SyncResult };
 export { buildEventPayload, fullSiteAddress } from "./event-payload";
 
 /**
- * One-way, OPOC → Calendar only — this client is never used to read or
+ * One-way, this app → Calendar only — this client is never used to read or
  * accept edits back, only free/busy (for conflict warnings, built
  * separately) and create/patch/delete of events this app itself owns.
  * Two supported auth modes, both via the same GOOGLE_SERVICE_ACCOUNT_KEY:

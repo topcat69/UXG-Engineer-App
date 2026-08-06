@@ -86,7 +86,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
             id="q"
             name="q"
             defaultValue={q}
-            placeholder="OPOC-2026-0001"
+            placeholder="UXG-2026-0001"
             className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
           />
         </div>

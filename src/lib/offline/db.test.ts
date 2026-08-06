@@ -11,7 +11,7 @@ describe("offline db", () => {
   it("stores and retrieves a job", async () => {
     await db.jobs.put({
       id: "job-1",
-      job_number: "OPOC-2026-0001",
+      job_number: "UXG-2026-0001",
       project_id: null,
       site_id: "site-1",
       job_type: "install",
@@ -39,7 +39,7 @@ describe("offline db", () => {
     });
 
     const job = await db.jobs.get("job-1");
-    expect(job?.job_number).toBe("OPOC-2026-0001");
+    expect(job?.job_number).toBe("UXG-2026-0001");
 
     const byStatus = await db.jobs.where("status").equals("dispatched").toArray();
     expect(byStatus).toHaveLength(1);

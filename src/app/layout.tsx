@@ -14,12 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OPOC",
+  title: "UXG Engineer Job Schedular",
   description: "Field service job management — install forms, photos, signatures, offline.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "OPOC",
+    title: "UXG",
   },
   icons: {
     icon: "/icons/icon-192.png",

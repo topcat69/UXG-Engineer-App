@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
+import { UxgLogo } from "@/components/branding/uxg-logo";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
@@ -40,7 +41,8 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>OPOC</CardTitle>
+          <UxgLogo className="mb-2 h-9 w-auto" />
+          <CardTitle>Engineer Job Schedular</CardTitle>
           <CardDescription>Sign in with a magic link — no password needed.</CardDescription>
         </CardHeader>
         <CardContent>

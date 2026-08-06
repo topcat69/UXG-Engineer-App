@@ -7,7 +7,7 @@
  * rather than the only way to reconstruct it.
  */
 export function emailThreadRootId(jobId: string): string {
-  return `<job-${jobId}@opoc.local>`;
+  return `<job-${jobId}@uxgengineering.local>`;
 }
 
 export type EmailHeaders = {
@@ -25,5 +25,5 @@ export type EmailHeaders = {
 export function buildEmailHeaders(jobId: string, isFirstEmailForJob: boolean, freshId: string): EmailHeaders {
   const root = emailThreadRootId(jobId);
   if (isFirstEmailForJob) return { messageId: root };
-  return { messageId: `<${freshId}@opoc.local>`, references: root, inReplyTo: root };
+  return { messageId: `<${freshId}@uxgengineering.local>`, references: root, inReplyTo: root };
 }

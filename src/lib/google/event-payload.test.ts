@@ -14,7 +14,7 @@ const site = {
 
 const job = {
   id: "job-1",
-  job_number: "OPOC-2026-0042",
+  job_number: "UXG-2026-0042",
   scheduled_start: "2026-08-10T09:00:00.000Z",
   scheduled_end: "2026-08-10T11:00:00.000Z",
   calendar_event_id: null,
@@ -32,24 +32,24 @@ describe("fullSiteAddress", () => {
 
 describe("buildEventPayload", () => {
   it("titles the event '{job_number} — {site.name}'", () => {
-    const payload = buildEventPayload(job, site, "https://opoc.example.com");
-    expect(payload.summary).toBe("OPOC-2026-0042 — Riverside Retail Park");
+    const payload = buildEventPayload(job, site, "https://uxgengineering.example.com");
+    expect(payload.summary).toBe("UXG-2026-0042 — Riverside Retail Park");
   });
 
   it("sets location to the full postal address, not just the site name", () => {
-    const payload = buildEventPayload(job, site, "https://opoc.example.com");
+    const payload = buildEventPayload(job, site, "https://uxgengineering.example.com");
     expect(payload.location).toBe("12 River Road, Leeds, LS1 4AB");
   });
 
   it("includes access notes, site contact, and a deep link to the job in the description", () => {
-    const payload = buildEventPayload(job, site, "https://opoc.example.com");
+    const payload = buildEventPayload(job, site, "https://uxgengineering.example.com");
     expect(payload.description).toContain("Access notes: Use the loading bay, ask for Dave");
     expect(payload.description).toContain("Dave Holt (07700 900123)");
-    expect(payload.description).toContain("https://opoc.example.com/office/jobs/job-1");
+    expect(payload.description).toContain("https://uxgengineering.example.com/office/jobs/job-1");
   });
 
   it("carries the job's scheduled start/end through unchanged", () => {
-    const payload = buildEventPayload(job, site, "https://opoc.example.com");
+    const payload = buildEventPayload(job, site, "https://uxgengineering.example.com");
     expect(payload.start).toEqual({ dateTime: "2026-08-10T09:00:00.000Z" });
     expect(payload.end).toEqual({ dateTime: "2026-08-10T11:00:00.000Z" });
   });

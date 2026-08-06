@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { InstallPrompt } from "@/components/install-prompt";
+import { UxgLogo } from "@/components/branding/uxg-logo";
 import { StorageOnboarding } from "@/components/storage-onboarding";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/offline/db";
@@ -27,12 +28,8 @@ export function FieldApp({ user }: { user: CurrentUser }) {
     <div className="flex min-h-screen flex-col">
       <InstallPrompt />
       <header className="flex items-center justify-between border-b px-4 py-3">
-        <button
-          className="font-semibold"
-          onClick={() => setView({ screen: "list" })}
-          type="button"
-        >
-          OPOC
+        <button onClick={() => setView({ screen: "list" })} type="button">
+          <UxgLogo className="h-6 w-auto" />
         </button>
         <div className="flex items-center gap-3 text-sm">
           {isSyncing && <span className="text-muted-foreground">Syncing…</span>}

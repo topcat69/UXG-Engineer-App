@@ -21,7 +21,7 @@ describe("buildEmailHeaders", () => {
 
   it("gives later emails a fresh Message-ID that references the root", () => {
     const headers = buildEmailHeaders("job-1", false, "fresh-id");
-    expect(headers.messageId).toBe("<fresh-id@opoc.local>");
+    expect(headers.messageId).toBe("<fresh-id@uxgengineering.local>");
     expect(headers.references).toBe(emailThreadRootId("job-1"));
     expect(headers.inReplyTo).toBe(emailThreadRootId("job-1"));
   });

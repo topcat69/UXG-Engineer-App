@@ -87,7 +87,7 @@ class OfflineDB extends Dexie {
   syncMeta!: EntityTable<SyncMeta, "key">;
 
   constructor() {
-    super("opoc");
+    super("uxg-engineer-job-schedular");
     this.version(1).stores({
       jobs: "id, status, assigned_to, scheduled_start, site_id",
       sites: "id",

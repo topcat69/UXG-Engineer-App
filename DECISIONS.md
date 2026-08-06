@@ -1199,3 +1199,42 @@ poking).
   on each invocation. At eight users and a 90-day retention window on
   jobs that never went anywhere, the operational risk is low enough that
   a preview mode would be solving a problem this app doesn't have.
+
+## Addendum, 2026-08-06 — rebrand to "UXG Engineer Job Schedular"
+
+Every user-visible occurrence of "OPOC" (page titles, PWA manifest, login
+card, office/field headers, install prompts, completion PDF header, ICS
+calendar name, README) was replaced with "UXG Engineer Job Schedular",
+per the user's request — shortened to "UXG" in tight UI chrome (nav
+header, PWA `short_name`, Apple web-app title) where the full name
+wouldn't fit. Three identifiers that are effectively internal-only but
+still spelled "opoc" were renamed too for full consistency: the
+job-number prefix (`OPOC-2026-NNNN` → `UXG-2026-NNNN`, confirmed by the
+user), the email "from" domain (`opoc.example.com` →
+`uxgengineering.example.com`, confirmed), the Dexie offline-database name
+(`opoc` → `uxg-engineer-job-schedular`), and the ICS feed's `PRODID`/
+event `UID` domain (`@opoc` → `@uxgengineering`).
+
+**Worth knowing if this app is ever renamed again after a real
+deployment** (not a concern now, since nothing has shipped to a real
+device or subscriber yet): the Dexie DB name and ICS event UIDs are both
+identity keys, not just display strings. Changing the Dexie name would
+make a phone that already has one installed silently start a fresh,
+empty offline database, orphaning whatever was in the old one — a real
+rename at that point would need an explicit migration (open the old
+named DB, copy rows into the new one) rather than a find-and-replace.
+Same logic for ICS UIDs: a calendar app that already subscribed to the
+feed and cached the old `@opoc` UIDs would see every event as newly
+created rather than recognizing them as the same ones, on the next
+refresh. Test-fixture email addresses (`@opoc.test`, used throughout the
+test suite for seeded office accounts) were deliberately left alone —
+that's test infrastructure, not product branding.
+
+Not done: the actual UXG logo (provided as an inline image in chat, not
+an uploadable file) couldn't be embedded as a real icon/favicon asset —
+there's no way to extract pixel data from an inline chat image via this
+session's file tools. The PWA manifest's icon files
+(`public/icons/icon-*.png`) still point at whatever placeholder icons
+were generated in Phase 3; swapping those to the real logo needs the
+actual image file (upload/attach it, or point at a path/URL already on
+disk).

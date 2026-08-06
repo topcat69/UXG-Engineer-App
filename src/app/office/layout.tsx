@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireOfficeUser } from "@/lib/auth/current-user";
+import { UxgLogo } from "@/components/branding/uxg-logo";
 
 const NAV = [
   { href: "/office/dashboard", label: "Dashboard" },
@@ -16,7 +17,7 @@ export default async function OfficeLayout({ children }: { children: React.React
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between border-b px-6 py-3">
         <div className="flex items-center gap-6">
-          <span className="font-semibold">OPOC</span>
+          <UxgLogo className="h-6 w-auto" />
           <nav className="flex gap-4 text-sm">
             {NAV.map((item) => (
               <Link key={item.href} href={item.href} className="text-muted-foreground hover:text-foreground">

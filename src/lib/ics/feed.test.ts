@@ -3,7 +3,7 @@ import { generateIcs, type IcsJob } from "./feed";
 
 const job: IcsJob = {
   id: "job-1",
-  job_number: "OPOC-2026-0042",
+  job_number: "UXG-2026-0042",
   scheduled_start: "2026-08-10T09:00:00.000Z",
   scheduled_end: "2026-08-10T11:00:00.000Z",
   site_name: "Riverside Retail Park",
@@ -17,13 +17,13 @@ describe("generateIcs", () => {
     expect(ics).toContain("BEGIN:VCALENDAR");
     expect(ics).toContain("VERSION:2.0");
     expect(ics).toContain("END:VCALENDAR");
-    expect(ics).toContain("X-WR-CALNAME:Jamie Vance — OPOC schedule");
+    expect(ics).toContain("X-WR-CALNAME:Jamie Vance — UXG schedule");
   });
 
   it("emits one VEVENT per job with a UID stable across regenerations", () => {
     const ics = generateIcs("Jamie Vance", [job]);
     expect(ics).toContain("BEGIN:VEVENT");
-    expect(ics).toContain("UID:job-job-1@opoc");
+    expect(ics).toContain("UID:job-job-1@uxgengineering");
     expect(ics).toContain("END:VEVENT");
   });
 
@@ -35,7 +35,7 @@ describe("generateIcs", () => {
 
   it("titles the event '{job_number} — {site_name}' and sets LOCATION to the address", () => {
     const ics = generateIcs("Jamie Vance", [job]);
-    expect(ics).toContain("SUMMARY:OPOC-2026-0042 — Riverside Retail Park");
+    expect(ics).toContain("SUMMARY:UXG-2026-0042 — Riverside Retail Park");
     expect(ics).toContain("LOCATION:12 River Road\\, Leeds\\, LS1 4AB");
   });
 
@@ -51,7 +51,7 @@ describe("generateIcs", () => {
 
   it("escapes commas, semicolons, and backslashes in text fields", () => {
     const ics = generateIcs("Jamie Vance", [{ ...job, site_name: "Acme; Corp, Ltd\\HQ" }]);
-    expect(ics).toContain("SUMMARY:OPOC-2026-0042 — Acme\\; Corp\\, Ltd\\\\HQ");
+    expect(ics).toContain("SUMMARY:UXG-2026-0042 — Acme\\; Corp\\, Ltd\\\\HQ");
   });
 
   it("produces an empty-but-valid calendar for an engineer with no jobs", () => {

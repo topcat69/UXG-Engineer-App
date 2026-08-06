@@ -102,7 +102,7 @@ begin
       scheduled_start, scheduled_end
     ) values (
       gen_random_uuid(),
-      'OPOC-2026-' || lpad(i::text, 4, '0'),
+      'UXG-2026-' || lpad(i::text, 4, '0'),
       project_id,
       site_id,
       'install',

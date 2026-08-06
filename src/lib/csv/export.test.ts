@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { jobsToCsv, type JobExportRow } from "./export";
 
 const row: JobExportRow = {
-  job_number: "OPOC-2026-0001",
+  job_number: "UXG-2026-0001",
   status: "closed",
   job_type: "install",
   priority: "P1",
@@ -17,7 +17,7 @@ describe("jobsToCsv", () => {
     const csv = jobsToCsv([row]);
     const lines = csv.split("\r\n");
     expect(lines[0]).toBe("job_number,status,job_type,priority,site,project,assigned_to,scheduled_start");
-    expect(lines[1]).toContain("OPOC-2026-0001");
+    expect(lines[1]).toContain("UXG-2026-0001");
   });
 
   it("quotes a field containing a comma", () => {

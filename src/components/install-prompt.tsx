@@ -54,7 +54,7 @@ export function InstallPrompt() {
   if (deferredPrompt) {
     return (
       <div className="flex items-center justify-between gap-3 border-b bg-muted/40 px-4 py-2 text-sm">
-        <span>Install OPOC for offline access on site.</span>
+        <span>Install UXG Engineer Job Schedular for offline access on site.</span>
         <div className="flex gap-2">
           <Button
             size="sm"
@@ -78,7 +78,7 @@ export function InstallPrompt() {
     return (
       <div className="flex items-center justify-between gap-3 border-b bg-muted/40 px-4 py-2 text-sm">
         <span>
-          Install OPOC: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.
+          Install UXG Engineer Job Schedular: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.
         </span>
         <Button size="sm" variant="ghost" onClick={() => setDismissed(true)}>
           Dismiss
