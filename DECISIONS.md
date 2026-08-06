@@ -1247,10 +1247,13 @@ next/image's remote-pattern config doesn't apply cleanly to signed
 Storage URLs, and the same reasoning extends to not adding it just for
 one static asset). The hand-drawn SVG version is gone; there was no
 reason to keep an approximation once the genuine asset existed. PWA
-icons and the favicon were regenerated from this real file too (a
-canvas crop of the letters, excluding the thin colour bar, which
-wouldn't read at 192px) — via the same "render an HTML page with
-Playwright and screenshot at exact pixel dimensions" technique used for
-the placeholder icons originally, plus `png-to-ico` (via `pnpm dlx`, not
-installed as a project dependency) for a real multi-resolution
-`favicon.ico`.
+icons and the favicon were regenerated from this real file too, via the
+same "render an HTML page with Playwright and screenshot at exact pixel
+dimensions" technique used for the placeholder icons originally, plus
+`png-to-ico` (via `pnpm dlx`, not installed as a project dependency) for
+a real multi-resolution `favicon.ico`. First pass cropped the icon
+source to just the letters, excluding the tri-colour sash beneath them —
+per the user, the sash is itself part of the brand mark, not an optional
+flourish, so the icons were regenerated a second time fitting the whole
+lockup (letters + sash) into the square canvas. Confirmed legible at
+192px and at the smaller maskable safe-zone crop before committing.
