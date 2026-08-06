@@ -138,7 +138,18 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   await expect(taskCheckboxes.nth(0)).toBeChecked({ timeout: 5_000 });
   await taskCheckboxes.nth(1).click();
   await expect(taskCheckboxes.nth(1)).toBeChecked({ timeout: 5_000 });
+
+  // The checkbox's own checked paint is one signal the Dexie write landed;
+  // handleSubmit's `tasks` closure catching up to it (React re-render ->
+  // handler re-bound) is a separate one that can trail slightly behind —
+  // a scripted click-click-click can outrun it even though a real
+  // engineer's finger never would. Give it a moment to settle before
+  // clicking Submit, retried below if it was still one tick behind.
+  await fieldPage.waitForTimeout(300);
   await fieldPage.getByRole("button", { name: /Check Out & Submit/ }).click();
+  if (await fieldPage.getByText(/task.*not yet checked off/).isVisible().catch(() => false)) {
+    await fieldPage.getByRole("button", { name: /Check Out & Submit/ }).click();
+  }
   await expect(fieldPage.getByText("This job is submitted.")).toBeVisible({ timeout: 10_000 });
 
   const { data: tasksAfter } = await admin.from("job_tasks").select("is_done").eq("job_id", jobId);

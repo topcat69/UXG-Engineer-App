@@ -7,7 +7,7 @@
 -- this seed exists to exercise RLS and joins, not to be a realistic dataset.
 
 -- ---------------------------------------------------------------------------
--- Users: one admin, one manager, one engineer. Passwordless (magic-link)
+-- Users: one superadmin, one manager, one engineer. Passwordless (magic-link)
 -- accounts — the password hash below is never used to sign in; tests and
 -- the app authenticate via Supabase's OTP/magic-link flow instead.
 -- ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ begin
   -- row for each of these from the auth.users insert above; upsert the real
   -- names/roles over it.
   insert into users (id, email, name, role, active) values
-    (admin_id, 'admin@opoc.test', 'Ada Admin', 'admin', true),
+    (admin_id, 'admin@opoc.test', 'Ada Superadmin', 'superadmin', true),
     (manager_id, 'manager@opoc.test', 'Mo Manager', 'manager', true),
     (engineer_id, 'engineer@opoc.test', 'Eve Engineer', 'engineer', true)
   on conflict (id) do update set name = excluded.name, role = excluded.role, active = excluded.active;

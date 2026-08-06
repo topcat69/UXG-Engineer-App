@@ -53,7 +53,7 @@ export async function sendDayBeforeEmail(supabase: AnySupabaseClient, jobId: str
  * "Submitted" (to manager) — deliberately takes an explicit `to` address
  * rather than looking up "the" manager, since there's no single designated
  * manager-per-job in the schema; the webhook route (the only caller today)
- * fans this out to every active manager/admin.
+ * fans this out to every active manager/superadmin.
  */
 export async function sendSubmittedEmail(supabase: AnySupabaseClient, jobId: string, to: string, managerName: string): Promise<SendResult> {
   const { data: job } = await supabase

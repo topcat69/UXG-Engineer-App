@@ -868,7 +868,7 @@ export type Database = {
         | "cancelled"
       pass_fail: "pass" | "fail" | "na"
       qa_status: "pending" | "approved" | "rejected"
-      user_role: "admin" | "manager" | "engineer"
+      user_role: "superadmin" | "manager" | "engineer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1016,7 +1016,7 @@ export const Constants = {
       ],
       pass_fail: ["pass", "fail", "na"],
       qa_status: ["pending", "approved", "rejected"],
-      user_role: ["admin", "manager", "engineer"],
+      user_role: ["superadmin", "manager", "engineer"],
     },
   },
 } as const

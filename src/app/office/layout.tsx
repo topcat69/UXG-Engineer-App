@@ -9,6 +9,7 @@ const NAV = [
   { href: "/office/qa", label: "QA Queue" },
   { href: "/office/import", label: "Import" },
   { href: "/office/templates", label: "Templates" },
+  { href: "/office/users", label: "Users" },
 ];
 
 export default async function OfficeLayout({ children }: { children: React.ReactNode }) {

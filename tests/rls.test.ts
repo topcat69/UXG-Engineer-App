@@ -26,7 +26,7 @@ beforeAll(async () => {
   engineerId = data.id;
 }, 30_000);
 
-describe("jobs: admin", () => {
+describe("jobs: superadmin", () => {
   it("reads all 60 seeded jobs", async () => {
     const { data, error } = await adminUser.from("jobs").select("id");
     expect(error).toBeNull();
@@ -41,23 +41,48 @@ describe("jobs: manager", () => {
     expect(data).toHaveLength(60);
   });
 
-  it("cannot write the users table directly (deliberately failing check)", async () => {
-    // Only admin may write `users` (users_write policy). Postgres RLS makes
-    // a role-only USING clause match zero rows for a disallowed role, so a
-    // blocked write comes back as success-with-nothing-updated, not an
-    // error — assert on the row count and the underlying data, not `error`.
-    // If this ever actually updates a row, a manager could silently grant
-    // themselves or anyone else the admin role.
-    const { data, error } = await managerUser
+  it("can edit an engineer's user row (name), but cannot promote them to manager/superadmin (deliberately failing check)", async () => {
+    const { data: before } = await admin.from("users").select("name").eq("email", "engineer@opoc.test").single();
+
+    const { data: renamed, error: renameError } = await managerUser
       .from("users")
-      .update({ role: "admin" })
+      .update({ name: "Eve Engineer (edited by manager)" })
       .eq("email", "engineer@opoc.test")
       .select();
-    expect(error).toBeNull();
-    expect(data).toHaveLength(0);
+    expect(renameError).toBeNull();
+    expect(renamed).toHaveLength(1);
+    expect(renamed![0].name).toBe("Eve Engineer (edited by manager)");
+    // Revert so later tests relying on the seeded engineer row are unaffected.
+    await admin.from("users").update({ name: before!.name }).eq("email", "engineer@opoc.test");
+
+    // A manager's users_write access is scoped to role = 'engineer' rows
+    // only, checked on both the existing row (via `using`) and the row
+    // being written (via `with check`). This one selects the row fine
+    // (using passes — it's still role='engineer' going in) but the
+    // attempted new value fails `with check`, and unlike a `using`
+    // rejection (silent 0 rows, see the tests above), Postgres raises a
+    // hard 42501 error for a `with check` failure on an already-selected
+    // row. If this ever silently succeeds instead, a manager could grant
+    // themselves or anyone else superadmin.
+    const { error: promoteError } = await managerUser
+      .from("users")
+      .update({ role: "manager" })
+      .eq("email", "engineer@opoc.test")
+      .select();
+    expect(promoteError?.code).toBe("42501");
 
     const { data: unchanged } = await admin.from("users").select("role").eq("email", "engineer@opoc.test").single();
     expect(unchanged?.role).toBe("engineer");
+  });
+
+  it("cannot write another manager's or the superadmin's user row (deliberately failing check)", async () => {
+    const { data, error } = await managerUser
+      .from("users")
+      .update({ name: "hijacked" })
+      .eq("email", "admin@opoc.test")
+      .select();
+    expect(error).toBeNull();
+    expect(data).toHaveLength(0);
   });
 });
 
@@ -99,7 +124,11 @@ describe("jobs: engineer", () => {
   });
 
   it("cannot escalate their own role (deliberately failing check)", async () => {
-    const { data, error } = await engineerUser.from("users").update({ role: "admin" }).eq("id", engineerId).select();
+    const { data, error } = await engineerUser
+      .from("users")
+      .update({ role: "superadmin" })
+      .eq("id", engineerId)
+      .select();
     expect(error).toBeNull();
     expect(data).toHaveLength(0);
 
@@ -109,7 +138,7 @@ describe("jobs: engineer", () => {
 });
 
 describe("status_events: append-only for every role", () => {
-  it("admin can insert a status_event but cannot update or delete it (deliberately failing check)", async () => {
+  it("superadmin can insert a status_event but cannot update or delete it (deliberately failing check)", async () => {
     const { data: job } = await admin.from("jobs").select("id").limit(1).single();
 
     const { data: inserted, error: insertError } = await adminUser

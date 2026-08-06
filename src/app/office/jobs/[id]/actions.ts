@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { removeCalendarForJob } from "@/lib/google/sync-job-calendar";
+import { deleteJobCalendarEvent } from "@/lib/google/calendar";
 import { createShareLinkForJob } from "@/lib/share-links/create";
 import { appBaseUrl } from "@/lib/app-url";
 import { duplicateJob } from "@/lib/jobs/duplicate-job";
@@ -89,6 +90,40 @@ export async function revokeShareLink(token: string, jobId: string): Promise<Act
 
   revalidatePath(`/office/jobs/${jobId}`);
   return { ok: true, message: "Link revoked." };
+}
+
+/**
+ * Hard-deletes a job outright — distinct from cancelJob above, which only
+ * changes status and leaves the row (and its history) in place. This is
+ * for removing a job created by mistake, so it's irreversible: the row and
+ * everything that belongs to it (issues, media, forms, status history,
+ * share links, tasks) cascade-deletes with it (see
+ * supabase/migrations/20260115000000_superadmin_role_and_job_delete.sql).
+ * A revisit job's `parent_job_id` and an issue's `revisit_job_id` pointing
+ * at this job are cleared rather than cascading further.
+ */
+export async function deleteJobAction(jobId: string): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, message: "Not signed in." };
+
+  const supabase = await createClient();
+  // removeCalendarForJob reads calendar_event_id off the jobs row itself,
+  // so it has to run — or at least capture that id — before the row is
+  // gone; captured here and passed to deleteJobCalendarEvent directly
+  // rather than the DB-row-nulling helper, since there's no row left to null it on.
+  const { data: job } = await supabase.from("jobs").select("calendar_event_id").eq("id", jobId).single();
+  const calendarEventId = job?.calendar_event_id ?? null;
+
+  const { error } = await supabase.from("jobs").delete().eq("id", jobId);
+  if (error) return { ok: false, message: error.message };
+
+  // Best-effort, scheduled via after() rather than awaited — same reasoning
+  // as cancelJob above: a Calendar API round trip shouldn't sit between the
+  // manager confirming delete and the UI reflecting it.
+  if (calendarEventId) after(() => deleteJobCalendarEvent(calendarEventId));
+
+  revalidatePath("/office/jobs");
+  return { ok: true, message: "Job deleted." };
 }
 
 export type DuplicateJobActionResult = { ok: true; newJobId: string } | { ok: false; message: string };

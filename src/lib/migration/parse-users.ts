@@ -2,7 +2,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { optionalText, parseCsvRows, parseEnum, parseOptionalBoolean, parseOptionalNumber, type ParseResult } from "./csv-helpers";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
-const USER_ROLES = ["admin", "manager", "engineer"] as const;
+const USER_ROLES = ["superadmin", "manager", "engineer"] as const;
 
 /**
  * Deliberately not a `users` table Insert row — `users.id` is a foreign key

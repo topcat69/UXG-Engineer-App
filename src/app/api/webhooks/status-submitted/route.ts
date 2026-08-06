@@ -24,11 +24,11 @@ export async function POST(request: Request) {
   const { data: managers } = await supabase
     .from("users")
     .select("email, name")
-    .in("role", ["admin", "manager"])
+    .in("role", ["superadmin", "manager"])
     .eq("active", true);
 
-  // Fan out to every active manager/admin — there's no single designated
-  // "the manager" for a job in this schema.
+  // Fan out to every active manager/superadmin — there's no single
+  // designated "the manager" for a job in this schema.
   await Promise.all(
     (managers ?? []).map((manager) => sendSubmittedEmail(supabase, body.job_id!, manager.email, manager.name)),
   );

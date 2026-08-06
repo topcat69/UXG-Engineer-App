@@ -7,6 +7,7 @@ import { appBaseUrl } from "@/lib/app-url";
 import { isShareLinkValid } from "@/lib/share-links/validity";
 import { IssueForm } from "./issue-form";
 import { CancelJobButton } from "./cancel-job-button";
+import { DeleteJobButton } from "./delete-job-button";
 import { DuplicateJobButton } from "./duplicate-job-button";
 import { TaskPanel } from "./task-panel";
 import { ShareLinkPanel } from "./share-link-panel";
@@ -91,6 +92,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <div className="flex items-center gap-2">
             <DuplicateJobButton jobId={job.id} />
             <CancelJobButton jobId={job.id} status={job.status} />
+            <DeleteJobButton jobId={job.id} jobNumber={job.job_number} />
           </div>
         </div>
       </div>

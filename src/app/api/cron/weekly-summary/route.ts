@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
   const [{ data: projects }, { data: managers }] = await Promise.all([
     supabase.from("projects").select("id, name").eq("status", "active"),
-    supabase.from("users").select("email").in("role", ["admin", "manager"]).eq("active", true),
+    supabase.from("users").select("email").in("role", ["superadmin", "manager"]).eq("active", true),
   ]);
 
   const recipients = (managers ?? []).map((m) => m.email);

@@ -16,7 +16,7 @@ describe("parseUsersCsv", () => {
   });
 
   it("rejects an unrecognised role", () => {
-    const csv = "email,name,role\nbob@example.com,Bob,superadmin";
+    const csv = "email,name,role\nbob@example.com,Bob,owner";
     const { rows, errors } = parseUsersCsv(csv);
     expect(rows[0].role).toBe("engineer");
     expect(errors[0]).toMatch(/unrecognised role/);

@@ -1361,3 +1361,114 @@ identity key, not just a display string, per the note further up about
 what renaming it would mean once a real device has it installed. Same
 conclusion applies here: safe to change outright, since nothing has
 shipped to a real device yet.
+
+## Addendum, 2026-08-06 — superadmin role, user management, job deletion
+
+Three-role model per explicit product requirements: **superadmin**
+("carte blanche over the system/app"), **manager** (create/deactivate
+users, create/delete/assign/schedule jobs), **engineer** (only update
+jobs assigned to themselves — already true of the existing `engineer`
+role's RLS, unchanged here).
+
+**`admin` renamed to `superadmin`, not added as a fourth role**
+(`supabase/migrations/20260115000000_superadmin_role_and_job_delete.sql`):
+`alter type user_role rename value 'admin' to 'superadmin'`. Confirmed
+safe to run in the same migration/transaction as everything else that
+follows it: Postgres resolves an enum literal to a stable internal value
+at `CREATE POLICY` time, and `RENAME VALUE` only changes the label future
+queries use to refer to that same value — every RLS policy already
+written against the `'admin'` literal in `20260103000000_rls.sql` and
+`20260114000000_job_templates_tasks.sql` kept working completely
+unchanged after the rename, with zero edits to either historical
+migration file. (This is a materially different, much lighter-weight
+operation than `ADD VALUE`, which genuinely can't be referenced in the
+same transaction it's added in — that specific Postgres restriction
+doesn't apply to a rename of an already-committed value.) Application
+code and `supabase/seed.sql` needed updating everywhere they held the
+`"admin"` string literal, since after the rename that string no longer
+names a valid role — TypeScript's own type-check against the regenerated
+`user_role` enum caught every one of these at compile time (`tsc
+--noEmit` after regenerating types), which is the real reason this
+rename was safe to do with confidence rather than trusting a grep to be
+exhaustive.
+
+**Manager's user-management reach is bounded to engineer accounts, by
+RLS, not just app-layer checks — a decision beyond what was explicitly
+asked.** The literal request was "manager can create and delete users,"
+full stop. Taken completely literally, that would leave the database
+with no permission boundary distinguishing "superadmin" from "manager"
+at all (every other capability manager already had was identical to
+admin's before this), which doesn't operationalize "superadmin has carte
+blanche" as anything real, and opens an obvious footgun: a manager could
+create a second superadmin, delete the real one, or promote themselves.
+`users_write` is now `superadmin: unrestricted` / `manager: only rows
+where role = 'engineer'`, checked via both `using` (which existing rows a
+manager can touch) and `with check` (what a manager can leave a row as),
+so a manager can edit an engineer's name/active flag but can't promote
+them to manager, and can't touch an existing manager or superadmin row at
+all. This is an inference beyond the literal instruction, flagged here
+so it can be corrected if it wasn't the intent — the alternative (fully
+unrestricted manager user-management) is a one-line policy change if
+that's actually preferred.
+
+A genuinely useful, unplanned discovery from proving this in
+`tests/rls.test.ts`: **a Postgres RLS `with check` failure on a row that
+already passed `using` raises a real error (42501)**, unlike a `using`
+rejection, which just silently excludes the row (0 rows affected, no
+error) — the first version of the manager-role-escalation test asserted
+the wrong one (expected 0-rows-no-error) and failed against the actually-
+correct, actually-more-secure behavior (a hard error). Worth remembering
+generally: "RLS blocks a write" has two different shapes depending on
+which clause caught it, and a test (or calling code) that only checks
+`error` OR only checks row count will miss one of them.
+
+**`getCurrentUser()` now treats `active = false` as not signed in**,
+even with a valid Supabase Auth session — every existing call site
+already redirected to `/login` on a null return, so deactivation and
+"not logged in" get the same, already-correct handling for free. Known,
+accepted gap: a deactivated user who requests a fresh magic link still
+receives one (`active` isn't Supabase Auth's concern) and will land back
+on `/login` after clicking it, with no explanation why — not a security
+issue, just a UX rough edge not worth building a dedicated
+"your account was deactivated" flow for right now.
+
+**Deactivate, not hard-delete, for users** — the existing `users.active`
+column, unused by any write path until now, is exactly the "revoke a
+grant, don't erase the row" pattern this app already uses for share links
+(`revoked`, not deleted). A hard-deleted user would null out or orphan
+every job/status-event/issue that referenced them; deactivating keeps a
+former engineer's name attached to their real history. A superadmin or
+manager can also reactivate.
+
+**Job deletion is new — jobs could previously only be cancelled (a status
+change), never removed.** `jobs_delete` policy added (superadmin/manager).
+Four foreign keys into `jobs` had no `on delete` behavior at all
+(`RESTRICT` by default), which would have made deleting almost any real
+job fail outright the moment it had a single issue or share link:
+`issues.job_id` and `share_links.job_id` now cascade (they belong to the
+job); `issues.revisit_job_id` and `jobs.parent_job_id` now `set null`
+instead (they're cross-references to another job, not ownership —
+deleting a revisit shouldn't be blocked by the issue that spawned it, and
+deleting a parent shouldn't cascade-delete every revisit it ever
+produced). Proven directly against Postgres (not just RLS) before trusting
+it: inserted an issue and a share link against a real job, deleted the
+job, confirmed both were gone and the delete didn't error. UI-side,
+deletion is irreversible and distinct from Cancel, so it requires typing
+the job number to confirm rather than a single confirmation click —
+matching the weight of the action rather than reusing Cancel's lighter
+click-through pattern.
+
+**Another instance of this build's RSC-refresh-lags-one-action-behind
+bug** (see the templates/tasks addendum above), found again while wiring
+up `/office/users`: server actions there already followed the
+return-the-row / local-state pattern from that fix, but `router.refresh()`
+was still called inside the same `startTransition` as every action "for
+other tabs" — and because all rows in `UsersManager` share one
+`isPending` from a single `useTransition()`, a slow `router.refresh()`
+after creating a user kept every other row's Deactivate button disabled
+for however long that refresh took, caught by a real E2E test
+click-timing out on a button that was live but disabled. Removed
+`router.refresh()` from that component entirely: each server action
+already calls `revalidatePath("/office/users")`, so other tabs/next
+visits stay consistent without it, and local state is the only thing
+this page's own UI depends on.
