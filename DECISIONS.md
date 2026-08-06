@@ -1230,11 +1230,27 @@ refresh. Test-fixture email addresses (`@opoc.test`, used throughout the
 test suite for seeded office accounts) were deliberately left alone —
 that's test infrastructure, not product branding.
 
-Not done: the actual UXG logo (provided as an inline image in chat, not
-an uploadable file) couldn't be embedded as a real icon/favicon asset —
-there's no way to extract pixel data from an inline chat image via this
-session's file tools. The PWA manifest's icon files
-(`public/icons/icon-*.png`) still point at whatever placeholder icons
-were generated in Phase 3; swapping those to the real logo needs the
-actual image file (upload/attach it, or point at a path/URL already on
-disk).
+**Follow-up, same day — the real logo file arrived.** Two earlier
+attempts to send the logo landed as inline chat content with no
+accessible file (see above), so `UxgLogo` was a hand-drawn SVG
+approximation for a while, iterated by rendering and visually comparing
+against screenshots rather than tracing real vector data — it captured
+the palette and the distinctive triple-accent-line "X" reasonably well,
+but was never a faithful reproduction of the actual letterforms. The
+user then committed the real file directly to the repo root
+(`UXG Logo.png`, a transparent 3012×1306 PNG) — an upload path that
+*does* land as a real, readable file, unlike the chat-inline route.
+Moved to `public/branding/uxg-logo.png`; `UxgLogo` is now a plain `<img>`
+pointing at it (matching the plain-`<img>` pattern already used for
+photo display elsewhere in this app, e.g. `share/[token]/page.tsx` —
+next/image's remote-pattern config doesn't apply cleanly to signed
+Storage URLs, and the same reasoning extends to not adding it just for
+one static asset). The hand-drawn SVG version is gone; there was no
+reason to keep an approximation once the genuine asset existed. PWA
+icons and the favicon were regenerated from this real file too (a
+canvas crop of the letters, excluding the thin colour bar, which
+wouldn't read at 192px) — via the same "render an HTML page with
+Playwright and screenshot at exact pixel dimensions" technique used for
+the placeholder icons originally, plus `png-to-ico` (via `pnpm dlx`, not
+installed as a project dependency) for a real multi-resolution
+`favicon.ico`.
