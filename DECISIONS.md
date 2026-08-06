@@ -1257,3 +1257,94 @@ per the user, the sash is itself part of the brand mark, not an optional
 flourish, so the icons were regenerated a second time fitting the whole
 lockup (letters + sash) into the square canvas. Confirmed legible at
 192px and at the smaller maskable safe-zone crop before committing.
+
+## Addendum, 2026-08-06 — job templates, per-job tasks, and job duplication
+
+New feature, not in the original PROMPT.md spec: an office user can build
+a named, reusable **template** (a plain ordered list of task labels — no
+job-type scoping, per explicit product decision: any template can be
+applied to any job), apply it to a job to create that job's own
+**task checklist**, add/remove ad-hoc tasks directly on a job without a
+template, and **duplicate** a job into a fresh draft.
+
+**Schema** (`supabase/migrations/20260114000000_job_templates_tasks.sql`):
+`job_templates` (name, created_by) and `job_template_tasks`
+(template_id, position, label) are the reusable source; `job_tasks`
+(job_id, position, label, is_done, done_at, done_by) is the per-job,
+tickable copy. Applying a template *copies* its tasks into `job_tasks`
+rather than referencing the template live — editing a template
+afterwards never retroactively changes a job it was already applied to.
+RLS: templates are admin/manager-only (office reference data, like
+projects/sites); `job_tasks` is readable/insertable/updatable wherever
+the parent job is visible, the same `job_id in (select id from jobs)`
+idiom already used for `media_assets` — the assigned engineer can flip
+`is_done` themselves (RLS can't restrict to specific columns, so this
+mirrors the same trust boundary `jobs_update` already grants an assigned
+engineer for the job row itself), but only office can add/remove task
+rows.
+
+**Task completion blocks field submission** (explicit product decision,
+asked directly rather than assumed): `job-workflow.tsx`'s `handleSubmit`
+adds an error to the same validation-error list `validateInstallForm`
+already produces if any `job_tasks` row for the job is still
+`is_done = false`, so "Check Out & Submit" behaves exactly like a missing
+required field — no separate blocking mechanism to reason about.
+
+**Duplication deliberately does *not* use `parent_job_id`.** That column
+already means something specific — "this is a revisit created from a QA
+fail or a blocking issue" (`src/lib/jobs/create-revisit.ts`) — and feeds
+the dashboard's revisit-rate metric (`src/lib/dashboard/metrics.ts`). A
+duplicate is a new, unrelated job someone chose to re-run, not rework a
+failed job needs; wiring it through `parent_job_id` would have silently
+inflated that metric. `duplicate-job.ts` instead records the link only
+in the new job's first `status_events` reason ("Duplicated from
+UXG-2026-NNNN"), the same provenance-via-audit-trail approach a revisit
+already uses for its own reason text. The duplicate's task list (if any)
+is cloned unticked via the same pure `cloneTasksForJob` helper that also
+powers "apply template to job" — both are "take an ordered (position,
+label) source and re-index it onto a new job, always unticked."
+
+**A real, reproducible framework bug in this pinned Next.js build,
+found and worked around, not blamed and left:** the first implementation
+of the templates/tasks UI followed this app's own established pattern
+(server action → `revalidatePath` → client `router.refresh()`) and
+appeared to silently drop every mutation. A controlled repro (add three
+tasks in immediate sequence, screenshot the list after each) showed the
+UI consistently displaying state from exactly *one action ago* — after
+adding Task A the list was empty, after adding Task B it showed only
+Task A, and so on. This is a genuine RSC-refresh staleness bug under
+rapid sequential same-page Server Action calls in this build (AGENTS.md's
+warning that this isn't the Next.js of prior training data, in effect) —
+not a mistake in the calling code, and not something a `router.refresh()`
+retry or timeout would fix, since the lag is structural, not slow.
+Worked around by making the templates/tasks server actions
+(`addTemplateTask`, `applyTemplateToJob`, `addJobTask`, `createTemplate`,
+etc.) return the mutated row(s), and having `templates-manager.tsx` /
+`task-panel.tsx` hold `templates`/`tasks` in local component state seeded
+from server props, patched directly from each action's own return value.
+`router.refresh()` and `revalidatePath` are still called too, for the
+benefit of other tabs and back/forward navigation, but the page no
+longer depends on them for its own immediate UI. Confirmed fixed with
+the same repro script before moving on.
+
+**E2E coverage** (`tests/e2e/job-templates-tasks.spec.ts`): builds a
+template through the real UI, applies it to a real job, duplicates that
+job and confirms the clone's tasks arrived unticked, then drives the
+field engineer through check-in and a full form fill, confirms Check Out
+& Submit is blocked with both tasks unticked, ticks them, and confirms
+submission then succeeds — the whole chain through real UI interactions,
+no direct DB shortcuts for the parts under test. Building this test
+surfaced two of its own unrelated mistakes worth remembering: a second
+Playwright `Page` opened via `browser.newPage()` (as `phase5`'s spec
+already did, harmlessly, since it never needed geolocation) lands in a
+**new, separate `BrowserContext`** — permissions and mocked geolocation
+granted on the first page's context do not carry over, which silently
+hung `getCurrentPosition()`'s underlying permission request forever.
+Fixed by using `page.context().newPage()` instead. Second, Playwright's
+`.check()` on a checkbox verifies the state actually flipped in a single
+actionability pass, which is stricter than this checkbox needs — ticking
+it triggers an async Dexie write (`toggleTask`) whose `useLiveQuery`-
+driven `checked` prop lands a tick later, so `.check()` intermittently
+reported "did not change its state" even though it always did, a moment
+later. Fixed with a plain `.click()` followed by a polling
+`expect(...).toBeChecked()`.

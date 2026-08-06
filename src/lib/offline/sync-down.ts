@@ -43,39 +43,55 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
   );
   const overwritableJobIds = new Set(jobIdsSafeToOverwrite(jobIds, pendingJobIds));
 
-  const [{ data: installForms, error: installError }, { data: surveyForms, error: surveyError }] =
+  const [{ data: installForms, error: installError }, { data: surveyForms, error: surveyError }, { data: jobTasks, error: jobTasksError }] =
     jobIds.length > 0
       ? await Promise.all([
           supabase.from("install_forms").select("*").in("job_id", jobIds),
           supabase.from("survey_forms").select("*").in("job_id", jobIds),
+          supabase.from("job_tasks").select("*").in("job_id", jobIds),
         ])
-      : [{ data: [], error: null } as const, { data: [], error: null } as const];
+      : [{ data: [], error: null } as const, { data: [], error: null } as const, { data: [], error: null } as const];
   if (installError) throw installError;
   if (surveyError) throw surveyError;
+  if (jobTasksError) throw jobTasksError;
 
-  await db.transaction("rw", [db.jobs, db.sites, db.installForms, db.surveyForms, db.syncMeta], async () => {
-    await db.jobs.bulkPut(jobs ?? []);
-    await db.sites.bulkPut(sites ?? []);
+  // A task the engineer just ticked/unticked offline has a pending
+  // task_toggle op keyed by its own id — pulling the server's stale copy
+  // over it would silently discard that tap until the op drains.
+  const pendingTaskIds = new Set(
+    pendingOps.filter((op) => op.type === "task_toggle").map((op) => op.taskId),
+  );
 
-    for (const row of installForms ?? []) {
-      if (row.job_id && overwritableJobIds.has(row.job_id)) await db.installForms.put(row);
-    }
-    for (const row of surveyForms ?? []) {
-      if (row.job_id && overwritableJobIds.has(row.job_id)) await db.surveyForms.put(row);
-    }
+  await db.transaction(
+    "rw",
+    [db.jobs, db.sites, db.installForms, db.surveyForms, db.jobTasks, db.syncMeta],
+    async () => {
+      await db.jobs.bulkPut(jobs ?? []);
+      await db.sites.bulkPut(sites ?? []);
 
-    // Drop local jobs that have fallen out of the assigned/windowed set —
-    // unless they still have unsynced work, which must survive until drained.
-    const freshJobIds = new Set(jobIds);
-    const localJobs = await db.jobs.toArray();
-    for (const job of localJobs) {
-      if (!freshJobIds.has(job.id) && !pendingJobIds.has(job.id)) {
-        await db.jobs.delete(job.id);
+      for (const row of installForms ?? []) {
+        if (row.job_id && overwritableJobIds.has(row.job_id)) await db.installForms.put(row);
       }
-    }
+      for (const row of surveyForms ?? []) {
+        if (row.job_id && overwritableJobIds.has(row.job_id)) await db.surveyForms.put(row);
+      }
+      for (const row of jobTasks ?? []) {
+        if (!pendingTaskIds.has(row.id)) await db.jobTasks.put(row);
+      }
 
-    await db.syncMeta.put({ key: "lastSyncedAt", value: new Date().toISOString() });
-  });
+      // Drop local jobs that have fallen out of the assigned/windowed set —
+      // unless they still have unsynced work, which must survive until drained.
+      const freshJobIds = new Set(jobIds);
+      const localJobs = await db.jobs.toArray();
+      for (const job of localJobs) {
+        if (!freshJobIds.has(job.id) && !pendingJobIds.has(job.id)) {
+          await db.jobs.delete(job.id);
+        }
+      }
+
+      await db.syncMeta.put({ key: "lastSyncedAt", value: new Date().toISOString() });
+    },
+  );
 
   return { jobCount: jobs?.length ?? 0, siteCount: sites?.length ?? 0 };
 }

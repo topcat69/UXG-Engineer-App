@@ -229,6 +229,118 @@ export type Database = {
           },
         ]
       }
+      job_tasks: {
+        Row: {
+          created_at: string | null
+          done_at: string | null
+          done_by: string | null
+          id: string
+          is_done: boolean
+          job_id: string
+          label: string
+          position: number
+        }
+        Insert: {
+          created_at?: string | null
+          done_at?: string | null
+          done_by?: string | null
+          id?: string
+          is_done?: boolean
+          job_id: string
+          label: string
+          position: number
+        }
+        Update: {
+          created_at?: string | null
+          done_at?: string | null
+          done_by?: string | null
+          id?: string
+          is_done?: boolean
+          job_id?: string
+          label?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_tasks_done_by_fkey"
+            columns: ["done_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_tasks_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_template_tasks: {
+        Row: {
+          created_at: string | null
+          id: string
+          label: string
+          position: number
+          template_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          label: string
+          position: number
+          template_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          label?: string
+          position?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_template_tasks_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "job_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           actual_end: string | null

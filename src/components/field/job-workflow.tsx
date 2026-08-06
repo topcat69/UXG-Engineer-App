@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import { db, type InstallFormRow } from "@/lib/offline/db";
-import { checkIn, saveInstallFormDraft, submitJob } from "@/lib/offline/field-actions";
+import { checkIn, saveInstallFormDraft, submitJob, toggleTask } from "@/lib/offline/field-actions";
 import { getCurrentPosition } from "@/lib/offline/media-capture";
 import { distanceMeters } from "@/lib/geo/distance";
 import {
@@ -49,6 +49,7 @@ export function JobWorkflow({
   const site = useLiveQuery(() => (job ? db.sites.get(job.site_id) : undefined), [job?.site_id]);
   const formRow = useLiveQuery(() => db.installForms.where("job_id").equals(jobId).first(), [jobId]);
   const media = useLiveQuery(() => db.mediaQueue.where("jobId").equals(jobId).toArray(), [jobId], []);
+  const tasks = useLiveQuery(() => db.jobTasks.where("job_id").equals(jobId).sortBy("position"), [jobId], []);
 
   const [values, setValues] = useState<InstallFormValues>(EMPTY_INSTALL_FORM);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
@@ -141,9 +142,22 @@ export function JobWorkflow({
     }
   }
 
+  async function handleToggleTask(taskId: string, isDone: boolean) {
+    await toggleTask(taskId, jobId, isDone, currentUser.id);
+    onMutated?.();
+  }
+
   async function handleSubmit() {
     const capturedSlots = new Set(mediaBySlot.keys());
     const validationErrors = validateInstallForm(values, capturedSlots, !!signature);
+    const incompleteTasks = (tasks ?? []).filter((t) => !t.is_done);
+    if (incompleteTasks.length > 0) {
+      validationErrors.push(
+        incompleteTasks.length === 1
+          ? "1 task is not yet checked off."
+          : `${incompleteTasks.length} tasks are not yet checked off.`,
+      );
+    }
     setErrors(validationErrors);
     if (validationErrors.length > 0) return;
 
@@ -188,6 +202,25 @@ export function JobWorkflow({
 
       {(job.status === "on_site" || job.status === "in_progress") && (
         <div className="flex flex-col gap-4">
+          {(tasks ?? []).length > 0 && (
+            <div>
+              <p className="mb-2 text-sm font-medium">Tasks</p>
+              <ul className="flex flex-col gap-2">
+                {(tasks ?? []).map((task) => (
+                  <li key={task.id} className="flex items-center gap-2 rounded-md border p-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={task.is_done}
+                      onChange={(e) => handleToggleTask(task.id, e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <span className={task.is_done ? "text-muted-foreground line-through" : ""}>{task.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <Field label="Player serial">
             <div className="flex gap-2">
               <input

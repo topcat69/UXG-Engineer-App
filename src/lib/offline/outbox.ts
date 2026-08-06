@@ -72,6 +72,14 @@ async function applyOperation(supabase: ReturnType<typeof createClient>, op: Out
       if (error) throw error;
       return;
     }
+    case "task_toggle": {
+      const { error } = await supabase
+        .from("job_tasks")
+        .update({ is_done: op.isDone, done_at: op.doneAt, done_by: op.doneBy })
+        .eq("id", op.taskId);
+      if (error) throw error;
+      return;
+    }
     case "media_pending_delta": {
       const { error } = await supabase.rpc("adjust_media_pending", { p_job_id: op.jobId, p_delta: op.delta });
       if (error) throw error;

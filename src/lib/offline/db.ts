@@ -7,6 +7,7 @@ export type InstallFormRow = Database["public"]["Tables"]["install_forms"]["Row"
 export type SurveyFormRow = Database["public"]["Tables"]["survey_forms"]["Row"];
 export type SignatureRow = Database["public"]["Tables"]["signatures"]["Row"];
 export type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
+export type JobTaskRow = Database["public"]["Tables"]["job_tasks"]["Row"];
 export type JobStatus = Database["public"]["Enums"]["job_status"];
 
 type OutboxBase = {
@@ -40,6 +41,7 @@ export type OutboxOperation = OutboxBase &
     | { type: "survey_form_upsert"; row: SurveyFormRow }
     | { type: "signature_insert"; row: SignatureRow }
     | { type: "issue_insert"; row: IssueRow }
+    | { type: "task_toggle"; taskId: string; jobId: string; isDone: boolean; doneAt: string | null; doneBy: string | null }
     // Queued instead of applied directly because enqueuePhoto/enqueueSignature
     // must work fully offline. See adjust_media_pending() in
     // supabase/migrations/20260108000000_media_pending_delta.sql for why this
@@ -85,6 +87,7 @@ class OfflineDB extends Dexie {
   outbox!: Table<OutboxOperation, string>;
   mediaQueue!: EntityTable<MediaQueueItem, "id">;
   syncMeta!: EntityTable<SyncMeta, "key">;
+  jobTasks!: EntityTable<JobTaskRow, "id">;
 
   constructor() {
     super("uxg-engineer-job-schedular");
@@ -96,6 +99,16 @@ class OfflineDB extends Dexie {
       outbox: "id, createdAt",
       mediaQueue: "id, jobId, status",
       syncMeta: "key",
+    });
+    this.version(2).stores({
+      jobs: "id, status, assigned_to, scheduled_start, site_id",
+      sites: "id",
+      installForms: "id, job_id",
+      surveyForms: "id, job_id",
+      outbox: "id, createdAt",
+      mediaQueue: "id, jobId, status",
+      syncMeta: "key",
+      jobTasks: "id, job_id, is_done",
     });
   }
 }

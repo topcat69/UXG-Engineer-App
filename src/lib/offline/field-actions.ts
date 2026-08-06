@@ -85,6 +85,28 @@ export async function saveInstallFormDraft(row: InstallFormRow): Promise<void> {
   await db.installForms.put(row);
 }
 
+/** Ticks/unticks a job task. Optimistic local write + queued outbox op, same shape as checkIn. */
+export async function toggleTask(taskId: string, jobId: string, isDone: boolean, userId: string): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const doneAt = isDone ? nowIso : null;
+  const doneBy = isDone ? userId : null;
+
+  await db.transaction("rw", [db.jobTasks, db.outbox], async () => {
+    await db.jobTasks.update(taskId, { is_done: isDone, done_at: doneAt, done_by: doneBy });
+    await db.outbox.add({
+      id: uuid(),
+      type: "task_toggle",
+      taskId,
+      jobId,
+      isDone,
+      doneAt,
+      doneBy,
+      createdAt: nowIso,
+      attempts: 0,
+    });
+  });
+}
+
 /**
  * Check Out & Submit: finalizes the form and marks the job submitted. Media
  * still outstanding keeps uploading independently — per the non-negotiable

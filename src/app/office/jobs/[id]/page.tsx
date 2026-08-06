@@ -7,6 +7,8 @@ import { appBaseUrl } from "@/lib/app-url";
 import { isShareLinkValid } from "@/lib/share-links/validity";
 import { IssueForm } from "./issue-form";
 import { CancelJobButton } from "./cancel-job-button";
+import { DuplicateJobButton } from "./duplicate-job-button";
+import { TaskPanel } from "./task-panel";
 import { ShareLinkPanel } from "./share-link-panel";
 
 const INSTALL_PHOTO_SLOTS = [
@@ -30,6 +32,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: media },
     { data: issues },
     { data: shareLinks },
+    { data: jobTasks },
+    { data: templates },
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -48,6 +52,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("media_assets").select("*").eq("job_id", id).order("slot"),
     supabase.from("issues").select("*, raised_by_user:users(name)").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("share_links").select("token, expires_at, revoked").eq("job_id", id).order("created_at", { ascending: false }),
+    supabase.from("job_tasks").select("id, label, is_done").eq("job_id", id).order("position"),
+    supabase.from("job_templates").select("id, name").order("name"),
   ]);
 
   if (error || !job) notFound();
@@ -82,7 +88,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               {job.scheduled_start ? new Date(job.scheduled_start).toLocaleString() : "Not scheduled"}
             </p>
           </div>
-          <CancelJobButton jobId={job.id} status={job.status} />
+          <div className="flex items-center gap-2">
+            <DuplicateJobButton jobId={job.id} />
+            <CancelJobButton jobId={job.id} status={job.status} />
+          </div>
         </div>
       </div>
 
@@ -157,6 +166,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           )}
         </section>
       )}
+
+      <TaskPanel jobId={job.id} tasks={jobTasks ?? []} templates={templates ?? []} />
 
       <section className="flex flex-col gap-2">
         <h2 className="font-medium">Media</h2>
