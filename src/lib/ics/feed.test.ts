@@ -8,6 +8,8 @@ const job: IcsJob = {
   scheduled_end: "2026-08-10T11:00:00.000Z",
   site_name: "Riverside Retail Park",
   site_address: "12 River Road, Leeds, LS1 4AB",
+  site_latitude: 53.7997,
+  site_longitude: -1.5492,
   cancelled: false,
 };
 
@@ -52,6 +54,16 @@ describe("generateIcs", () => {
   it("escapes commas, semicolons, and backslashes in text fields", () => {
     const ics = generateIcs("Jamie Vance", [{ ...job, site_name: "Acme; Corp, Ltd\\HQ" }]);
     expect(ics).toContain("SUMMARY:UXG-2026-0042 — Acme\\; Corp\\, Ltd\\\\HQ");
+  });
+
+  it("emits GEO with the site's exact coordinates when known", () => {
+    const ics = generateIcs("Jamie Vance", [job]);
+    expect(ics).toContain("GEO:53.7997;-1.5492");
+  });
+
+  it("omits GEO when the site has no lat/lng on file", () => {
+    const ics = generateIcs("Jamie Vance", [{ ...job, site_latitude: null, site_longitude: null }]);
+    expect(ics).not.toContain("GEO:");
   });
 
   it("produces an empty-but-valid calendar for an engineer with no jobs", () => {

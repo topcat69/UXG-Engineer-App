@@ -24,6 +24,7 @@ import {
   validateInstallForm,
   type InstallFormValues,
 } from "@/lib/forms/install-form";
+import SiteMap from "@/components/site-map-loader";
 import { BarcodeScanButton } from "./barcode-scan-button";
 import { PhotoSlot } from "./photo-slot";
 import { SignatureCapture } from "./signature-capture";
@@ -192,6 +193,11 @@ export function JobWorkflow({
         <p className="text-muted-foreground text-sm">
           {[site?.address_line1, site?.town, site?.postcode].filter(Boolean).join(", ")}
         </p>
+        {site?.latitude && site?.longitude && (
+          <div className="mt-2">
+            <SiteMap latitude={site.latitude} longitude={site.longitude} label={site.name} />
+          </div>
+        )}
       </div>
 
       {NOT_YET_ON_SITE.includes(job.status) && (

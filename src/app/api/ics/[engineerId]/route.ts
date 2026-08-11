@@ -23,7 +23,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ engi
 
   const { data: jobs } = await supabase
     .from("jobs")
-    .select("id, job_number, status, scheduled_start, scheduled_end, site:sites(name, address_line1, address_line2, town, postcode)")
+    .select(
+      "id, job_number, status, scheduled_start, scheduled_end, site:sites(name, address_line1, address_line2, town, postcode, latitude, longitude)",
+    )
     .eq("assigned_to", engineerId)
     .not("scheduled_start", "is", null)
     .neq("status", "draft")
@@ -40,6 +42,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ engi
       site_address: [job.site!.address_line1, job.site!.address_line2, job.site!.town, job.site!.postcode]
         .filter(Boolean)
         .join(", "),
+      site_latitude: job.site!.latitude,
+      site_longitude: job.site!.longitude,
       cancelled: job.status === "cancelled",
     }));
 

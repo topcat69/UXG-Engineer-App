@@ -10,6 +10,8 @@ const site = {
   access_notes: null,
   contact_name: null,
   contact_phone: null,
+  latitude: null,
+  longitude: null,
 };
 
 const scheduledJob = {

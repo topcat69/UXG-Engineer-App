@@ -5,6 +5,8 @@ export type IcsJob = {
   scheduled_end: string | null;
   site_name: string;
   site_address: string;
+  site_latitude: number | null;
+  site_longitude: number | null;
   cancelled: boolean;
 };
 
@@ -45,6 +47,9 @@ export function generateIcs(engineerName: string, jobs: IcsJob[]): string {
       `DTEND:${toIcsDateTime(job.scheduled_end ?? job.scheduled_start)}`,
       `SUMMARY:${escapeText(`${job.job_number} — ${job.site_name}`)}`,
       `LOCATION:${escapeText(job.site_address)}`,
+      ...(job.site_latitude != null && job.site_longitude != null
+        ? [`GEO:${job.site_latitude};${job.site_longitude}`]
+        : []),
       `STATUS:${job.cancelled ? "CANCELLED" : "CONFIRMED"}`,
       "END:VEVENT",
     );

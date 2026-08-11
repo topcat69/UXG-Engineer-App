@@ -10,6 +10,8 @@ const site = {
   access_notes: "Use the loading bay, ask for Dave",
   contact_name: "Dave Holt",
   contact_phone: "07700 900123",
+  latitude: 53.7997,
+  longitude: -1.5492,
 };
 
 const job = {
@@ -59,7 +61,21 @@ describe("buildEventPayload", () => {
   });
 
   it("omits missing optional description lines instead of leaving blank lines", () => {
-    const payload = buildEventPayload(job, { ...site, access_notes: null, contact_name: null }, "https://x");
+    const payload = buildEventPayload(
+      job,
+      { ...site, access_notes: null, contact_name: null, latitude: null, longitude: null },
+      "https://x",
+    );
     expect(payload.description).toBe("https://x/office/jobs/job-1");
+  });
+
+  it("includes a link to the site's exact stored coordinates when known", () => {
+    const payload = buildEventPayload(job, site, "https://x");
+    expect(payload.description).toContain("https://www.google.com/maps?q=53.7997,-1.5492");
+  });
+
+  it("omits the coordinates link when the site has no lat/lng on file", () => {
+    const payload = buildEventPayload(job, { ...site, latitude: null, longitude: null }, "https://x");
+    expect(payload.description).not.toContain("google.com/maps");
   });
 });
