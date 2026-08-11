@@ -2,6 +2,7 @@
 
 import imageCompression from "browser-image-compression";
 import { db } from "./db";
+import { extensionForMime, mediaKindForFile, MAX_VIDEO_BYTES } from "./media-kind";
 
 /**
  * Compress client-side to ~1600px long edge, ~0.8 quality, before it enters
@@ -44,26 +45,46 @@ export function getCurrentPosition(): Promise<GeolocationPosition | null> {
   });
 }
 
-export async function enqueuePhoto(params: {
+export type EnqueueMediaResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Handles both photo and video capture for a slot. Photos are compressed
+ * client-side (see compressImage); there's no equivalent for video, so a
+ * video is queued at its original size but rejected upfront past
+ * MAX_VIDEO_BYTES rather than risking IndexedDB storage eviction (see
+ * media-kind.ts) or an upload that's never going to succeed over a site's
+ * wifi/cellular connection.
+ */
+export async function enqueueMedia(params: {
   jobId: string;
   slot: string;
   file: File | Blob;
   capturedBy: string;
-}): Promise<void> {
-  const compressed = await compressImage(params.file);
-  const [hash, position] = await Promise.all([sha256Hex(compressed), getCurrentPosition()]);
-  const storagePath = `jobs/${params.jobId}/${params.slot}-${Date.now()}.jpg`;
+}): Promise<EnqueueMediaResult> {
+  const kind = mediaKindForFile(params.file);
+
+  if (kind === "video" && params.file.size > MAX_VIDEO_BYTES) {
+    const maxMb = Math.round(MAX_VIDEO_BYTES / (1024 * 1024));
+    const gotMb = Math.round(params.file.size / (1024 * 1024));
+    return { ok: false, error: `Video is too large (${gotMb}MB, max ${maxMb}MB) — please record a shorter clip.` };
+  }
+
+  const blob = kind === "photo" ? await compressImage(params.file) : params.file;
+  const mime = kind === "photo" ? "image/jpeg" : params.file.type || "video/mp4";
+  const extension = kind === "photo" ? "jpg" : extensionForMime(mime);
+  const [hash, position] = await Promise.all([sha256Hex(blob), getCurrentPosition()]);
+  const storagePath = `jobs/${params.jobId}/${params.slot}-${Date.now()}.${extension}`;
   const now = new Date().toISOString();
 
   await db.transaction("rw", [db.mediaQueue, db.outbox], async () => {
     await db.mediaQueue.add({
       id: crypto.randomUUID(),
       jobId: params.jobId,
-      kind: "photo",
+      kind,
       slot: params.slot,
-      blob: compressed,
-      mime: "image/jpeg",
-      bytes: compressed.size,
+      blob,
+      mime,
+      bytes: blob.size,
       capturedAt: now,
       latitude: position?.coords.latitude,
       longitude: position?.coords.longitude,
@@ -83,6 +104,8 @@ export async function enqueuePhoto(params: {
       attempts: 0,
     });
   });
+
+  return { ok: true };
 }
 
 export async function enqueueSignature(params: {

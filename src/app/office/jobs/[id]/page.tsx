@@ -180,7 +180,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               return (
                 <div key={slot} className="flex flex-col gap-1 rounded-md border p-2 text-xs">
                   <div className="bg-muted flex h-20 items-center justify-center rounded text-muted-foreground">
-                    {asset ? "📷" : "—"}
+                    {asset ? (asset.media_type === "video" ? "🎥" : "📷") : "—"}
                   </div>
                   <span className="font-medium">{slot.replace("photo_", "").replace(/_/g, " ")}</span>
                   {asset ? (
@@ -200,7 +200,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {(media ?? []).map((asset) => (
               <div key={asset.id} className="flex flex-col gap-1 rounded-md border p-2 text-xs">
-                <div className="bg-muted flex h-20 items-center justify-center rounded text-muted-foreground">📷</div>
+                <div className="bg-muted flex h-20 items-center justify-center rounded text-muted-foreground">
+                  {asset.media_type === "video" ? "🎥" : "📷"}
+                </div>
                 <span className="font-medium">{asset.slot}</span>
               </div>
             ))}

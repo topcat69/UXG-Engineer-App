@@ -89,7 +89,7 @@ async function applyOperation(supabase: ReturnType<typeof createClient>, op: Out
 }
 
 /**
- * Uploads every queued photo/signature to Supabase Storage and writes its
+ * Uploads every queued photo/video/signature to Supabase Storage and writes its
  * media_assets row — per the non-negotiable rule, media never blocks
  * submission, so this always runs independently of the outbox operations
  * queue, on its own retry loop, and can lag behind a job already marked
@@ -128,7 +128,7 @@ export async function drainMediaQueue(): Promise<DrainResult> {
           job_id: item.jobId,
           slot: item.slot,
           storage_path: item.storagePath,
-          media_type: "image",
+          media_type: item.kind === "video" ? "video" : "image",
           bytes: item.bytes,
           mime: item.mime,
           captured_at: item.capturedAt,
@@ -142,7 +142,7 @@ export async function drainMediaQueue(): Promise<DrainResult> {
         if (insertError) throw insertError;
       }
 
-      // Both photos and the signature increment media_pending at capture
+      // Both media (photo/video) and the signature increment media_pending at capture
       // time (see media-capture.ts), so both must decrement it here too.
       await decrementMediaPending(supabase, item.jobId);
       await db.mediaQueue.update(item.id, { status: "uploaded" });

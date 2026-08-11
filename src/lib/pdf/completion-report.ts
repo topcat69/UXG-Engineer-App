@@ -113,16 +113,25 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
     }
   }
 
-  // --- Photos, one per page, GPS/timestamp overlay burned in ---
+  // --- Photos and videos, one per page, GPS/timestamp overlay burned in ---
+  // pdfkit's .image() only understands JPEG/PNG, so a video can't be
+  // embedded the way a photo is — it still gets a page (label, overlay,
+  // and a manifest entry hashing the actual downloaded bytes, same
+  // evidentiary record as a photo), just as a note instead of an image.
   const photos = (media ?? []).filter((m) => INSTALL_PHOTO_SLOTS.includes(m.slot));
   for (const photo of photos) {
     const bytes = await downloadBytes(supabase, photo.storage_path);
     if (!bytes) continue;
-    manifest.push({ label: `Photo: ${photo.slot}`, sha256: sha256Hex(bytes) });
+    const isVideo = photo.media_type === "video";
+    manifest.push({ label: `${isVideo ? "Video" : "Photo"}: ${photo.slot}`, sha256: sha256Hex(bytes) });
 
     doc.addPage();
     doc.fontSize(12).text(photo.slot.replace("photo_", "").replace(/_/g, " "));
-    doc.image(bytes, { fit: [500, 600], align: "center" });
+    if (isVideo) {
+      doc.fontSize(10).text("Video captured on site — see the job record for playback.");
+    } else {
+      doc.image(bytes, { fit: [500, 600], align: "center" });
+    }
     const overlay = formatGpsTimestampOverlay(photo.latitude, photo.longitude, photo.captured_at);
     doc.fontSize(9).fillColor("#333").text(overlay, { align: "center" });
     doc.fillColor("black");

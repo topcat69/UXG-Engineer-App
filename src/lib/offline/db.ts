@@ -42,7 +42,7 @@ export type OutboxOperation = OutboxBase &
     | { type: "signature_insert"; row: SignatureRow }
     | { type: "issue_insert"; row: IssueRow }
     | { type: "task_toggle"; taskId: string; jobId: string; isDone: boolean; doneAt: string | null; doneBy: string | null }
-    // Queued instead of applied directly because enqueuePhoto/enqueueSignature
+    // Queued instead of applied directly because enqueueMedia/enqueueSignature
     // must work fully offline. See adjust_media_pending() in
     // supabase/migrations/20260108000000_media_pending_delta.sql for why this
     // is a delta rather than an absolute set.
@@ -52,8 +52,8 @@ export type OutboxOperation = OutboxBase &
 export type MediaQueueItem = {
   id: string;
   jobId: string;
-  /** "photo" uploads land in media_assets on sync; "signature" lands in signatures. */
-  kind: "photo" | "signature";
+  /** "photo"/"video" uploads land in media_assets on sync; "signature" lands in signatures. */
+  kind: "photo" | "video" | "signature";
   slot: string;
   blob: Blob;
   mime: string;
