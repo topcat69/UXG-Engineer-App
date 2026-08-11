@@ -16,7 +16,7 @@ import {
   type Engineer,
 } from "@/lib/dashboard/metrics";
 
-const CHART_COLOR = "#0CB0DD";
+const CHART_COLOR = "#F3941D";
 
 function jobsHref(params: Record<string, string>): string {
   return `/office/jobs?${new URLSearchParams(params).toString()}`;
