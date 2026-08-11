@@ -150,4 +150,5 @@ end $$;
 insert into app_settings (key, value) values
   ('webhook_url', 'http://host.docker.internal:3000/api/webhooks/status-submitted'),
   ('webhook_secret', 'local-dev-webhook-secret-not-for-production-use'),
-  ('issue_webhook_url', 'http://host.docker.internal:3000/api/webhooks/issue-blocks-completion');
+  ('issue_webhook_url', 'http://host.docker.internal:3000/api/webhooks/issue-blocks-completion'),
+  ('monday_issue_webhook_url', 'http://host.docker.internal:3000/api/webhooks/issue-monday-sync');
