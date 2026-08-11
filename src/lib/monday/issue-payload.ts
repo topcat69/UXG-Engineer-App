@@ -17,6 +17,7 @@ const COLUMN_IDS = {
   dateRaised: "date_mm5xn22e",
   severity: "color_mm5xg295",
   status: "color_mm5x1wcq",
+  reportedBy: "multiple_person_mm5xsats",
 };
 
 const SEVERITY_LABELS: Record<string, string> = {
@@ -65,8 +66,16 @@ export function buildIssueItemName(issue: MondayIssue, job: MondayIssueJob): str
 }
 
 /** Monday's create_item mutation takes column_values as a JSON-encoded
- * string; this builds the plain object callers then JSON.stringify. */
-export function buildIssueColumnValues(issue: MondayIssue, job: MondayIssueJob): Record<string, unknown> {
+ * string; this builds the plain object callers then JSON.stringify.
+ * `raisedByMondayUserId` is looked up separately (by email, best-effort —
+ * see client.ts's findMondayUserIdByEmail) since it needs a live API call
+ * this function, being pure, can't make itself; pass null/undefined when
+ * there's no match to leave the column unset rather than guessing. */
+export function buildIssueColumnValues(
+  issue: MondayIssue,
+  job: MondayIssueJob,
+  raisedByMondayUserId?: number | null,
+): Record<string, unknown> {
   const values: Record<string, unknown> = {
     [COLUMN_IDS.jobReference]: job.job_number,
     [COLUMN_IDS.issueType]: { labels: [issueTypeLabel(issue)] },
@@ -75,6 +84,9 @@ export function buildIssueColumnValues(issue: MondayIssue, job: MondayIssueJob):
   };
   if (issue.created_at) {
     values[COLUMN_IDS.dateRaised] = { date: issue.created_at.slice(0, 10) };
+  }
+  if (raisedByMondayUserId != null) {
+    values[COLUMN_IDS.reportedBy] = { personsAndTeams: [{ id: raisedByMondayUserId, kind: "person" }] };
   }
   return values;
 }

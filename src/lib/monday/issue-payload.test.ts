@@ -84,4 +84,14 @@ describe("buildIssueColumnValues", () => {
     const values = buildIssueColumnValues({ ...issue, category: "cracked screen", blocks_completion: true }, job);
     expect(values.dropdown_mm5xbd).toEqual({ labels: ["Revisit Required"] });
   });
+
+  it("sets Reported By to the resolved Monday.com user when one was found", () => {
+    const values = buildIssueColumnValues(issue, job, 12345678);
+    expect(values.multiple_person_mm5xsats).toEqual({ personsAndTeams: [{ id: 12345678, kind: "person" }] });
+  });
+
+  it.each([undefined, null])("omits Reported By rather than guessing when the lookup found no match (%s)", (id) => {
+    const values = buildIssueColumnValues(issue, job, id);
+    expect(values.multiple_person_mm5xsats).toBeUndefined();
+  });
 });
