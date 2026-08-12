@@ -24,11 +24,10 @@ async function mondayRequest<T>(token: string, query: string, variables: Record<
  */
 export type MondayCreateItemResult = { status: "created" | "skipped"; itemId: string | null };
 
-// This board's "Open" group id. Passed explicitly on every create because
-// the board's configured top_group (where Monday puts an item when no
-// group is given) is actually "Resolved", not "Open" — a pre-existing
-// quirk of this specific board's setup, not something to rely on.
-const ISSUES_OPEN_GROUP_ID = "group_mm5xced5";
+// The CRM > Issues board's "Open Issues" group id (this board's own
+// top_group, unlike the Field Service Management board this app targeted
+// before — passed explicitly anyway rather than relying on that holding).
+const ISSUES_OPEN_GROUP_ID = "topics";
 
 export async function createMondayIssueItem(
   itemName: string,
@@ -49,24 +48,4 @@ export async function createMondayIssueItem(
     columnValues: JSON.stringify(columnValues),
   });
   return { status: "created", itemId: data.create_item.id };
-}
-
-/**
- * Looks up a Monday.com user's numeric id by email, for the "Reported By"
- * people column — this app's engineers aren't otherwise linked to Monday
- * user accounts, so email (assumed shared between the two systems) is the
- * only signal available. Returns null on no match or when unconfigured, not
- * a thrown error, so a lookup miss just leaves the column unset rather than
- * failing the whole sync.
- */
-export async function findMondayUserIdByEmail(email: string): Promise<number | null> {
-  const token = process.env.MONDAY_API_TOKEN;
-  if (!token) return null;
-
-  const query = `query ($email: [String]) {
-    users(emails: $email, limit: 1) { id }
-  }`;
-
-  const data = await mondayRequest<{ users: { id: string }[] }>(token, query, { email: [email] });
-  return data.users[0] ? Number(data.users[0].id) : null;
 }
