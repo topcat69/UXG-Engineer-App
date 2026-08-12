@@ -1472,3 +1472,63 @@ click-timing out on a button that was live but disabled. Removed
 already calls `revalidatePath("/office/users")`, so other tabs/next
 visits stay consistent without it, and local state is the only thing
 this page's own UI depends on.
+
+## Addendum, 2026-08-12 — on-demand job reports (PDF + zip)
+
+**A dedicated `/office/reports` page, not buttons on the job sheet.** The
+request offered both; a central page won out because it lets a
+superadmin/manager find and pull a report without first opening the job
+(reusing `parseJobListFilters`/`applyJobListFilters` from the jobs list for
+the same search-by-job-number/status behavior), and keeps report-pulling
+separate from day-to-day job management on the detail page.
+
+**Generated fresh on every request, not read from
+`jobs.completion_pdf_url`.** That column is set once, at QA approval
+(`qa/actions.ts`), and stays null for any job never approved — exactly the
+jobs this feature needs to cover too, since "as applicable" was explicit in
+the request (a draft job with no media yet still produces *a* report, just
+a short one, same graceful-degradation behavior `generateCompletionReport`
+already had). Reusing the stored PDF would also mean the report going
+stale the moment anything on an already-approved job changed after
+approval. Two new routes, `/api/jobs/[id]/report/{pdf,zip}`, call
+`generateCompletionReport`/`generateJobArchive` directly instead.
+
+**The zip bundles the same PDF alongside full-resolution originals**, per
+explicit instruction, rather than raw media alone — one download has both
+the readable summary and the evidence behind it. Built with `jszip`
+(in-memory `Buffer` in, `Buffer` out), matching the existing
+`generateCompletionReport` shape rather than `archiver`'s stream-based API,
+since nothing here needs streaming at this app's scale. `completion-report.ts`'s
+`downloadBytes` helper is now exported and shared by both generators rather
+than duplicated — it was already the one place original media bytes get
+pulled from Storage and hashed.
+
+**These two API routes re-check `getCurrentUser()`/role manually**,
+mirroring `/api/export/jobs`'s existing comment about why: `/api` is public
+at the proxy layer, so the `/office` layout's redirect-based
+`requireOfficeUser()` gate never runs for a direct request to them.
+
+**`NextResponse` needed `new Uint8Array(buffer)`, not the `Buffer` itself** —
+`tsc` rejected a bare `Buffer<ArrayBufferLike>` against `BodyInit` (a
+`@types/node` vs. DOM-lib generic mismatch, not a real runtime issue; a
+`Buffer` already *is* a `Uint8Array` at runtime), surfaced by `pnpm typecheck`
+before it reached a browser.
+
+**Two new pure functions (`sanitizeFilename`, `extensionFor`) live in their
+own `archive-naming.ts`, not inside `job-archive.ts`.** `job-archive.ts`
+carries `import "server-only"`, which throws immediately under vitest's
+jsdom test environment (`window` is defined there) — the same split
+`overlay-text.ts`/`completion-report.ts` already established, so the pure
+naming logic stays directly unit-testable.
+
+**Not verified against a live browser or real Supabase in this session** —
+this sandbox's Docker daemon refuses to start (`ulimit: error setting
+limit (Operation not permitted)`), so `supabase start` and therefore the
+new `tests/e2e/job-reports.spec.ts` (a manager downloading and parsing a
+real PDF and a real zip, modeled on the Phase 5 completion-report E2E
+test) could not actually be run here, nor could the RLS/migration suites
+that already depend on local Supabase. `pnpm typecheck`, `pnpm lint`, and
+the full `pnpm test` unit run are clean (203 passed, same 2 pre-existing
+Supabase-dependent failures as before this change) — someone with a
+working Docker environment should run the full suite, including the new
+E2E spec, before treating this as verified end-to-end.

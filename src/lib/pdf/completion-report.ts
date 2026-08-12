@@ -31,7 +31,8 @@ function sha256Hex(buffer: Buffer): string {
   return createHash("sha256").update(buffer).digest("hex");
 }
 
-async function downloadBytes(supabase: AnySupabaseClient, storagePath: string): Promise<Buffer | null> {
+/** Exported for job-archive.ts, which needs the same original bytes this file already downloads for embedding. */
+export async function downloadBytes(supabase: AnySupabaseClient, storagePath: string): Promise<Buffer | null> {
   const { data } = await supabase.storage.from("media").download(storagePath);
   if (!data) return null;
   return Buffer.from(await data.arrayBuffer());

@@ -29,6 +29,7 @@
     "dexie": "^4.4.4",
     "dexie-react-hooks": "^4.4.0",
     "googleapis": "^174.0.0",
+    "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.28.0",
     "next": "16.2.12",
