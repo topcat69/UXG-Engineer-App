@@ -1,0 +1,42 @@
+# Split-hosting model (see DECISIONS.md's deploy addendum): this VM runs only the Next.js
+# app + a reverse proxy. Postgres/Auth/Storage/Realtime stay on Supabase
+# Cloud — this app already talks to Supabase entirely over its public API
+# (NEXT_PUBLIC_SUPABASE_URL + keys), so nothing here changes for that.
+#
+# Run with: docker compose --env-file .env.production up -d --build
+# The same --env-file is what lets ${...} below resolve both for build
+# args (NEXT_PUBLIC_* — baked into the client bundle) and, via env_file:,
+# for the app container's runtime env (everything else: service role key,
+# Resend, Monday.com, webhook secret, ...).
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN}
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:

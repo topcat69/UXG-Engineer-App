@@ -1,0 +1,49 @@
+name: Deploy
+
+# Fires once CI (typecheck/lint/tests/build against a real local Supabase —
+# see ci.yml) has finished on main, and only deploys if CI actually passed.
+# Deliberately not a plain `push: branches: [main]` trigger — that would
+# start deploying before CI has even run, since both workflows would kick
+# off from the same push independently.
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      # The VM pulls and rebuilds from its own clone of `main` — nothing
+      # about the app's code or secrets passes through GitHub Actions
+      # itself. This job's only job is "tell the VM a new main landed."
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script_stop: true
+          script: |
+            cd ${{ secrets.DEPLOY_PATH || '/opt/uxg-engineer-app' }}
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose --env-file .env.production build
+            docker compose --env-file .env.production up -d
+            docker image prune -f
+
+            # Smoke test: the app must actually answer before this run is
+            # "green" — a container that starts but crash-loops on a bad
+            # env var should fail the deploy, not report success.
+            for i in $(seq 1 10); do
+              if curl -fsS http://localhost:3000/ > /dev/null; then
+                echo "App responded, deploy OK."
+                exit 0
+              fi
+              sleep 3
+            done
+            echo "App did not respond after deploy — check 'docker compose logs app'." >&2
+            exit 1

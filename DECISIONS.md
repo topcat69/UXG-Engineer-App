@@ -1532,3 +1532,78 @@ the full `pnpm test` unit run are clean (203 passed, same 2 pre-existing
 Supabase-dependent failures as before this change) — someone with a
 working Docker environment should run the full suite, including the new
 E2E spec, before treating this as verified end-to-end.
+
+## Addendum, 2026-08-12 — self-hosted VM deploy (Docker + CI/CD)
+
+**Split hosting, not full self-host.** The VM runs only the Next.js app;
+Supabase (Postgres/Auth/Storage/Realtime) stays a managed Cloud project.
+At this app's scale (10 users, ~50 jobs/month) self-hosting the entire
+Supabase Docker stack too would need a meaningfully bigger VM for very
+little benefit, and trades away Supabase's backups/patching for none.
+Worth revisiting only if Supabase Cloud's storage costs (see below)
+outgrow the savings.
+
+**`output: "standalone"` added to `next.config.ts`.** Pairs with the
+existing `serverExternalPackages: ["pdfkit"]` (added for Phase 5's PDF
+generator) rather than fighting it: that setting exists specifically so
+Next's file tracer copies a package needing real on-disk assets (pdfkit's
+`.afm` font files) wholesale into the standalone output instead of trying
+to cherry-pick files the way a normally-bundled dependency would.
+
+**`jszip` bundles into the client if anything outside `job-archive.ts`
+imports it carelessly** — worth flagging since it's a new dependency:
+both `job-archive.ts` and `completion-report.ts` are `server-only`, so
+this hasn't happened, but it's a static-analysis-friendly footgun to keep
+in mind for future dependents.
+
+**A single `.env.production` on the VM drives both the Docker build args
+(`NEXT_PUBLIC_*`, inlined into the client bundle at build time) and the
+running container's env (everything else, read at runtime)** — one file
+via `docker compose --env-file .env.production build|up`, rather than
+maintaining `NEXT_PUBLIC_*` in GitHub Actions secrets separately from
+runtime secrets on the VM. Deliberately: none of `.env.production`'s
+contents pass through GitHub Actions at all — the deploy workflow only
+carries SSH connection details, not app secrets, and the VM's `git pull`
+is what brings in code changes.
+
+**Deploy pipeline is push-to-`main` via SSH, not a container registry.**
+`.github/workflows/deploy.yml` triggers on `workflow_run` for `CI`
+completing successfully on `main` (not directly on push — a plain push
+trigger would race CI rather than wait for it), then SSHes in and runs
+`git fetch/reset` + `docker compose build` + `up -d` on the VM itself.
+Building on the VM instead of in CI-then-pushing-to-a-registry means no
+registry account/credentials to manage, at the cost of build time and
+memory happening on the (smaller, cheaper) VM rather than a CI runner —
+an acceptable trade at this app's size and low deploy frequency, worth
+revisiting if the VM stays undersized for the build itself. The deploy
+step ends with a `curl` smoke test against the container so a crash-loop
+on a bad env var fails the Actions run instead of reporting green.
+
+**Three production config steps have no code to point at, so they're
+logged here instead of only in a comment**, since none of them exist in
+`.env.example` or the local Supabase config and each fails silently if
+skipped:
+- **Supabase Auth → URL Configuration**: Site URL and
+  `https://<domain>/auth/callback` must be added as allowed redirect
+  URLs, or magic-link login silently breaks — `src/app/login/page.tsx`'s
+  `redirectTo` is `window.location.origin`-based, not hardcoded, but
+  Supabase Auth still only follows redirects it's explicitly told to
+  trust.
+- **`app_settings` table** (`webhook_url`, `issue_webhook_url`,
+  `monday_issue_webhook_url`, `webhook_secret`): the three pg_net
+  triggers (status-submitted email, issue-blocks-completion revisit,
+  issue-Monday sync) all read their target URL from this table at call
+  time rather than a migration-seeded value, by original design (see
+  `20260109000000_status_submitted_webhook.sql`'s own comment on why) —
+  it has to be set once by hand against the real domain and
+  `WEBHOOK_SHARED_SECRET`.
+- **Cron**: `/api/cron/{day-before-reminders,weekly-summary,media-lifecycle}`
+  are plain `X-Webhook-Secret`-authenticated POST routes with no
+  self-triggering mechanism (no pg_cron, no Vercel Cron on a bare VM) —
+  needs real crontab entries hitting them with `curl`.
+
+**Storage cost is the one number worth watching after go-live.**
+Supabase Cloud's free tier caps Storage at 1GB; this app captures several
+photos plus video per job, so even 50 jobs/month will likely cross that
+within weeks — budget for Supabase Pro (~$25/mo) once real jobs start
+landing, not as a "someday" upgrade.

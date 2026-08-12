@@ -5,8 +5,17 @@ const nextConfig: NextConfig = {
   // via __dirname-relative paths; bundled into the server build, those
   // paths point at a virtual module graph instead of real files (ENOENT).
   // Excluding it here makes Next.js load it as a plain CommonJS require
-  // against the real node_modules on disk instead.
+  // against the real node_modules on disk instead — and, as a documented
+  // side effect, tells the `output: "standalone"` file tracer below to
+  // copy pdfkit's whole package directory (including those .afm files)
+  // into the standalone bundle verbatim, instead of trying to trace and
+  // cherry-pick only the files a normal bundled dependency would need.
   serverExternalPackages: ["pdfkit"],
+  // Self-hosted Docker deploy (see Dockerfile/DEPLOYMENT.md): produces a
+  // `.next/standalone` folder containing only the production server plus
+  // the node_modules subset it actually needs, instead of requiring the
+  // full node_modules (incl. devDependencies) inside the runtime image.
+  output: "standalone",
 };
 
 export default nextConfig;
