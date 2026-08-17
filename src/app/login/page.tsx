@@ -9,11 +9,15 @@ import { createClient } from "@/lib/supabase/client";
 import { UxgLogo } from "@/components/branding/uxg-logo";
 
 type Status = "idle" | "sending" | "sent" | "error";
+type CodeStatus = "idle" | "verifying" | "error";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [codeStatus, setCodeStatus] = useState<CodeStatus>("idle");
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,6 +39,35 @@ export default function LoginPage() {
     }
 
     setStatus("sent");
+  }
+
+  /**
+   * Fallback for the link-click flow: some corporate email security
+   * gateways pre-fetch every link in an incoming message to scan it before
+   * delivery, which silently burns a single-use magic link before the real
+   * user ever clicks it. Typing in the code sidesteps that entirely — there's
+   * no link for a scanner to consume. Requires the Magic Link email template
+   * (Supabase dashboard > Authentication > Emails) to include {{ .Token }}.
+   */
+  async function handleVerifyCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCodeStatus("verifying");
+    setCodeError(null);
+
+    const supabase = createClient();
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: "email",
+    });
+
+    if (verifyError) {
+      setCodeStatus("error");
+      setCodeError(verifyError.message);
+      return;
+    }
+
+    window.location.href = "/";
   }
 
   /**
@@ -69,9 +102,30 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           {status === "sent" ? (
-            <p className="text-sm text-muted-foreground">
-              Check {email} for a sign-in link.
-            </p>
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                Check {email} for a sign-in link, or enter the 6-digit code from that email below.
+              </p>
+              <form onSubmit={handleVerifyCode} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="code">Code</Label>
+                  <Input
+                    id="code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    required
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    placeholder="123456"
+                  />
+                </div>
+                {codeError ? <p className="text-sm text-destructive">{codeError}</p> : null}
+                <Button type="submit" disabled={codeStatus === "verifying"}>
+                  {codeStatus === "verifying" ? "Verifying…" : "Verify code"}
+                </Button>
+              </form>
+            </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
