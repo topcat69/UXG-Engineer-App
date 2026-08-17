@@ -104,7 +104,7 @@ export default function LoginPage() {
           {status === "sent" ? (
             <div className="flex flex-col gap-4">
               <p className="text-sm text-muted-foreground">
-                Check {email} for a sign-in link, or enter the 6-digit code from that email below.
+                Check {email} for a sign-in link, or enter the code from that email below.
               </p>
               <form onSubmit={handleVerifyCode} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
@@ -113,11 +113,10 @@ export default function LoginPage() {
                     id="code"
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    maxLength={6}
                     required
                     value={code}
                     onChange={(event) => setCode(event.target.value)}
-                    placeholder="123456"
+                    placeholder="Enter the code from your email"
                   />
                 </div>
                 {codeError ? <p className="text-sm text-destructive">{codeError}</p> : null}
