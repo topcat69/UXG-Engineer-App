@@ -31,6 +31,12 @@ ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
     NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
     NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 
+# V8 sizes its default heap ceiling off detected physical RAM, not swap —
+# on a memory-constrained VM that default sits well under what's actually
+# available once swap is added, and the build's TypeScript-checking pass
+# (a separate worker process) hits it. Raise it explicitly so the build
+# can actually use the swap instead of hitting a self-imposed ceiling.
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN pnpm build
 
 # --- runner: just the standalone server output, no source or devDependencies ---
