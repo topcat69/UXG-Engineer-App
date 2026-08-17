@@ -23,6 +23,15 @@ services:
       - .env.production
     expose:
       - "3000"
+    # Published directly for the pre-domain testing phase, so the app is
+    # reachable at http://<VM_IP>:3000 without Caddy in front of it (Caddy
+    # can't issue a real TLS cert without a domain to issue one for). Safe
+    # to leave in place once Caddy's live too — `expose` above already
+    # covers container-to-container traffic — but worth removing this
+    # `ports:` mapping (and closing 3000 in ufw) once HTTPS is the only
+    # front door, so the app isn't reachable over plain HTTP in parallel.
+    ports:
+      - "3000:3000"
 
   caddy:
     image: caddy:2-alpine
