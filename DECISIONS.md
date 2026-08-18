@@ -1689,3 +1689,104 @@ login after the earlier migration-collision fix), then a real walkthrough
 — create a client, add a site, create a job against it, confirm the
 Calendar/Monday hooks still fire correctly with a job created this way
 rather than via CSV import.
+
+
+## Addendum, 2026-08-18 — four job types (install/SLA/maintenance/delivery), from a supplied spec doc
+
+Replaced the single generic "install" field-capture form with four
+job-type-specific ones, per an uploaded "Field Operations Platform
+Replacement" spec plus a follow-up instruction to fold the existing
+AV-specific install fields (player/screen serial, mount type, power
+source, network type, WiFi signal, boot test, content displaying) into
+install/SLA/maintenance (not delivery, which has no equipment-condition
+checks). `survey` and its `survey_forms` table are explicitly kept
+as-is — worth noting they were never actually wired into the field app
+to begin with (`JobWorkflow` always rendered the install form
+regardless of `job.job_type`, a pre-existing gap this change doesn't
+touch, since fixing survey's own field UI was never asked for).
+
+**Most of the spec's sections needed no new schema at all** —
+`20260117000000_job_details.sql`'s own comment spells out why: journey
+start / site-arrival timestamps are already the travelling/on_site
+`status_events` rows; "Customer Sign Off (date stamped)" is already
+`signatures.signed_at`; "Photos of..." are already `media_assets` with
+new slot values (see `photoSlotsFor` in `lib/forms/job-form.ts`); "Log
+any issues... creates an issue in the issue log and Monday.com" is
+already the `issues` table and its existing webhook. What's genuinely
+new: the AV fields (carried over from `install_forms`), RAMS/site-plan
+file references, a `sla_requirement_detail` text field
+(SLA/maintenance only), `parking_notified`/`reported_to_site_manager`
+booleans, and `revisit_required` (install/SLA only).
+
+**One shared `job_details` table for all four types, not four**, given
+how much overlaps — the field-app UI already has to branch on job type
+to decide what to show, so a single table with a superset of nullable
+columns (mirroring `install_forms`/`survey_forms`'s existing "fixed
+columns, not database-driven" pattern from `lib/forms/install-form.ts`,
+just now parameterised by type) avoids duplicating the AV field set
+three times. `lib/forms/job-form.ts`'s `shows*` predicates
+(`showsAvFields`, `showsSiteplanAndEquipment`, `showsSlaRequirement`,
+`showsIssuesSection`, `showsRevisitRequired`) are the single source of
+truth for which sections a given type shows, used identically by the
+field app's rendering, validation, and the office's job-details panel.
+
+**"Revisit Required: Yes" reuses the existing
+`issues.blocks_completion` webhook** (`create-revisit.ts`) rather than
+a new mechanism — it's just an explicit engineer-driven trigger for the
+same "this needs a follow-up visit" outcome a failed AV check already
+produces, so `detectAutoIssues` in job-form.ts raises it as a
+high-severity blocking issue alongside the boot-test/content-displaying
+checks.
+
+**RAMS and site plan reuse the existing `media` Storage bucket**
+(`jobs/{job_id}/{filename}` convention, same RLS already in place) —
+office uploads them from the job detail page's new panel
+(`job-details-panel.tsx`) once a job exists, mirroring how templates
+get applied after creation rather than during the "New Job" quick-create
+form. Equipment list is its own table (`job_equipment`) rather than
+fixed columns, since a repeating model+serial list doesn't fit a flat
+row the way `job_details`' other fields do — office-write-only RLS
+(same "shared reference data" shape as `clients`/`sites`/`projects`),
+since it's planning data, not something an engineer edits in the field.
+
+**The field app has no existing pattern for viewing remote Storage
+files offline** — photos are purely local capture (blob previews from
+the offline media queue), never fetched back from Storage. Rather than
+build offline document caching (a genuinely separate, nontrivial
+concern — would need pre-downloading files into IndexedDB during
+sync-down, the reverse of how photo uploads work), the field app's
+"Info on system" section just shows RAMS/site plan as
+attached-or-not — full offline viewing is out of scope for this pass,
+worth flagging plainly rather than leaving unstated.
+
+**`lib/pdf/completion-report.ts` had a real, pre-existing bug this
+surfaced**: its photo loop filtered `media_assets` down to a hardcoded
+`INSTALL_PHOTO_SLOTS` list, silently producing zero photos in the PDF
+for any job type other than install (survey already had this bug;
+sla/maintenance/delivery would have inherited it). Fixed by dropping
+the slot filter entirely — the `media_assets` query is already scoped
+to the one job via `job_id`, so there's no reason to filter further.
+`job-archive.ts` (the zip export) already had no such filter, so it
+needed no fix.
+
+**A newer, stricter ESLint rule (`react-hooks/set-state-in-effect`)
+flagged the field workflow's local-state hydration effect** once it had
+two parallel state slots (install vs job_details) — the *identical*
+single-setState-in-a-conditional shape the original code already had
+passed cleanly, but splitting into two conditionally-reachable setState
+calls within one effect apparently trips a stricter heuristic than one
+does. Fixed by splitting into two separate effects, one per state
+variable, each individually matching the original's simple shape again
+— not by suppressing the rule.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, and `pnpm test`
+all clean (226 passed — 19 new tests in `job-form.test.ts` covering the
+per-type section visibility, validation, and auto-issue logic — same 2
+pre-existing Supabase-dependent failures as every prior addendum in
+this sandbox, still no working Docker daemon here). Not verified
+against a live browser, real Supabase, or the actual VM — needs
+`supabase db push` for `20260117000000_job_details.sql` on the real
+project, then a real walkthrough: create an install job, upload
+RAMS/site plan/equipment from the office side, complete it from a phone
+end to end, confirm the PDF report and Monday/Calendar hooks all still
+fire correctly for the new types.

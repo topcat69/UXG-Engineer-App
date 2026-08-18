@@ -5,6 +5,8 @@ export type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 export type SiteRow = Database["public"]["Tables"]["sites"]["Row"];
 export type InstallFormRow = Database["public"]["Tables"]["install_forms"]["Row"];
 export type SurveyFormRow = Database["public"]["Tables"]["survey_forms"]["Row"];
+export type JobDetailsRow = Database["public"]["Tables"]["job_details"]["Row"];
+export type JobEquipmentRow = Database["public"]["Tables"]["job_equipment"]["Row"];
 export type SignatureRow = Database["public"]["Tables"]["signatures"]["Row"];
 export type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
 export type JobTaskRow = Database["public"]["Tables"]["job_tasks"]["Row"];
@@ -39,6 +41,7 @@ export type OutboxOperation = OutboxBase &
     | { type: "job_patch"; jobId: string; patch: Partial<JobRow> }
     | { type: "install_form_upsert"; row: InstallFormRow }
     | { type: "survey_form_upsert"; row: SurveyFormRow }
+    | { type: "job_details_upsert"; row: JobDetailsRow }
     | { type: "signature_insert"; row: SignatureRow }
     | { type: "issue_insert"; row: IssueRow }
     | { type: "task_toggle"; taskId: string; jobId: string; isDone: boolean; doneAt: string | null; doneBy: string | null }
@@ -88,6 +91,8 @@ class OfflineDB extends Dexie {
   mediaQueue!: EntityTable<MediaQueueItem, "id">;
   syncMeta!: EntityTable<SyncMeta, "key">;
   jobTasks!: EntityTable<JobTaskRow, "id">;
+  jobDetails!: EntityTable<JobDetailsRow, "id">;
+  jobEquipment!: EntityTable<JobEquipmentRow, "id">;
 
   constructor() {
     super("uxg-engineer-job-scheduler");
@@ -109,6 +114,18 @@ class OfflineDB extends Dexie {
       mediaQueue: "id, jobId, status",
       syncMeta: "key",
       jobTasks: "id, job_id, is_done",
+    });
+    this.version(3).stores({
+      jobs: "id, status, assigned_to, scheduled_start, site_id",
+      sites: "id",
+      installForms: "id, job_id",
+      surveyForms: "id, job_id",
+      outbox: "id, createdAt",
+      mediaQueue: "id, jobId, status",
+      syncMeta: "key",
+      jobTasks: "id, job_id, is_done",
+      jobDetails: "id, job_id",
+      jobEquipment: "id, job_id",
     });
   }
 }

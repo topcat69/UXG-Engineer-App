@@ -38,22 +38,46 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
   const pendingOps = await db.outbox.toArray();
   const pendingJobIds = new Set(
     pendingOps
-      .map((op) => ("jobId" in op ? op.jobId : op.type === "install_form_upsert" || op.type === "survey_form_upsert" ? op.row.job_id : undefined))
+      .map((op) =>
+        "jobId" in op
+          ? op.jobId
+          : op.type === "install_form_upsert" || op.type === "survey_form_upsert" || op.type === "job_details_upsert"
+            ? op.row.job_id
+            : undefined,
+      )
       .filter((id): id is string => !!id),
   );
   const overwritableJobIds = new Set(jobIdsSafeToOverwrite(jobIds, pendingJobIds));
 
-  const [{ data: installForms, error: installError }, { data: surveyForms, error: surveyError }, { data: jobTasks, error: jobTasksError }] =
+  const [
+    { data: installForms, error: installError },
+    { data: surveyForms, error: surveyError },
+    { data: jobTasks, error: jobTasksError },
+    { data: jobDetails, error: jobDetailsError },
+    { data: jobEquipment, error: jobEquipmentError },
+  ] =
     jobIds.length > 0
       ? await Promise.all([
           supabase.from("install_forms").select("*").in("job_id", jobIds),
           supabase.from("survey_forms").select("*").in("job_id", jobIds),
           supabase.from("job_tasks").select("*").in("job_id", jobIds),
+          supabase.from("job_details").select("*").in("job_id", jobIds),
+          // Office-prepared, engineer never writes it, so there's no
+          // pending-outbox guard needed the way install_forms/job_details have.
+          supabase.from("job_equipment").select("*").in("job_id", jobIds),
         ])
-      : [{ data: [], error: null } as const, { data: [], error: null } as const, { data: [], error: null } as const];
+      : [
+          { data: [], error: null } as const,
+          { data: [], error: null } as const,
+          { data: [], error: null } as const,
+          { data: [], error: null } as const,
+          { data: [], error: null } as const,
+        ];
   if (installError) throw installError;
   if (surveyError) throw surveyError;
   if (jobTasksError) throw jobTasksError;
+  if (jobDetailsError) throw jobDetailsError;
+  if (jobEquipmentError) throw jobEquipmentError;
 
   // A task the engineer just ticked/unticked offline has a pending
   // task_toggle op keyed by its own id — pulling the server's stale copy
@@ -64,7 +88,7 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
 
   await db.transaction(
     "rw",
-    [db.jobs, db.sites, db.installForms, db.surveyForms, db.jobTasks, db.syncMeta],
+    [db.jobs, db.sites, db.installForms, db.surveyForms, db.jobTasks, db.jobDetails, db.jobEquipment, db.syncMeta],
     async () => {
       await db.jobs.bulkPut(jobs ?? []);
       await db.sites.bulkPut(sites ?? []);
@@ -78,6 +102,10 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
       for (const row of jobTasks ?? []) {
         if (!pendingTaskIds.has(row.id)) await db.jobTasks.put(row);
       }
+      for (const row of jobDetails ?? []) {
+        if (row.job_id && overwritableJobIds.has(row.job_id)) await db.jobDetails.put(row);
+      }
+      await db.jobEquipment.bulkPut(jobEquipment ?? []);
 
       // Drop local jobs that have fallen out of the assigned/windowed set —
       // unless they still have unsynced work, which must survive until drained.

@@ -9,15 +9,6 @@ type AnySupabaseClient = SupabaseClient<Database>;
 
 type ManifestEntry = { label: string; sha256: string };
 
-const INSTALL_PHOTO_SLOTS = [
-  "photo_before",
-  "photo_screen_mounted",
-  "photo_player_installed",
-  "photo_cable_management",
-  "photo_content_on_screen",
-  "photo_wide_shot",
-];
-
 /**
  * Every hash in the manifest is computed here, from the bytes just
  * downloaded for embedding — never trusted from `media_assets.sha256`
@@ -45,17 +36,19 @@ export async function downloadBytes(supabase: AnySupabaseClient, storagePath: st
  * and setting `jobs.completion_pdf_url` (see qa/actions.ts's approveJob).
  */
 export async function generateCompletionReport(supabase: AnySupabaseClient, jobId: string): Promise<Buffer> {
-  const [{ data: job }, { data: installForm }, { data: media }, { data: signatures }, { data: issues }] = await Promise.all([
-    supabase
-      .from("jobs")
-      .select("job_number, job_type, status, scheduled_start, actual_start, actual_end, site:sites(name, address_line1, address_line2, town, postcode), project:projects(name)")
-      .eq("id", jobId)
-      .single(),
-    supabase.from("install_forms").select("*").eq("job_id", jobId).maybeSingle(),
-    supabase.from("media_assets").select("*").eq("job_id", jobId).order("slot"),
-    supabase.from("signatures").select("*").eq("job_id", jobId),
-    supabase.from("issues").select("severity, description, status").eq("job_id", jobId).order("created_at"),
-  ]);
+  const [{ data: job }, { data: installForm }, { data: jobDetails }, { data: media }, { data: signatures }, { data: issues }] =
+    await Promise.all([
+      supabase
+        .from("jobs")
+        .select("job_number, job_type, status, scheduled_start, actual_start, actual_end, site:sites(name, address_line1, address_line2, town, postcode), project:projects(name)")
+        .eq("id", jobId)
+        .single(),
+      supabase.from("install_forms").select("*").eq("job_id", jobId).maybeSingle(),
+      supabase.from("job_details").select("*").eq("job_id", jobId).maybeSingle(),
+      supabase.from("media_assets").select("*").eq("job_id", jobId).order("slot"),
+      supabase.from("signatures").select("*").eq("job_id", jobId),
+      supabase.from("issues").select("severity, description, status").eq("job_id", jobId).order("created_at"),
+    ]);
   if (!job) throw new Error(`Job ${jobId} not found`);
 
   const doc = new PDFDocument({ margin: 50 });
@@ -105,6 +98,32 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
     }
   }
 
+  if (jobDetails) {
+    doc.moveDown().fontSize(14).text("Form answers");
+    doc.fontSize(10);
+    const fields: [string, string | boolean | null][] = [
+      ["Player serial", jobDetails.player_serial],
+      ["Screen serial", jobDetails.screen_serial],
+      ["Mount type", jobDetails.mount_type],
+      ["Power source", jobDetails.power_source],
+      ["Network type", jobDetails.network_type],
+      ["WiFi signal", jobDetails.wifi_signal],
+      ["Player boot test", jobDetails.player_boot_test],
+      ["Content displaying", jobDetails.content_displaying],
+      ["SLA requirement", jobDetails.sla_requirement_detail],
+      ["Parking notified", jobDetails.parking_notified],
+      ["Reported to site manager", jobDetails.reported_to_site_manager],
+      ["Revisit required", jobDetails.revisit_required],
+      ["Issues found", jobDetails.issues_found],
+      ["Issue detail", jobDetails.issue_detail],
+      ["Engineer notes", jobDetails.engineer_notes],
+    ];
+    for (const [label, value] of fields) {
+      if (value === null || value === "") continue;
+      doc.text(`${label}: ${value}`);
+    }
+  }
+
   // --- Issues raised ---
   if (issues && issues.length > 0) {
     doc.moveDown().fontSize(14).text("Issues raised");
@@ -119,8 +138,7 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
   // embedded the way a photo is — it still gets a page (label, overlay,
   // and a manifest entry hashing the actual downloaded bytes, same
   // evidentiary record as a photo), just as a note instead of an image.
-  const photos = (media ?? []).filter((m) => INSTALL_PHOTO_SLOTS.includes(m.slot));
-  for (const photo of photos) {
+  for (const photo of media ?? []) {
     const bytes = await downloadBytes(supabase, photo.storage_path);
     if (!bytes) continue;
     const isVideo = photo.media_type === "video";

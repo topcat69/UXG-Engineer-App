@@ -208,6 +208,78 @@ export async function deleteJobTask(taskId: string, jobId: string): Promise<Acti
   return { ok: true, message: "Task removed." };
 }
 
+/**
+ * Uploads RAMS or a site plan document (office-prepared reference material
+ * for the field app's "Info on system" section, see 20260117000000_job_details.sql)
+ * and points job_details' matching *_storage_path column at it. Reuses the
+ * existing 'media' bucket / jobs/{job_id}/{filename} path convention (see
+ * media-capture.ts) rather than a new bucket — same storage policies apply.
+ */
+export async function uploadJobDocument(
+  jobId: string,
+  kind: "rams" | "site_plan",
+  formData: FormData,
+): Promise<ActionResult> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose a file first." };
+
+  const supabase = await createClient();
+  const extension = file.name.split(".").pop() ?? "pdf";
+  const storagePath = `jobs/${jobId}/${kind}-${Date.now()}.${extension}`;
+
+  const { error: uploadError } = await supabase.storage.from("media").upload(storagePath, file, {
+    contentType: file.type || undefined,
+  });
+  if (uploadError) return { ok: false, message: uploadError.message };
+
+  const patch = kind === "rams" ? { rams_storage_path: storagePath } : { site_plan_storage_path: storagePath };
+  const { error } = await supabase.from("job_details").upsert({ job_id: jobId, ...patch }, { onConflict: "job_id" });
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/office/jobs/${jobId}`);
+  return { ok: true, message: `${kind === "rams" ? "RAMS" : "Site plan"} uploaded.` };
+}
+
+export async function updateSlaRequirement(jobId: string, detail: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("job_details")
+    .upsert({ job_id: jobId, sla_requirement_detail: detail.trim() || null }, { onConflict: "job_id" });
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/office/jobs/${jobId}`);
+  return { ok: true, message: "Saved." };
+}
+
+export type JobEquipmentRow = { id: string; model: string; serial: string | null };
+export type AddEquipmentResult = { ok: true; item: JobEquipmentRow } | { ok: false; message: string };
+
+export async function addJobEquipment(jobId: string, model: string, serial: string): Promise<AddEquipmentResult> {
+  const trimmedModel = model.trim();
+  if (!trimmedModel) return { ok: false, message: "Model is required." };
+
+  const supabase = await createClient();
+  const { count } = await supabase.from("job_equipment").select("id", { count: "exact", head: true }).eq("job_id", jobId);
+  const { data, error } = await supabase
+    .from("job_equipment")
+    .insert({ job_id: jobId, model: trimmedModel, serial: serial.trim() || null, position: count ?? 0 })
+    .select("id, model, serial")
+    .single();
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/office/jobs/${jobId}`);
+  return { ok: true, item: data };
+}
+
+export async function deleteJobEquipment(itemId: string, jobId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("job_equipment").delete().eq("id", itemId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/office/jobs/${jobId}`);
+  return { ok: true, message: "Removed." };
+}
+
 export async function toggleJobTask(taskId: string, jobId: string, isDone: boolean): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Not signed in." };

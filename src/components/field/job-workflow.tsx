@@ -6,8 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { CurrentUser } from "@/lib/auth/current-user";
-import { db, type InstallFormRow } from "@/lib/offline/db";
-import { checkIn, saveInstallFormDraft, submitJob, toggleTask } from "@/lib/offline/field-actions";
+import { db, type InstallFormRow, type JobDetailsRow, type MediaQueueItem } from "@/lib/offline/db";
+import {
+  checkIn,
+  saveInstallFormDraft,
+  saveJobDetailsDraft,
+  submitJob,
+  submitJobDetails,
+  toggleTask,
+} from "@/lib/offline/field-actions";
 import { getCurrentPosition } from "@/lib/offline/media-capture";
 import { distanceMeters } from "@/lib/geo/distance";
 import {
@@ -19,11 +26,27 @@ import {
   POWER_SOURCES,
   WIFI_SIGNALS,
   installFormRowToValues,
-  showIssueDetail,
-  showWifiSignal,
+  showIssueDetail as showIssueDetailInstall,
+  showWifiSignal as showWifiSignalInstall,
   validateInstallForm,
   type InstallFormValues,
 } from "@/lib/forms/install-form";
+import {
+  EMPTY_JOB_DETAILS,
+  jobDetailsRowToValues,
+  photoSlotsFor,
+  showIssueDetail as showIssueDetailJobDetails,
+  showWifiSignal as showWifiSignalJobDetails,
+  showsAvFields,
+  showsIssuesSection,
+  showsRevisitRequired,
+  showsSiteplanAndEquipment,
+  showsSlaRequirement,
+  usesJobDetails,
+  validateJobDetails,
+  type JobDetailsType,
+  type JobDetailsValues,
+} from "@/lib/forms/job-form";
 import SiteMap from "@/components/site-map-loader";
 import { BarcodeScanButton } from "./barcode-scan-button";
 import { PhotoSlot } from "./photo-slot";
@@ -49,10 +72,19 @@ export function JobWorkflow({
   const job = useLiveQuery(() => db.jobs.get(jobId), [jobId]);
   const site = useLiveQuery(() => (job ? db.sites.get(job.site_id) : undefined), [job?.site_id]);
   const formRow = useLiveQuery(() => db.installForms.where("job_id").equals(jobId).first(), [jobId]);
+  const detailsRow = useLiveQuery(() => db.jobDetails.where("job_id").equals(jobId).first(), [jobId]);
+  const equipment = useLiveQuery(() => db.jobEquipment.where("job_id").equals(jobId).sortBy("position"), [jobId], []);
   const media = useLiveQuery(() => db.mediaQueue.where("jobId").equals(jobId).toArray(), [jobId], []);
   const tasks = useLiveQuery(() => db.jobTasks.where("job_id").equals(jobId).sortBy("position"), [jobId], []);
 
-  const [values, setValues] = useState<InstallFormValues>(EMPTY_INSTALL_FORM);
+  const jobType = job?.job_type ?? "";
+  const detailsMode = usesJobDetails(jobType);
+
+  // Two parallel form-state slots — only one is ever rendered/used, per
+  // detailsMode, but hooks can't be called conditionally, so both exist
+  // unconditionally and the unused one just sits idle at its empty default.
+  const [installValues, setInstallValues] = useState<InstallFormValues>(EMPTY_INSTALL_FORM);
+  const [detailsValues, setDetailsValues] = useState<JobDetailsValues>(EMPTY_JOB_DETAILS);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -63,33 +95,63 @@ export function JobWorkflow({
     hydrated.current = false;
   }, [jobId]);
   useEffect(() => {
-    if (!hydrated.current && formRow !== undefined) {
-      setValues(installFormRowToValues(formRow));
-      hydrated.current = true;
-    }
-  }, [formRow]);
+    if (hydrated.current || !detailsMode || detailsRow === undefined) return;
+    setDetailsValues(jobDetailsRowToValues(detailsRow));
+    hydrated.current = true;
+  }, [detailsMode, detailsRow]);
+  useEffect(() => {
+    if (hydrated.current || detailsMode || formRow === undefined) return;
+    setInstallValues(installFormRowToValues(formRow));
+    hydrated.current = true;
+  }, [detailsMode, formRow]);
 
   const mediaBySlot = new Map((media ?? []).filter((m) => m.kind === "photo").map((m) => [m.slot, m]));
   const signature = (media ?? []).find((m) => m.kind === "signature");
 
-  function currentFormRow(): InstallFormRow {
+  function currentInstallRow(): InstallFormRow {
     return {
       id: formRow?.id ?? crypto.randomUUID(),
       job_id: jobId,
-      player_serial: values.player_serial || null,
-      screen_serial: values.screen_serial || null,
-      mount_type: values.mount_type || null,
-      power_source: values.power_source || null,
-      network_type: values.network_type || null,
-      wifi_signal: values.wifi_signal || null,
-      player_boot_test: (values.player_boot_test || null) as InstallFormRow["player_boot_test"],
-      content_displaying: (values.content_displaying || null) as InstallFormRow["content_displaying"],
-      issues_found: values.issues_found,
-      issue_detail: values.issue_detail || null,
-      engineer_notes: values.engineer_notes || null,
-      client_name: values.client_name || null,
+      player_serial: installValues.player_serial || null,
+      screen_serial: installValues.screen_serial || null,
+      mount_type: installValues.mount_type || null,
+      power_source: installValues.power_source || null,
+      network_type: installValues.network_type || null,
+      wifi_signal: installValues.wifi_signal || null,
+      player_boot_test: (installValues.player_boot_test || null) as InstallFormRow["player_boot_test"],
+      content_displaying: (installValues.content_displaying || null) as InstallFormRow["content_displaying"],
+      issues_found: installValues.issues_found,
+      issue_detail: installValues.issue_detail || null,
+      engineer_notes: installValues.engineer_notes || null,
+      client_name: installValues.client_name || null,
       submitted_at: formRow?.submitted_at ?? null,
       created_at: formRow?.created_at ?? new Date().toISOString(),
+    };
+  }
+
+  function currentDetailsRow(): JobDetailsRow {
+    return {
+      id: detailsRow?.id ?? crypto.randomUUID(),
+      job_id: jobId,
+      player_serial: detailsValues.player_serial || null,
+      screen_serial: detailsValues.screen_serial || null,
+      mount_type: detailsValues.mount_type || null,
+      power_source: detailsValues.power_source || null,
+      network_type: detailsValues.network_type || null,
+      wifi_signal: detailsValues.wifi_signal || null,
+      player_boot_test: (detailsValues.player_boot_test || null) as JobDetailsRow["player_boot_test"],
+      content_displaying: (detailsValues.content_displaying || null) as JobDetailsRow["content_displaying"],
+      rams_storage_path: detailsRow?.rams_storage_path ?? null,
+      site_plan_storage_path: detailsRow?.site_plan_storage_path ?? null,
+      sla_requirement_detail: detailsRow?.sla_requirement_detail ?? null,
+      parking_notified: detailsValues.parking_notified,
+      reported_to_site_manager: detailsValues.reported_to_site_manager,
+      revisit_required: detailsValues.revisit_required === "" ? null : detailsValues.revisit_required === "yes",
+      issues_found: detailsValues.issues_found,
+      issue_detail: detailsValues.issue_detail || null,
+      engineer_notes: detailsValues.engineer_notes || null,
+      submitted_at: detailsRow?.submitted_at ?? null,
+      created_at: detailsRow?.created_at ?? new Date().toISOString(),
     };
   }
 
@@ -99,11 +161,12 @@ export function JobWorkflow({
   useEffect(() => {
     if (!job || NOT_YET_ON_SITE.includes(job.status)) return;
     const interval = setInterval(() => {
-      saveInstallFormDraft(currentFormRow());
+      if (detailsMode) saveJobDetailsDraft(currentDetailsRow());
+      else saveInstallFormDraft(currentInstallRow());
     }, AUTOSAVE_INTERVAL_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job?.status, values]);
+  }, [job?.status, installValues, detailsValues, detailsMode]);
 
   if (job === undefined || site === undefined) {
     return <p className="text-muted-foreground p-4 text-sm">Loading…</p>;
@@ -150,7 +213,12 @@ export function JobWorkflow({
 
   async function handleSubmit() {
     const capturedSlots = new Set(mediaBySlot.keys());
-    const validationErrors = validateInstallForm(values, capturedSlots, !!signature);
+    let validationErrors: string[];
+    if (detailsMode) {
+      validationErrors = validateJobDetails(jobType as JobDetailsType, detailsValues, capturedSlots, !!signature);
+    } else {
+      validationErrors = validateInstallForm(installValues, capturedSlots, !!signature);
+    }
     const incompleteTasks = (tasks ?? []).filter((t) => !t.is_done);
     if (incompleteTasks.length > 0) {
       validationErrors.push(
@@ -164,19 +232,22 @@ export function JobWorkflow({
 
     setIsSubmitting(true);
     try {
-      await saveInstallFormDraft(currentFormRow());
       const position = await getCurrentPosition();
-      await submitJob(
-        jobId,
-        currentFormRow(),
-        position ? { latitude: position.coords.latitude, longitude: position.coords.longitude } : null,
-        currentUser.id,
-      );
+      const point = position ? { latitude: position.coords.latitude, longitude: position.coords.longitude } : null;
+      if (detailsMode) {
+        await saveJobDetailsDraft(currentDetailsRow());
+        await submitJobDetails(jobId, jobType as JobDetailsType, currentDetailsRow(), point, currentUser.id);
+      } else {
+        await saveInstallFormDraft(currentInstallRow());
+        await submitJob(jobId, currentInstallRow(), point, currentUser.id);
+      }
       onMutated?.();
     } finally {
       setIsSubmitting(false);
     }
   }
+
+  const onSite = job.status === "on_site" || job.status === "in_progress";
 
   return (
     <div className="flex flex-col gap-4 p-4 pb-24">
@@ -206,27 +277,282 @@ export function JobWorkflow({
         </Button>
       )}
 
-      {(job.status === "on_site" || job.status === "in_progress") && (
-        <div className="flex flex-col gap-4">
-          {(tasks ?? []).length > 0 && (
-            <div>
-              <p className="mb-2 text-sm font-medium">Tasks</p>
-              <ul className="flex flex-col gap-2">
-                {(tasks ?? []).map((task) => (
-                  <li key={task.id} className="flex items-center gap-2 rounded-md border p-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={task.is_done}
-                      onChange={(e) => handleToggleTask(task.id, e.target.checked)}
-                      className="h-4 w-4"
-                    />
-                    <span className={task.is_done ? "text-muted-foreground line-through" : ""}>{task.label}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+      {onSite && !detailsMode && (
+        <InstallFormSection
+          jobId={jobId}
+          currentUser={currentUser}
+          values={installValues}
+          setValues={setInstallValues}
+          tasks={tasks ?? []}
+          onToggleTask={handleToggleTask}
+          mediaBySlot={mediaBySlot}
+          signature={signature}
+          onMutated={onMutated}
+          errors={errors}
+          isSubmitting={isSubmitting}
+          onSubmit={handleSubmit}
+        />
+      )}
 
+      {onSite && detailsMode && (
+        <JobDetailsSection
+          jobId={jobId}
+          jobType={jobType as JobDetailsType}
+          currentUser={currentUser}
+          site={site}
+          values={detailsValues}
+          setValues={setDetailsValues}
+          detailsRow={detailsRow}
+          equipment={equipment ?? []}
+          tasks={tasks ?? []}
+          onToggleTask={handleToggleTask}
+          mediaBySlot={mediaBySlot}
+          signature={signature}
+          onMutated={onMutated}
+          errors={errors}
+          isSubmitting={isSubmitting}
+          onSubmit={handleSubmit}
+        />
+      )}
+
+      {!NOT_YET_ON_SITE.includes(job.status) && !onSite && (
+        <p className="text-muted-foreground text-sm">
+          This job is {job.status.replace("_", " ")}. No further action needed here.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** The pre-existing install form flow, unchanged — this only renders for job_type "survey" now, since "install" moved to JobDetailsSection below. Kept exactly as-is rather than reworked, since survey's own field-app rendering was never built to begin with (a pre-existing gap this change doesn't touch). */
+function InstallFormSection({
+  jobId,
+  currentUser,
+  values,
+  setValues,
+  tasks,
+  onToggleTask,
+  mediaBySlot,
+  signature,
+  onMutated,
+  errors,
+  isSubmitting,
+  onSubmit,
+}: {
+  jobId: string;
+  currentUser: CurrentUser;
+  values: InstallFormValues;
+  setValues: React.Dispatch<React.SetStateAction<InstallFormValues>>;
+  tasks: { id: string; label: string; is_done: boolean }[];
+  onToggleTask: (taskId: string, isDone: boolean) => void;
+  mediaBySlot: Map<string, MediaQueueItem>;
+  signature: MediaQueueItem | undefined;
+  onMutated?: () => void;
+  errors: string[];
+  isSubmitting: boolean;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      {tasks.length > 0 && (
+        <div>
+          <p className="mb-2 text-sm font-medium">Tasks</p>
+          <ul className="flex flex-col gap-2">
+            {tasks.map((task) => (
+              <li key={task.id} className="flex items-center gap-2 rounded-md border p-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={task.is_done}
+                  onChange={(e) => onToggleTask(task.id, e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <span className={task.is_done ? "text-muted-foreground line-through" : ""}>{task.label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <Field label="Player serial">
+        <div className="flex gap-2">
+          <input
+            value={values.player_serial}
+            onChange={(e) => setValues((v) => ({ ...v, player_serial: e.target.value }))}
+            className="border-input h-9 flex-1 rounded-md border bg-transparent px-2 text-sm"
+          />
+          <BarcodeScanButton onScan={(v) => setValues((prev) => ({ ...prev, player_serial: v }))} />
+        </div>
+      </Field>
+
+      <Field label="Screen serial">
+        <div className="flex gap-2">
+          <input
+            value={values.screen_serial}
+            onChange={(e) => setValues((v) => ({ ...v, screen_serial: e.target.value }))}
+            className="border-input h-9 flex-1 rounded-md border bg-transparent px-2 text-sm"
+          />
+          <BarcodeScanButton onScan={(v) => setValues((prev) => ({ ...prev, screen_serial: v }))} />
+        </div>
+      </Field>
+
+      <Field label="Mount type">
+        <Select value={values.mount_type} options={MOUNT_TYPES} onChange={(v) => setValues((prev) => ({ ...prev, mount_type: v }))} />
+      </Field>
+
+      <Field label="Power source">
+        <Select value={values.power_source} options={POWER_SOURCES} onChange={(v) => setValues((prev) => ({ ...prev, power_source: v }))} />
+      </Field>
+
+      <Field label="Network">
+        <Select value={values.network_type} options={NETWORK_TYPES} onChange={(v) => setValues((prev) => ({ ...prev, network_type: v }))} />
+      </Field>
+
+      {showWifiSignalInstall(values) && (
+        <Field label="WiFi signal">
+          <Select value={values.wifi_signal} options={WIFI_SIGNALS} onChange={(v) => setValues((prev) => ({ ...prev, wifi_signal: v }))} />
+        </Field>
+      )}
+
+      <Field label="Player boot test">
+        <Select value={values.player_boot_test} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, player_boot_test: v }))} />
+      </Field>
+
+      <Field label="Content displaying">
+        <Select value={values.content_displaying} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, content_displaying: v }))} />
+      </Field>
+
+      <PhotoGrid jobId={jobId} slots={PHOTO_SLOTS} currentUser={currentUser} mediaBySlot={mediaBySlot} onMutated={onMutated} />
+
+      <Field label="Issues found?">
+        <YesNoButtons
+          value={values.issues_found}
+          onChange={(v) => setValues((prev) => ({ ...prev, issues_found: v, issue_detail: v ? prev.issue_detail : "" }))}
+        />
+      </Field>
+
+      {showIssueDetailInstall(values) && (
+        <Field label="Issue detail">
+          <Textarea value={values.issue_detail} onChange={(e) => setValues((v) => ({ ...v, issue_detail: e.target.value }))} />
+        </Field>
+      )}
+
+      <Field label="Engineer notes">
+        <Textarea value={values.engineer_notes} onChange={(e) => setValues((v) => ({ ...v, engineer_notes: e.target.value }))} />
+      </Field>
+
+      <Field label="Client name">
+        <input
+          value={values.client_name}
+          onChange={(e) => setValues((v) => ({ ...v, client_name: e.target.value }))}
+          className="border-input h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+        />
+      </Field>
+
+      <div>
+        <p className="mb-2 text-sm font-medium">Client signature</p>
+        <SignatureCapture jobId={jobId} capturedBy={currentUser.id} captured={!!signature} clientName={values.client_name} onCaptured={onMutated} />
+      </div>
+
+      <SubmitSection errors={errors} isSubmitting={isSubmitting} onSubmit={onSubmit} />
+    </div>
+  );
+}
+
+/** install/sla/maintenance/delivery — one form, sections shown/hidden per job type via job-form.ts's show* helpers. */
+function JobDetailsSection({
+  jobId,
+  jobType,
+  currentUser,
+  site,
+  values,
+  setValues,
+  detailsRow,
+  equipment,
+  tasks,
+  onToggleTask,
+  mediaBySlot,
+  signature,
+  onMutated,
+  errors,
+  isSubmitting,
+  onSubmit,
+}: {
+  jobId: string;
+  jobType: JobDetailsType;
+  currentUser: CurrentUser;
+  site: { name: string; contact_name?: string | null; contact_phone?: string | null; contact_email?: string | null } | undefined;
+  values: JobDetailsValues;
+  setValues: React.Dispatch<React.SetStateAction<JobDetailsValues>>;
+  detailsRow: JobDetailsRow | undefined;
+  equipment: { id: string; model: string; serial: string | null }[];
+  tasks: { id: string; label: string; is_done: boolean }[];
+  onToggleTask: (taskId: string, isDone: boolean) => void;
+  mediaBySlot: Map<string, MediaQueueItem>;
+  signature: MediaQueueItem | undefined;
+  onMutated?: () => void;
+  errors: string[];
+  isSubmitting: boolean;
+  onSubmit: () => void;
+}) {
+  const slots = photoSlotsFor(jobType);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-md border p-3">
+        <p className="mb-2 text-sm font-medium">Info on system</p>
+        <p className="text-sm">
+          Customer contact: {[site?.contact_name, site?.contact_phone, site?.contact_email].filter(Boolean).join(" · ") || "Not on file"}
+        </p>
+        <p className="text-sm">RAMS: {detailsRow?.rams_storage_path ? "Attached — view in office system" : "Not attached"}</p>
+        {showsSiteplanAndEquipment(jobType) && (
+          <>
+            <p className="text-sm">Site plan: {detailsRow?.site_plan_storage_path ? "Attached — view in office system" : "Not attached"}</p>
+            {equipment.length > 0 && (
+              <div className="mt-2">
+                <p className="text-sm font-medium">Equipment list</p>
+                <ul className="list-disc pl-5 text-sm">
+                  {equipment.map((e) => (
+                    <li key={e.id}>
+                      {e.model}
+                      {e.serial ? ` — ${e.serial}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+        {showsSlaRequirement(jobType) && detailsRow?.sla_requirement_detail && (
+          <p className="mt-2 text-sm">
+            <span className="text-muted-foreground">SLA requirement:</span> {detailsRow.sla_requirement_detail}
+          </p>
+        )}
+      </div>
+
+      {tasks.length > 0 && (
+        <div>
+          <p className="mb-2 text-sm font-medium">Tasks</p>
+          <ul className="flex flex-col gap-2">
+            {tasks.map((task) => (
+              <li key={task.id} className="flex items-center gap-2 rounded-md border p-2 text-sm">
+                <input type="checkbox" checked={task.is_done} onChange={(e) => onToggleTask(task.id, e.target.checked)} className="h-4 w-4" />
+                <span className={task.is_done ? "text-muted-foreground line-through" : ""}>{task.label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <Field label="Parking notified">
+        <YesNoButtons value={values.parking_notified} onChange={(v) => setValues((prev) => ({ ...prev, parking_notified: v }))} />
+      </Field>
+
+      <Field label="Reported to site manager">
+        <YesNoButtons value={values.reported_to_site_manager} onChange={(v) => setValues((prev) => ({ ...prev, reported_to_site_manager: v }))} />
+      </Field>
+
+      {showsAvFields(jobType) && (
+        <>
           <Field label="Player serial">
             <div className="flex gap-2">
               <input
@@ -237,7 +563,6 @@ export function JobWorkflow({
               <BarcodeScanButton onScan={(v) => setValues((prev) => ({ ...prev, player_serial: v }))} />
             </div>
           </Field>
-
           <Field label="Screen serial">
             <div className="flex gap-2">
               <input
@@ -248,152 +573,138 @@ export function JobWorkflow({
               <BarcodeScanButton onScan={(v) => setValues((prev) => ({ ...prev, screen_serial: v }))} />
             </div>
           </Field>
-
           <Field label="Mount type">
-            <Select
-              value={values.mount_type}
-              options={MOUNT_TYPES}
-              onChange={(v) => setValues((prev) => ({ ...prev, mount_type: v }))}
-            />
+            <Select value={values.mount_type} options={MOUNT_TYPES} onChange={(v) => setValues((prev) => ({ ...prev, mount_type: v }))} />
           </Field>
-
           <Field label="Power source">
-            <Select
-              value={values.power_source}
-              options={POWER_SOURCES}
-              onChange={(v) => setValues((prev) => ({ ...prev, power_source: v }))}
-            />
+            <Select value={values.power_source} options={POWER_SOURCES} onChange={(v) => setValues((prev) => ({ ...prev, power_source: v }))} />
           </Field>
-
           <Field label="Network">
-            <Select
-              value={values.network_type}
-              options={NETWORK_TYPES}
-              onChange={(v) => setValues((prev) => ({ ...prev, network_type: v }))}
-            />
+            <Select value={values.network_type} options={NETWORK_TYPES} onChange={(v) => setValues((prev) => ({ ...prev, network_type: v }))} />
           </Field>
-
-          {showWifiSignal(values) && (
+          {showWifiSignalJobDetails(values) && (
             <Field label="WiFi signal">
-              <Select
-                value={values.wifi_signal}
-                options={WIFI_SIGNALS}
-                onChange={(v) => setValues((prev) => ({ ...prev, wifi_signal: v }))}
-              />
+              <Select value={values.wifi_signal} options={WIFI_SIGNALS} onChange={(v) => setValues((prev) => ({ ...prev, wifi_signal: v }))} />
             </Field>
           )}
-
           <Field label="Player boot test">
-            <Select
-              value={values.player_boot_test}
-              options={PASS_FAIL}
-              onChange={(v) => setValues((prev) => ({ ...prev, player_boot_test: v }))}
-            />
+            <Select value={values.player_boot_test} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, player_boot_test: v }))} />
           </Field>
-
           <Field label="Content displaying">
-            <Select
-              value={values.content_displaying}
-              options={PASS_FAIL}
-              onChange={(v) => setValues((prev) => ({ ...prev, content_displaying: v }))}
+            <Select value={values.content_displaying} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, content_displaying: v }))} />
+          </Field>
+        </>
+      )}
+
+      <PhotoGrid jobId={jobId} slots={slots} currentUser={currentUser} mediaBySlot={mediaBySlot} onMutated={onMutated} />
+
+      {showsIssuesSection(jobType) && (
+        <>
+          <Field label="Issues found?">
+            <YesNoButtons
+              value={values.issues_found}
+              onChange={(v) => setValues((prev) => ({ ...prev, issues_found: v, issue_detail: v ? prev.issue_detail : "" }))}
             />
           </Field>
-
-          <div>
-            <p className="mb-2 text-sm font-medium">Photos</p>
-            <div className="grid grid-cols-3 gap-3">
-              {PHOTO_SLOTS.map((slot) => (
-                <PhotoSlot
-                  key={slot}
-                  jobId={jobId}
-                  slot={slot}
-                  label={slot.replace("photo_", "").replace(/_/g, " ")}
-                  capturedBy={currentUser.id}
-                  item={mediaBySlot.get(slot)}
-                  onCaptured={onMutated}
-                />
-              ))}
-            </div>
-          </div>
-
-          <Field label="Issues found?">
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={values.issues_found ? "default" : "outline"}
-                onClick={() => setValues((v) => ({ ...v, issues_found: true }))}
-              >
-                Yes
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={!values.issues_found ? "default" : "outline"}
-                onClick={() => setValues((v) => ({ ...v, issues_found: false, issue_detail: "" }))}
-              >
-                No
-              </Button>
-            </div>
-          </Field>
-
-          {showIssueDetail(values) && (
+          {showIssueDetailJobDetails(values) && (
             <Field label="Issue detail">
-              <Textarea
-                value={values.issue_detail}
-                onChange={(e) => setValues((v) => ({ ...v, issue_detail: e.target.value }))}
-              />
+              <Textarea value={values.issue_detail} onChange={(e) => setValues((v) => ({ ...v, issue_detail: e.target.value }))} />
             </Field>
           )}
+        </>
+      )}
 
-          <Field label="Engineer notes">
-            <Textarea
-              value={values.engineer_notes}
-              onChange={(e) => setValues((v) => ({ ...v, engineer_notes: e.target.value }))}
-            />
-          </Field>
-
-          <Field label="Client name">
-            <input
-              value={values.client_name}
-              onChange={(e) => setValues((v) => ({ ...v, client_name: e.target.value }))}
-              className="border-input h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-            />
-          </Field>
-
-          <div>
-            <p className="mb-2 text-sm font-medium">Client signature</p>
-            <SignatureCapture
-              jobId={jobId}
-              capturedBy={currentUser.id}
-              captured={!!signature}
-              clientName={values.client_name}
-              onCaptured={onMutated}
-            />
+      {showsRevisitRequired(jobType) && (
+        <Field label="Revisit required">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={values.revisit_required === "yes" ? "default" : "outline"}
+              onClick={() => setValues((v) => ({ ...v, revisit_required: "yes" }))}
+            >
+              Yes
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={values.revisit_required === "no" ? "default" : "outline"}
+              onClick={() => setValues((v) => ({ ...v, revisit_required: "no" }))}
+            >
+              No
+            </Button>
           </div>
+        </Field>
+      )}
 
-          {errors.length > 0 && (
-            <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-              <p className="font-medium">Can&apos;t submit yet:</p>
-              <ul className="list-disc pl-5">
-                {errors.map((e) => (
-                  <li key={e}>{e}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+      <Field label="Engineer notes">
+        <Textarea value={values.engineer_notes} onChange={(e) => setValues((v) => ({ ...v, engineer_notes: e.target.value }))} />
+      </Field>
 
-          <Button onClick={handleSubmit} disabled={isSubmitting} size="lg">
-            {isSubmitting ? "Submitting…" : "Check Out & Submit"}
-          </Button>
+      <div>
+        <p className="mb-2 text-sm font-medium">Customer sign off</p>
+        <SignatureCapture jobId={jobId} capturedBy={currentUser.id} captured={!!signature} clientName={site?.contact_name ?? ""} onCaptured={onMutated} />
+      </div>
+
+      <SubmitSection errors={errors} isSubmitting={isSubmitting} onSubmit={onSubmit} />
+    </div>
+  );
+}
+
+function PhotoGrid({
+  jobId,
+  slots,
+  currentUser,
+  mediaBySlot,
+  onMutated,
+}: {
+  jobId: string;
+  slots: readonly string[];
+  currentUser: CurrentUser;
+  mediaBySlot: Map<string, MediaQueueItem>;
+  onMutated?: () => void;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-sm font-medium">Photos</p>
+      <div className="grid grid-cols-3 gap-3">
+        {slots.map((slot) => (
+          <PhotoSlot key={slot} jobId={jobId} slot={slot} label={slot.replace("photo_", "").replace(/_/g, " ")} capturedBy={currentUser.id} item={mediaBySlot.get(slot)} onCaptured={onMutated} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SubmitSection({ errors, isSubmitting, onSubmit }: { errors: string[]; isSubmitting: boolean; onSubmit: () => void }) {
+  return (
+    <>
+      {errors.length > 0 && (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+          <p className="font-medium">Can&apos;t submit yet:</p>
+          <ul className="list-disc pl-5">
+            {errors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
         </div>
       )}
+      <Button onClick={onSubmit} disabled={isSubmitting} size="lg">
+        {isSubmitting ? "Submitting…" : "Check Out & Submit"}
+      </Button>
+    </>
+  );
+}
 
-      {!NOT_YET_ON_SITE.includes(job.status) && job.status !== "on_site" && job.status !== "in_progress" && (
-        <p className="text-muted-foreground text-sm">
-          This job is {job.status.replace("_", " ")}. No further action needed here.
-        </p>
-      )}
+function YesNoButtons({ value, onChange }: { value: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <div className="flex gap-2">
+      <Button type="button" size="sm" variant={value ? "default" : "outline"} onClick={() => onChange(true)}>
+        Yes
+      </Button>
+      <Button type="button" size="sm" variant={!value ? "default" : "outline"} onClick={() => onChange(false)}>
+        No
+      </Button>
     </div>
   );
 }

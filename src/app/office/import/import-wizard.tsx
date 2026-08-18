@@ -3,9 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 import { generateJobs, importSitesCsv } from "./actions";
-
-const JOB_TYPES = ["install", "survey"];
 
 export function ImportWizard({
   projects,
@@ -141,7 +140,7 @@ export function ImportWizard({
               <option value="">Select…</option>
               {JOB_TYPES.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {JOB_TYPE_LABELS[t]}
                 </option>
               ))}
             </select>

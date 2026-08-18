@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { applyJobListFilters, hasAnyFilter, parseJobListFilters, type JobListSearchParams } from "@/lib/jobs/list-query";
+import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 import { CreateJobForm } from "./create-job-form";
 import { JobsTable, type JobRow } from "./jobs-table";
 
@@ -21,7 +22,6 @@ const JOB_STATUSES: Database["public"]["Enums"]["job_status"][] = [
   "on_hold",
   "cancelled",
 ];
-const JOB_TYPES = ["install", "survey"];
 
 function param(searchParams: JobListSearchParams, key: string): string {
   const value = searchParams[key];
@@ -127,7 +127,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
             <option value="">All</option>
             {JOB_TYPES.map((t) => (
               <option key={t} value={t}>
-                {t}
+                {JOB_TYPE_LABELS[t]}
               </option>
             ))}
           </select>

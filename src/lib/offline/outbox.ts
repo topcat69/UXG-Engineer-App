@@ -62,6 +62,11 @@ async function applyOperation(supabase: ReturnType<typeof createClient>, op: Out
       if (error) throw error;
       return;
     }
+    case "job_details_upsert": {
+      const { error } = await supabase.from("job_details").upsert(op.row);
+      if (error) throw error;
+      return;
+    }
     case "signature_insert": {
       const { error } = await supabase.from("signatures").upsert(op.row);
       if (error) throw error;

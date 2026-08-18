@@ -1,7 +1,8 @@
 "use client";
 
-import { db, type InstallFormRow, type JobStatus } from "./db";
+import { db, type InstallFormRow, type JobDetailsRow, type JobStatus } from "./db";
 import { detectAutoIssues, installFormRowToValues } from "@/lib/forms/install-form";
+import { detectAutoIssues as detectJobDetailsAutoIssues, jobDetailsRowToValues, type JobDetailsType } from "@/lib/forms/job-form";
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -83,6 +84,11 @@ export async function checkIn(
 /** Persists the in-progress form draft locally. Called on a 15s timer and on capture events. */
 export async function saveInstallFormDraft(row: InstallFormRow): Promise<void> {
   await db.installForms.put(row);
+}
+
+/** job_details equivalent of saveInstallFormDraft, for install/sla/maintenance/delivery. */
+export async function saveJobDetailsDraft(row: JobDetailsRow): Promise<void> {
+  await db.jobDetails.put(row);
 }
 
 /** Ticks/unticks a job task. Optimistic local write + queued outbox op, same shape as checkIn. */
@@ -187,6 +193,93 @@ export async function submitJob(
           raised_by: raisedBy,
           severity: issue.severity,
           category: "install",
+          description: issue.description,
+          blocks_completion: issue.blocksCompletion,
+          status: "open",
+          resolved_at: null,
+          revisit_job_id: null,
+          created_at: nowIso,
+        },
+        createdAt: issueCreatedAts[index],
+        attempts: 0,
+      });
+    }
+  });
+}
+
+/**
+ * job_details equivalent of submitJob, for install/sla/maintenance/delivery
+ * — same shape (form upsert must replay before the status_event flips the
+ * job to "submitted" and RLS locks further writes; issue inserts have no
+ * such ordering dependency), parameterised by job type since which
+ * fields/sections apply — and therefore which auto-issues can even fire —
+ * differs per type (see job-form.ts).
+ */
+export async function submitJobDetails(
+  jobId: string,
+  jobType: JobDetailsType,
+  detailsRow: JobDetailsRow,
+  point: GeoPoint | null,
+  raisedBy: string,
+): Promise<void> {
+  const job = await db.jobs.get(jobId);
+  if (!job) throw new Error("Job not found locally");
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const submittedDetails = { ...detailsRow, submitted_at: nowIso };
+  const autoIssues = detectJobDetailsAutoIssues(jobType, jobDetailsRowToValues(detailsRow));
+  const [detailsCreatedAt, patchCreatedAt, eventCreatedAt, ...issueCreatedAts] = batchTimestamps(
+    now,
+    3 + autoIssues.length,
+  );
+
+  await db.transaction("rw", [db.jobs, db.jobDetails, db.outbox], async () => {
+    await db.jobDetails.put(submittedDetails);
+    await db.jobs.update(jobId, {
+      status: "submitted" as JobStatus,
+      actual_end: nowIso,
+    });
+
+    await db.outbox.add({
+      id: uuid(),
+      type: "job_details_upsert",
+      row: submittedDetails,
+      createdAt: detailsCreatedAt,
+      attempts: 0,
+    });
+    await db.outbox.add({
+      id: uuid(),
+      type: "job_patch",
+      jobId,
+      patch: { actual_end: nowIso },
+      createdAt: patchCreatedAt,
+      attempts: 0,
+    });
+    await db.outbox.add({
+      id: uuid(),
+      type: "status_event",
+      jobId,
+      fromStatus: job.status,
+      toStatus: "submitted",
+      reason: "Submitted from field",
+      occurredAt: nowIso,
+      latitude: point?.latitude,
+      longitude: point?.longitude,
+      createdAt: eventCreatedAt,
+      attempts: 0,
+    });
+
+    for (const [index, issue] of autoIssues.entries()) {
+      await db.outbox.add({
+        id: uuid(),
+        type: "issue_insert",
+        row: {
+          id: uuid(),
+          job_id: jobId,
+          site_id: job.site_id,
+          raised_by: raisedBy,
+          severity: issue.severity,
+          category: jobType,
           description: issue.description,
           blocks_completion: issue.blocksCompletion,
           status: "open",

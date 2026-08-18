@@ -11,15 +11,8 @@ import { DeleteJobButton } from "./delete-job-button";
 import { DuplicateJobButton } from "./duplicate-job-button";
 import { TaskPanel } from "./task-panel";
 import { ShareLinkPanel } from "./share-link-panel";
-
-const INSTALL_PHOTO_SLOTS = [
-  "photo_before",
-  "photo_screen_mounted",
-  "photo_player_installed",
-  "photo_cable_management",
-  "photo_content_on_screen",
-  "photo_wide_shot",
-];
+import { JobDetailsPanel } from "./job-details-panel";
+import { usesJobDetails, photoSlotsFor, type JobDetailsType } from "@/lib/forms/job-form";
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,6 +23,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: statusEvents },
     { data: installForm },
     { data: surveyForm },
+    { data: jobDetails },
+    { data: jobEquipment },
     { data: media },
     { data: issues },
     { data: shareLinks },
@@ -50,6 +45,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       .order("occurred_at", { ascending: false }),
     supabase.from("install_forms").select("*").eq("job_id", id).maybeSingle(),
     supabase.from("survey_forms").select("*").eq("job_id", id).maybeSingle(),
+    supabase.from("job_details").select("*").eq("job_id", id).maybeSingle(),
+    supabase.from("job_equipment").select("id, model, serial").eq("job_id", id).order("position"),
     supabase.from("media_assets").select("*").eq("job_id", id).order("slot"),
     supabase.from("issues").select("*, raised_by_user:users(name)").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("share_links").select("token, expires_at, revoked").eq("job_id", id).order("created_at", { ascending: false }),
@@ -152,7 +149,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </section>
       </div>
 
-      {(installForm || surveyForm) && (
+      {(installForm || surveyForm || jobDetails) && (
         <section className="flex flex-col gap-2">
           <h2 className="font-medium">Form data</h2>
           {installForm && (
@@ -178,16 +175,45 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <FormField label="Measurements" value={surveyForm.measurements} />
             </dl>
           )}
+          {jobDetails && (
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
+              {usesJobDetails(job.job_type) && job.job_type !== "delivery" && (
+                <>
+                  <FormField label="Player serial" value={jobDetails.player_serial} />
+                  <FormField label="Screen serial" value={jobDetails.screen_serial} />
+                  <FormField label="Mount type" value={jobDetails.mount_type} />
+                  <FormField label="Power source" value={jobDetails.power_source} />
+                  <FormField label="Network" value={jobDetails.network_type} />
+                  <FormField label="WiFi signal" value={jobDetails.wifi_signal} />
+                  <FormField label="Player boot test" value={jobDetails.player_boot_test} />
+                  <FormField label="Content displaying" value={jobDetails.content_displaying} />
+                </>
+              )}
+              <FormField label="Parking notified" value={jobDetails.parking_notified ? "Yes" : "No"} />
+              <FormField label="Reported to site manager" value={jobDetails.reported_to_site_manager ? "Yes" : "No"} />
+              {jobDetails.revisit_required !== null && (
+                <FormField label="Revisit required" value={jobDetails.revisit_required ? "Yes" : "No"} />
+              )}
+              <FormField label="Issues found" value={jobDetails.issues_found ? "Yes" : "No"} />
+            </dl>
+          )}
         </section>
       )}
+
+      <JobDetailsPanel
+        jobId={job.id}
+        jobType={job.job_type as JobDetailsType}
+        jobDetails={jobDetails ?? null}
+        equipment={jobEquipment ?? []}
+      />
 
       <TaskPanel jobId={job.id} tasks={jobTasks ?? []} templates={templates ?? []} />
 
       <section className="flex flex-col gap-2">
         <h2 className="font-medium">Media</h2>
-        {job.job_type === "install" ? (
+        {usesJobDetails(job.job_type) ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {INSTALL_PHOTO_SLOTS.map((slot) => {
+            {photoSlotsFor(job.job_type as JobDetailsType).map((slot) => {
               const asset = mediaBySlot.get(slot);
               return (
                 <div key={slot} className="flex flex-col gap-1 rounded-md border p-2 text-xs">

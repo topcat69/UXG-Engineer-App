@@ -259,6 +259,121 @@ export type Database = {
           },
         ]
       }
+      job_details: {
+        Row: {
+          content_displaying: Database["public"]["Enums"]["pass_fail"] | null
+          created_at: string | null
+          engineer_notes: string | null
+          id: string
+          issue_detail: string | null
+          issues_found: boolean | null
+          job_id: string | null
+          mount_type: string | null
+          network_type: string | null
+          parking_notified: boolean | null
+          player_boot_test: Database["public"]["Enums"]["pass_fail"] | null
+          player_serial: string | null
+          power_source: string | null
+          rams_storage_path: string | null
+          reported_to_site_manager: boolean | null
+          revisit_required: boolean | null
+          screen_serial: string | null
+          site_plan_storage_path: string | null
+          sla_requirement_detail: string | null
+          submitted_at: string | null
+          wifi_signal: string | null
+        }
+        Insert: {
+          content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
+          created_at?: string | null
+          engineer_notes?: string | null
+          id?: string
+          issue_detail?: string | null
+          issues_found?: boolean | null
+          job_id?: string | null
+          mount_type?: string | null
+          network_type?: string | null
+          parking_notified?: boolean | null
+          player_boot_test?: Database["public"]["Enums"]["pass_fail"] | null
+          player_serial?: string | null
+          power_source?: string | null
+          rams_storage_path?: string | null
+          reported_to_site_manager?: boolean | null
+          revisit_required?: boolean | null
+          screen_serial?: string | null
+          site_plan_storage_path?: string | null
+          sla_requirement_detail?: string | null
+          submitted_at?: string | null
+          wifi_signal?: string | null
+        }
+        Update: {
+          content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
+          created_at?: string | null
+          engineer_notes?: string | null
+          id?: string
+          issue_detail?: string | null
+          issues_found?: boolean | null
+          job_id?: string | null
+          mount_type?: string | null
+          network_type?: string | null
+          parking_notified?: boolean | null
+          player_boot_test?: Database["public"]["Enums"]["pass_fail"] | null
+          player_serial?: string | null
+          power_source?: string | null
+          rams_storage_path?: string | null
+          reported_to_site_manager?: boolean | null
+          revisit_required?: boolean | null
+          screen_serial?: string | null
+          site_plan_storage_path?: string | null
+          sla_requirement_detail?: string | null
+          submitted_at?: string | null
+          wifi_signal?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_details_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_equipment: {
+        Row: {
+          created_at: string | null
+          id: string
+          job_id: string | null
+          model: string
+          position: number
+          serial: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          job_id?: string | null
+          model: string
+          position?: number
+          serial?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          job_id?: string | null
+          model?: string
+          position?: number
+          serial?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_equipment_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_tasks: {
         Row: {
           created_at: string | null
