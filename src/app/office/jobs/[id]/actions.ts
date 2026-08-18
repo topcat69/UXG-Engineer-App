@@ -10,6 +10,9 @@ import { createShareLinkForJob } from "@/lib/share-links/create";
 import { appBaseUrl } from "@/lib/app-url";
 import { duplicateJob } from "@/lib/jobs/duplicate-job";
 import { cloneTasksForJob } from "@/lib/jobs/clone-tasks";
+import { detectConflicts } from "@/lib/scheduler/conflicts";
+import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
+import { sendJobAssignedEmail } from "@/lib/email/send-job-emails";
 import type { ActionResult } from "../actions";
 
 export async function raiseIssue(jobId: string, siteId: string, formData: FormData): Promise<ActionResult> {
@@ -278,6 +281,101 @@ export async function deleteJobEquipment(itemId: string, jobId: string): Promise
 
   revalidatePath(`/office/jobs/${jobId}`);
   return { ok: true, message: "Removed." };
+}
+
+export type AssignScheduleResult = { ok: true; message: string; warning?: string } | { ok: false; message: string };
+
+/**
+ * Single-job assign + schedule from the job detail page itself — the same
+ * two operations the Scheduler tab's drag-and-drop does (see
+ * rescheduleJob/bulkAssignJobs/bulkScheduleJobs in ../actions.ts), just
+ * reachable without leaving the job. `scheduledStartLocal` is a
+ * datetime-local input value ("" clears/leaves the schedule alone,
+ * engineerId null unassigns) so the office user isn't forced to touch both
+ * fields at once.
+ */
+export async function assignAndScheduleJob(
+  jobId: string,
+  engineerId: string | null,
+  scheduledStartLocal: string,
+  durationHours: number,
+): Promise<AssignScheduleResult> {
+  const supabase = await createClient();
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("status, assigned_to, scheduled_end, site_id")
+    .eq("id", jobId)
+    .single();
+  if (!job) return { ok: false, message: "Job not found." };
+
+  const patch: { assigned_to: string | null; scheduled_start?: string; scheduled_end?: string } = {
+    assigned_to: engineerId,
+  };
+  let newStart: Date | null = null;
+  if (scheduledStartLocal) {
+    newStart = new Date(scheduledStartLocal);
+    if (Number.isNaN(newStart.getTime())) return { ok: false, message: "Invalid date/time." };
+    patch.scheduled_start = newStart.toISOString();
+    patch.scheduled_end = new Date(newStart.getTime() + durationHours * 60 * 60 * 1000).toISOString();
+  }
+
+  let warning: string | undefined;
+  if (engineerId && newStart) {
+    const dayStart = new Date(newStart);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+
+    const [{ data: engineer }, { data: others }] = await Promise.all([
+      supabase.from("users").select("max_jobs_per_day").eq("id", engineerId).single(),
+      supabase
+        .from("jobs")
+        .select("id, scheduled_start, scheduled_end")
+        .eq("assigned_to", engineerId)
+        .neq("id", jobId)
+        .gte("scheduled_start", dayStart.toISOString())
+        .lt("scheduled_start", dayEnd.toISOString()),
+    ]);
+
+    const warnings = detectConflicts(
+      { id: jobId, scheduledStart: newStart.toISOString(), scheduledEnd: patch.scheduled_end! },
+      (others ?? [])
+        .filter((o) => o.scheduled_start)
+        .map((o) => ({ id: o.id, scheduledStart: o.scheduled_start!, scheduledEnd: o.scheduled_end })),
+      engineer?.max_jobs_per_day ?? 4,
+    );
+    if (warnings.length > 0) warning = warnings.join(" ");
+  }
+
+  const { error } = await supabase.from("jobs").update(patch).eq("id", jobId);
+  if (error) return { ok: false, message: error.message };
+
+  const user = await getCurrentUser();
+  if (job.status === "draft" && newStart) {
+    await supabase.from("jobs").update({ status: "scheduled" }).eq("id", jobId);
+    await supabase.from("status_events").insert({
+      job_id: jobId,
+      from_status: "draft",
+      to_status: "scheduled",
+      user_id: user?.id,
+      reason: "Scheduled from job detail",
+    });
+  }
+
+  // Same best-effort, non-blocking contract as rescheduleJob/bulkAssignJobs
+  // in ../actions.ts — a Calendar/Resend round trip shouldn't sit between
+  // the office user clicking Save and seeing it take effect.
+  after(async () => {
+    await syncCalendarForJob(supabase, jobId);
+    if (engineerId && engineerId !== job.assigned_to) {
+      await sendJobAssignedEmail(supabase, jobId);
+    }
+  });
+
+  revalidatePath(`/office/jobs/${jobId}`);
+  revalidatePath("/office/jobs");
+  revalidatePath("/office/scheduler");
+  return { ok: true, message: "Saved.", warning };
 }
 
 export async function toggleJobTask(taskId: string, jobId: string, isDone: boolean): Promise<ActionResult> {

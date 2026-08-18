@@ -88,6 +88,7 @@ export function JobWorkflow({
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [checkInError, setCheckInError] = useState<string | null>(null);
   const hydrated = useRef(false);
 
   // Hydrate local edit state from Dexie once per job, not on every autosave echo.
@@ -105,7 +106,17 @@ export function JobWorkflow({
     hydrated.current = true;
   }, [detailsMode, formRow]);
 
-  const mediaBySlot = new Map((media ?? []).filter((m) => m.kind === "photo").map((m) => [m.slot, m]));
+  // Grouped by slot (not a single latest-wins entry) so every captured item
+  // shows up — a slot can hold more than one photo. Video is included here
+  // too: it was previously filtered out despite PhotoSlot having a video
+  // icon branch, so a captured video never actually appeared as captured.
+  const mediaBySlot = new Map<string, MediaQueueItem[]>();
+  for (const m of media ?? []) {
+    if (m.kind !== "photo" && m.kind !== "video") continue;
+    const list = mediaBySlot.get(m.slot);
+    if (list) list.push(m);
+    else mediaBySlot.set(m.slot, [m]);
+  }
   const signature = (media ?? []).find((m) => m.kind === "signature");
 
   function currentInstallRow(): InstallFormRow {
@@ -184,10 +195,15 @@ export function JobWorkflow({
 
   async function handleCheckIn() {
     setIsCheckingIn(true);
+    setCheckInError(null);
     try {
       const position = await getCurrentPosition();
+      if (!position) {
+        setCheckInError("Location is required to check in — enable location services and try again.");
+        return;
+      }
       let geofenceVarianceM: number | null = null;
-      if (position && site?.latitude != null && site?.longitude != null) {
+      if (site?.latitude != null && site?.longitude != null) {
         geofenceVarianceM = distanceMeters(
           position.coords.latitude,
           position.coords.longitude,
@@ -195,11 +211,10 @@ export function JobWorkflow({
           site.longitude,
         );
       }
-      await checkIn(
-        jobId,
-        geofenceVarianceM,
-        position ? { latitude: position.coords.latitude, longitude: position.coords.longitude } : null,
-      );
+      await checkIn(jobId, geofenceVarianceM, {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
       onMutated?.();
     } finally {
       setIsCheckingIn(false);
@@ -227,13 +242,18 @@ export function JobWorkflow({
           : `${incompleteTasks.length} tasks are not yet checked off.`,
       );
     }
+    // Fetched here (not deferred into the try block below) so a missing GPS
+    // fix shows up alongside every other reason submission is blocked,
+    // rather than failing silently after the office believes the form was
+    // otherwise ready.
+    const position = await getCurrentPosition();
+    if (!position) validationErrors.push("Location is required — enable location services and try again.");
     setErrors(validationErrors);
-    if (validationErrors.length > 0) return;
+    if (validationErrors.length > 0 || !position) return;
 
     setIsSubmitting(true);
     try {
-      const position = await getCurrentPosition();
-      const point = position ? { latitude: position.coords.latitude, longitude: position.coords.longitude } : null;
+      const point = { latitude: position.coords.latitude, longitude: position.coords.longitude };
       if (detailsMode) {
         await saveJobDetailsDraft(currentDetailsRow());
         await submitJobDetails(jobId, jobType as JobDetailsType, currentDetailsRow(), point, currentUser.id);
@@ -272,9 +292,12 @@ export function JobWorkflow({
       </div>
 
       {NOT_YET_ON_SITE.includes(job.status) && (
-        <Button onClick={handleCheckIn} disabled={isCheckingIn}>
-          {isCheckingIn ? "Checking in…" : "Check In & Start Work"}
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button onClick={handleCheckIn} disabled={isCheckingIn}>
+            {isCheckingIn ? "Checking in…" : "Check In & Start Work"}
+          </Button>
+          {checkInError && <p className="text-destructive text-sm">{checkInError}</p>}
+        </div>
       )}
 
       {onSite && !detailsMode && (
@@ -345,7 +368,7 @@ function InstallFormSection({
   setValues: React.Dispatch<React.SetStateAction<InstallFormValues>>;
   tasks: { id: string; label: string; is_done: boolean }[];
   onToggleTask: (taskId: string, isDone: boolean) => void;
-  mediaBySlot: Map<string, MediaQueueItem>;
+  mediaBySlot: Map<string, MediaQueueItem[]>;
   signature: MediaQueueItem | undefined;
   onMutated?: () => void;
   errors: string[];
@@ -480,14 +503,22 @@ function JobDetailsSection({
   jobId: string;
   jobType: JobDetailsType;
   currentUser: CurrentUser;
-  site: { name: string; contact_name?: string | null; contact_phone?: string | null; contact_email?: string | null } | undefined;
+  site:
+    | {
+        name: string;
+        contact_name?: string | null;
+        contact_phone?: string | null;
+        contact_email?: string | null;
+        access_notes?: string | null;
+      }
+    | undefined;
   values: JobDetailsValues;
   setValues: React.Dispatch<React.SetStateAction<JobDetailsValues>>;
   detailsRow: JobDetailsRow | undefined;
   equipment: { id: string; model: string; serial: string | null }[];
   tasks: { id: string; label: string; is_done: boolean }[];
   onToggleTask: (taskId: string, isDone: boolean) => void;
-  mediaBySlot: Map<string, MediaQueueItem>;
+  mediaBySlot: Map<string, MediaQueueItem[]>;
   signature: MediaQueueItem | undefined;
   onMutated?: () => void;
   errors: string[];
@@ -504,6 +535,11 @@ function JobDetailsSection({
           Customer contact: {[site?.contact_name, site?.contact_phone, site?.contact_email].filter(Boolean).join(" · ") || "Not on file"}
         </p>
         <p className="text-sm">RAMS: {detailsRow?.rams_storage_path ? "Attached — view in office system" : "Not attached"}</p>
+        {site?.access_notes && (
+          <p className="mt-2 text-sm">
+            <span className="text-muted-foreground">Particular instructions:</span> {site.access_notes}
+          </p>
+        )}
         {showsSiteplanAndEquipment(jobType) && (
           <>
             <p className="text-sm">Site plan: {detailsRow?.site_plan_storage_path ? "Attached — view in office system" : "Not attached"}</p>
@@ -661,7 +697,7 @@ function PhotoGrid({
   jobId: string;
   slots: readonly string[];
   currentUser: CurrentUser;
-  mediaBySlot: Map<string, MediaQueueItem>;
+  mediaBySlot: Map<string, MediaQueueItem[]>;
   onMutated?: () => void;
 }) {
   return (
@@ -669,7 +705,7 @@ function PhotoGrid({
       <p className="mb-2 text-sm font-medium">Photos</p>
       <div className="grid grid-cols-3 gap-3">
         {slots.map((slot) => (
-          <PhotoSlot key={slot} jobId={jobId} slot={slot} label={slot.replace("photo_", "").replace(/_/g, " ")} capturedBy={currentUser.id} item={mediaBySlot.get(slot)} onCaptured={onMutated} />
+          <PhotoSlot key={slot} jobId={jobId} slot={slot} label={slot.replace("photo_", "").replace(/_/g, " ")} capturedBy={currentUser.id} items={mediaBySlot.get(slot) ?? []} onCaptured={onMutated} />
         ))}
       </div>
     </div>

@@ -12,6 +12,7 @@ import { DuplicateJobButton } from "./duplicate-job-button";
 import { TaskPanel } from "./task-panel";
 import { ShareLinkPanel } from "./share-link-panel";
 import { JobDetailsPanel } from "./job-details-panel";
+import { AssignSchedulePanel } from "./assign-schedule-panel";
 import { usesJobDetails, photoSlotsFor, type JobDetailsType } from "@/lib/forms/job-form";
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,6 +31,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: shareLinks },
     { data: jobTasks },
     { data: templates },
+    { data: engineers },
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -52,6 +54,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("share_links").select("token, expires_at, revoked").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("job_tasks").select("id, label, is_done").eq("job_id", id).order("position"),
     supabase.from("job_templates").select("id, name").order("name"),
+    supabase.from("users").select("id, name").eq("role", "engineer").eq("active", true).order("name"),
   ]);
 
   if (error || !job) notFound();
@@ -89,12 +92,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <div className="text-right text-sm">
-            <p>Assigned: {job.assigned?.name ?? "Unassigned"}</p>
-            <p className="text-muted-foreground">
-              {job.scheduled_start ? new Date(job.scheduled_start).toLocaleString() : "Not scheduled"}
-            </p>
-          </div>
+          <AssignSchedulePanel
+            jobId={job.id}
+            assignedTo={job.assigned_to}
+            assignedName={job.assigned?.name ?? null}
+            scheduledStart={job.scheduled_start}
+            engineers={engineers ?? []}
+          />
           <div className="flex items-center gap-2">
             <DuplicateJobButton jobId={job.id} />
             <CancelJobButton jobId={job.id} status={job.status} />

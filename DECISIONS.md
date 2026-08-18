@@ -1790,3 +1790,86 @@ project, then a real walkthrough: create an install job, upload
 RAMS/site plan/equipment from the office side, complete it from a phone
 end to end, confirm the PDF report and Monday/Calendar hooks all still
 fire correctly for the new types.
+
+## 2026-08-18 — Four gaps from real device testing: GPS, multi-photo, particular instructions, assign/schedule
+
+Testing the job-types feature above on a real phone surfaced four gaps,
+addressed here without touching the fixed-columns form architecture
+itself:
+
+**Geo location is now compulsory, not best-effort.** The spec always
+said "all jobs will need geo locating," and `getCurrentPosition()`
+already ran at check-in and submit — but a denied/unavailable GPS fix
+silently degraded to `null` coordinates rather than blocking anything.
+`handleCheckIn` now refuses to check in without a fix (shown as an
+inline error next to the button); `handleSubmit` fetches the position
+up front and adds "Location is required" to the same validation-errors
+list every other missing field goes through, rather than discovering
+the problem deep inside the submit transaction. No schema change — this
+was purely a "don't silently accept `null`" fix.
+
+**Multi-photo capture, and a bug it uncovered.** `media_assets` never
+had a `unique(job_id, slot)` constraint — multiple rows per slot were
+always storable — but the field UI's `PhotoSlot` only ever rendered
+`mediaBySlot.get(slot)` as a single item, so a second capture in the
+same slot silently orphaned the first from view (still uploaded, just
+invisible). `PhotoSlot` is now a gallery: every captured item for a
+slot renders as a thumbnail (local blob URL via `useMemo` +
+revoke-on-cleanup), with an always-present "add another" tile next to
+them — tap it as many times as the job needs (e.g. several "equipment
+in situ" shots). While regrouping `mediaBySlot` by slot, also fixed a
+second latent bug in the same map: it filtered to `kind === "photo"`
+only, so a captured **video** never showed as captured at all despite
+`PhotoSlot` already having a working video-icon branch for it — videos
+are now included in the grouping. Office-side rendering (job detail
+page's Media section, `completion-report.ts`'s photo loop) already
+iterated every `media_assets` row unconditionally, so neither needed a
+change — this was purely a field-app capture/display gap.
+
+**"Particular instructions (parking, unloading etc)" was in the spec
+doc's Install "Info on system" list but never rendered anywhere in the
+field app** — it existed in the schema all along as `sites.access_notes`
+and was already shown on the *office* job detail page, just never
+surfaced to the engineer. Added as a line in `JobDetailsSection`'s
+existing "Info on system" panel, shown whenever a site has one (not
+gated to install-only — parking/access notes are just as relevant on
+an SLA or maintenance visit).
+
+**Assign + schedule, reachable from the job itself, not just the
+Scheduler tab's drag-and-drop.** Per the request: "assigning the job
+can be done in the job itself or via the scheduling tab" — both, not
+either. Rather than building a second, parallel assign/schedule code
+path, `assignAndScheduleJob` (new, in `office/jobs/[id]/actions.ts`)
+does the same two operations `bulkAssignJobs`/`bulkScheduleJobs`/
+`rescheduleJob` already do (conflict detection via
+`detectConflicts`, draft→scheduled status transition with its
+`status_events` row, best-effort Calendar sync + assignment email via
+`after()`) — just parameterised for one job instead of an array, and
+combining assign+schedule into a single save instead of two separate
+bulk actions, since the job detail page has one form for both. The
+existing top-right "Assigned: X / <date>" block on the job detail page
+(kept exactly as it was — a screenshot of the pre-existing layout was
+explicitly called out as one to keep) now has an "Assign / schedule"
+toggle that swaps that same two-line block for an inline engineer
+picker + datetime-local input + duration, in place — no new page
+section, no layout disruption.
+
+**Not done in this pass, flagged rather than silently dropped:** the
+spec's two separate timestamps per job — "commence job from beginning
+of journey" vs. "commence job at customer site" — are still collapsed
+into the field app's single "Check In & Start Work" tap (`actual_start`
+covers only the latter). Splitting them needs a real schema addition
+(a travel-start column, a new pre-check-in status transition) rather
+than a UI-only fix, and wasn't part of what was explicitly flagged this
+round — worth a dedicated pass rather than a rushed bolt-on here.
+
+Verified: `pnpm typecheck`, `pnpm lint`, and `pnpm build` all clean.
+`pnpm test`: 226 passed, same 2 pre-existing Supabase-dependent
+failures as every prior addendum in this sandbox (still no working
+Docker/local Supabase here) — no new failures, no regressions. No new
+pure-logic functions were added (this pass was UI/server-action wiring
+on top of existing validated logic), so no new unit tests were needed;
+not verified against a live browser or the real VM — needs a real
+phone walkthrough for the GPS-required check-in/submit paths in
+particular, since geolocation permission prompts don't reproduce in
+this sandbox.
