@@ -2,7 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { createSiteForClient, type SiteRow } from "../actions";
+import { createSiteForClient, deleteSiteForClient, updateSiteForClient, type SiteRow } from "../actions";
+
+type EditFields = { name: string; address_line1: string; town: string; postcode: string };
+
+function toEditFields(s: SiteRow): EditFields {
+  return {
+    name: s.name,
+    address_line1: s.address_line1 ?? "",
+    town: s.town ?? "",
+    postcode: s.postcode ?? "",
+  };
+}
 
 export function ClientSites({ clientId, sites: initialSites }: { clientId: string; sites: SiteRow[] }) {
   const [sites, setSites] = useState(initialSites);
@@ -12,6 +23,10 @@ export function ClientSites({ clientId, sites: initialSites }: { clientId: strin
   const [postcode, setPostcode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFields, setEditFields] = useState<EditFields>({ name: "", address_line1: "", town: "", postcode: "" });
+  const [rowMessage, setRowMessage] = useState<string | null>(null);
 
   function handleCreate() {
     startTransition(async () => {
@@ -34,6 +49,36 @@ export function ClientSites({ clientId, sites: initialSites }: { clientId: strin
     });
   }
 
+  function startEdit(s: SiteRow) {
+    setEditingId(s.id);
+    setEditFields(toEditFields(s));
+    setRowMessage(null);
+  }
+
+  function handleSaveEdit(siteId: string) {
+    startTransition(async () => {
+      const result = await updateSiteForClient(siteId, clientId, editFields);
+      if (result.ok) {
+        setSites((prev) => prev.map((s) => (s.id === siteId ? result.site : s)).sort((a, b) => a.name.localeCompare(b.name)));
+        setEditingId(null);
+      } else {
+        setRowMessage(result.message);
+      }
+    });
+  }
+
+  function handleDelete(siteId: string) {
+    if (!window.confirm("Delete this site? This can't be undone.")) return;
+    startTransition(async () => {
+      const result = await deleteSiteForClient(siteId, clientId);
+      if (result.ok) {
+        setSites((prev) => prev.filter((s) => s.id !== siteId));
+      } else {
+        setRowMessage(result.message);
+      }
+    });
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -49,26 +94,84 @@ export function ClientSites({ clientId, sites: initialSites }: { clientId: strin
           <tr className="border-b text-left">
             <th className="py-2 font-medium">Name</th>
             <th className="py-2 font-medium">Address</th>
+            <th className="py-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {sites.map((s) => (
-            <tr key={s.id} className="border-b">
-              <td className="py-2">{s.name}</td>
-              <td className="py-2 text-muted-foreground">
-                {[s.address_line1, s.town, s.postcode].filter(Boolean).join(", ") || "—"}
-              </td>
-            </tr>
-          ))}
+          {sites.map((s) =>
+            editingId === s.id ? (
+              <tr key={s.id} className="border-b">
+                <td className="py-2">
+                  <input
+                    value={editFields.name}
+                    onChange={(e) => setEditFields((f) => ({ ...f, name: e.target.value }))}
+                    className="border-input h-8 w-full rounded-md border bg-transparent px-2 text-sm"
+                  />
+                </td>
+                <td className="py-2">
+                  <div className="flex flex-col gap-1">
+                    <input
+                      placeholder="Address"
+                      value={editFields.address_line1}
+                      onChange={(e) => setEditFields((f) => ({ ...f, address_line1: e.target.value }))}
+                      className="border-input h-8 rounded-md border bg-transparent px-2 text-sm"
+                    />
+                    <div className="flex gap-1">
+                      <input
+                        placeholder="Town"
+                        value={editFields.town}
+                        onChange={(e) => setEditFields((f) => ({ ...f, town: e.target.value }))}
+                        className="border-input h-8 w-1/2 rounded-md border bg-transparent px-2 text-sm"
+                      />
+                      <input
+                        placeholder="Postcode"
+                        value={editFields.postcode}
+                        onChange={(e) => setEditFields((f) => ({ ...f, postcode: e.target.value }))}
+                        className="border-input h-8 w-1/2 rounded-md border bg-transparent px-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                </td>
+                <td className="py-2">
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" disabled={isPending || !editFields.name.trim()} onClick={() => handleSaveEdit(s.id)}>
+                      Save
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setEditingId(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              <tr key={s.id} className="border-b">
+                <td className="py-2">{s.name}</td>
+                <td className="py-2 text-muted-foreground">
+                  {[s.address_line1, s.town, s.postcode].filter(Boolean).join(", ") || "—"}
+                </td>
+                <td className="py-2">
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => startEdit(s)}>
+                      Edit
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleDelete(s.id)}>
+                      Delete
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ),
+          )}
           {sites.length === 0 && (
             <tr>
-              <td colSpan={2} className="text-muted-foreground py-4 text-center">
+              <td colSpan={3} className="text-muted-foreground py-4 text-center">
                 No sites yet.
               </td>
             </tr>
           )}
         </tbody>
       </table>
+      {rowMessage && <p className="text-destructive text-sm">{rowMessage}</p>}
 
       <section className="flex flex-col gap-3 border-t pt-4">
         <h3 className="font-medium">Add a site</h3>

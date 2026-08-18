@@ -37,6 +37,51 @@ export async function createClientRecord(input: {
   return { ok: true, client: data };
 }
 
+export type UpdateClientResult = { ok: true; client: ClientRow } | { ok: false; message: string };
+export type DeleteResult = { ok: true } | { ok: false; message: string };
+
+export async function updateClientRecord(
+  clientId: string,
+  input: { name: string; contact_name?: string; contact_email?: string; contact_phone?: string; notes?: string },
+): Promise<UpdateClientResult> {
+  const name = input.name.trim();
+  if (!name) return { ok: false, message: "Name is required." };
+
+  const supabase = await createSupabaseClient();
+  const { data, error } = await supabase
+    .from("clients")
+    .update({
+      name,
+      contact_name: input.contact_name?.trim() || null,
+      contact_email: input.contact_email?.trim() || null,
+      contact_phone: input.contact_phone?.trim() || null,
+      notes: input.notes?.trim() || null,
+    })
+    .eq("id", clientId)
+    .select("*")
+    .single();
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/office/clients");
+  revalidatePath(`/office/clients/${clientId}`);
+  return { ok: true, client: data };
+}
+
+/** A client can't be deleted while it still has sites — the FK is a plain RESTRICT (no cascade), by design: deleting a client should never silently orphan/wipe out site history. */
+export async function deleteClientRecord(clientId: string): Promise<DeleteResult> {
+  const supabase = await createSupabaseClient();
+  const { error } = await supabase.from("clients").delete().eq("id", clientId);
+  if (error) {
+    if (error.code === "23503") {
+      return { ok: false, message: "Can't delete — this client still has sites. Remove or reassign them first." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath("/office/clients");
+  return { ok: true };
+}
+
 export type SiteRow = Database["public"]["Tables"]["sites"]["Row"];
 export type CreateSiteResult = { ok: true; site: SiteRow } | { ok: false; message: string };
 
@@ -72,6 +117,58 @@ export async function createSiteForClient(
 
   revalidatePath(`/office/clients/${clientId}`);
   return { ok: true, site: data };
+}
+
+export type UpdateSiteResult = { ok: true; site: SiteRow } | { ok: false; message: string };
+
+export async function updateSiteForClient(
+  siteId: string,
+  clientId: string,
+  input: {
+    name: string;
+    address_line1?: string;
+    town?: string;
+    postcode?: string;
+    contact_name?: string;
+    contact_phone?: string;
+  },
+): Promise<UpdateSiteResult> {
+  const name = input.name.trim();
+  if (!name) return { ok: false, message: "Name is required." };
+
+  const supabase = await createSupabaseClient();
+  const { data, error } = await supabase
+    .from("sites")
+    .update({
+      name,
+      address_line1: input.address_line1?.trim() || null,
+      town: input.town?.trim() || null,
+      postcode: input.postcode?.trim() || null,
+      contact_name: input.contact_name?.trim() || null,
+      contact_phone: input.contact_phone?.trim() || null,
+    })
+    .eq("id", siteId)
+    .select("*")
+    .single();
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/office/clients/${clientId}`);
+  return { ok: true, site: data };
+}
+
+/** A site can't be deleted while it still has jobs — the FK is a plain RESTRICT (no cascade), same reasoning as deleteClientRecord: deleting a site should never silently take job history with it. */
+export async function deleteSiteForClient(siteId: string, clientId: string): Promise<DeleteResult> {
+  const supabase = await createSupabaseClient();
+  const { error } = await supabase.from("sites").delete().eq("id", siteId);
+  if (error) {
+    if (error.code === "23503") {
+      return { ok: false, message: "Can't delete — this site still has jobs against it." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/office/clients/${clientId}`);
+  return { ok: true };
 }
 
 export async function importClientsCsv(formData: FormData): Promise<ImportClientsResult> {

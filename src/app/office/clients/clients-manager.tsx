@@ -3,7 +3,18 @@
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { createClientRecord, importClientsCsv, type ClientRow } from "./actions";
+import { createClientRecord, deleteClientRecord, importClientsCsv, updateClientRecord, type ClientRow } from "./actions";
+
+type EditFields = { name: string; contact_name: string; contact_email: string; contact_phone: string };
+
+function toEditFields(c: ClientRow): EditFields {
+  return {
+    name: c.name,
+    contact_name: c.contact_name ?? "",
+    contact_email: c.contact_email ?? "",
+    contact_phone: c.contact_phone ?? "",
+  };
+}
 
 export function ClientsManager({
   clients: initialClients,
@@ -19,6 +30,10 @@ export function ClientsManager({
   const [contactPhone, setContactPhone] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFields, setEditFields] = useState<EditFields>({ name: "", contact_name: "", contact_email: "", contact_phone: "" });
+  const [rowMessage, setRowMessage] = useState<string | null>(null);
 
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [isImporting, startImport] = useTransition();
@@ -45,6 +60,41 @@ export function ClientsManager({
     });
   }
 
+  function startEdit(c: ClientRow) {
+    setEditingId(c.id);
+    setEditFields(toEditFields(c));
+    setRowMessage(null);
+  }
+
+  function handleSaveEdit(clientId: string) {
+    startTransition(async () => {
+      const result = await updateClientRecord(clientId, {
+        name: editFields.name,
+        contact_name: editFields.contact_name,
+        contact_email: editFields.contact_email,
+        contact_phone: editFields.contact_phone,
+      });
+      if (result.ok) {
+        setClients((prev) => prev.map((c) => (c.id === clientId ? result.client : c)).sort((a, b) => a.name.localeCompare(b.name)));
+        setEditingId(null);
+      } else {
+        setRowMessage(result.message);
+      }
+    });
+  }
+
+  function handleDelete(clientId: string) {
+    if (!window.confirm("Delete this client? This can't be undone.")) return;
+    startTransition(async () => {
+      const result = await deleteClientRecord(clientId);
+      if (result.ok) {
+        setClients((prev) => prev.filter((c) => c.id !== clientId));
+      } else {
+        setRowMessage(result.message);
+      }
+    });
+  }
+
   function handleImport(formData: FormData) {
     startImport(async () => {
       const result = await importClientsCsv(formData);
@@ -64,31 +114,88 @@ export function ClientsManager({
             <th className="py-2 font-medium">Name</th>
             <th className="py-2 font-medium">Contact</th>
             <th className="py-2 font-medium">Sites</th>
+            <th className="py-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {clients.map((c) => (
-            <tr key={c.id} className="border-b">
-              <td className="py-2">
-                <Link href={`/office/clients/${c.id}`} className="font-medium hover:underline">
-                  {c.name}
-                </Link>
-              </td>
-              <td className="py-2 text-muted-foreground">
-                {[c.contact_name, c.contact_email, c.contact_phone].filter(Boolean).join(" · ") || "—"}
-              </td>
-              <td className="py-2 text-muted-foreground">{siteCounts[c.id] ?? 0}</td>
-            </tr>
-          ))}
+          {clients.map((c) =>
+            editingId === c.id ? (
+              <tr key={c.id} className="border-b">
+                <td className="py-2">
+                  <input
+                    value={editFields.name}
+                    onChange={(e) => setEditFields((f) => ({ ...f, name: e.target.value }))}
+                    className="border-input h-8 w-full rounded-md border bg-transparent px-2 text-sm"
+                  />
+                </td>
+                <td className="py-2">
+                  <div className="flex flex-col gap-1">
+                    <input
+                      placeholder="Contact name"
+                      value={editFields.contact_name}
+                      onChange={(e) => setEditFields((f) => ({ ...f, contact_name: e.target.value }))}
+                      className="border-input h-8 rounded-md border bg-transparent px-2 text-sm"
+                    />
+                    <input
+                      placeholder="Contact email"
+                      value={editFields.contact_email}
+                      onChange={(e) => setEditFields((f) => ({ ...f, contact_email: e.target.value }))}
+                      className="border-input h-8 rounded-md border bg-transparent px-2 text-sm"
+                    />
+                    <input
+                      placeholder="Contact phone"
+                      value={editFields.contact_phone}
+                      onChange={(e) => setEditFields((f) => ({ ...f, contact_phone: e.target.value }))}
+                      className="border-input h-8 rounded-md border bg-transparent px-2 text-sm"
+                    />
+                  </div>
+                </td>
+                <td className="py-2 text-muted-foreground">{siteCounts[c.id] ?? 0}</td>
+                <td className="py-2">
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" disabled={isPending || !editFields.name.trim()} onClick={() => handleSaveEdit(c.id)}>
+                      Save
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setEditingId(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              <tr key={c.id} className="border-b">
+                <td className="py-2">
+                  <Link href={`/office/clients/${c.id}`} className="font-medium hover:underline">
+                    {c.name}
+                  </Link>
+                </td>
+                <td className="py-2 text-muted-foreground">
+                  {[c.contact_name, c.contact_email, c.contact_phone].filter(Boolean).join(" · ") || "—"}
+                </td>
+                <td className="py-2 text-muted-foreground">{siteCounts[c.id] ?? 0}</td>
+                <td className="py-2">
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => startEdit(c)}>
+                      Edit
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleDelete(c.id)}>
+                      Delete
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ),
+          )}
           {clients.length === 0 && (
             <tr>
-              <td colSpan={3} className="text-muted-foreground py-4 text-center">
+              <td colSpan={4} className="text-muted-foreground py-4 text-center">
                 No clients yet.
               </td>
             </tr>
           )}
         </tbody>
       </table>
+      {rowMessage && <p className="text-destructive text-sm">{rowMessage}</p>}
 
       <section className="flex flex-col gap-3 border-t pt-4">
         <h2 className="font-medium">Add a client</h2>
