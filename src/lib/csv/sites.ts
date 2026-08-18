@@ -3,8 +3,11 @@ import type { Database } from "@/lib/supabase/database.types";
 
 export type SiteInsert = Database["public"]["Tables"]["sites"]["Insert"];
 
+/** client_id isn't parsed from the CSV — see the function doc below. */
+export type ParsedSiteRow = Omit<SiteInsert, "client_id">;
+
 export type ParsedSitesCsv = {
-  rows: SiteInsert[];
+  rows: ParsedSiteRow[];
   errors: string[];
 };
 
@@ -13,6 +16,12 @@ export type ParsedSitesCsv = {
  * be unit tested directly. Required column: `name`. Everything else is
  * optional and passed through; `latitude`/`longitude` are validated as
  * numbers when present.
+ *
+ * No `client_id` column here — every site now requires one (see
+ * 20260116000000_clients.sql), but a whole CSV batch of sites is a single
+ * client's stores in practice (e.g. FootAsylum's 200 locations in one
+ * file), so the caller attaches one client_id to every parsed row rather
+ * than expecting it per-row in the CSV itself.
  */
 export function parseSitesCsv(text: string): ParsedSitesCsv {
   const parsed = Papa.parse<Record<string, string>>(text, {
@@ -22,7 +31,7 @@ export function parseSitesCsv(text: string): ParsedSitesCsv {
   });
 
   const errors: string[] = parsed.errors.map((e) => `Row ${(e.row ?? 0) + 2}: ${e.message}`);
-  const rows: SiteInsert[] = [];
+  const rows: ParsedSiteRow[] = [];
 
   parsed.data.forEach((raw, index) => {
     const rowNumber = index + 2; // +1 for header row, +1 for 1-indexing
@@ -62,7 +71,6 @@ export function parseSitesCsv(text: string): ParsedSitesCsv {
       contact_name: raw.contact_name?.trim() || undefined,
       contact_phone: raw.contact_phone?.trim() || undefined,
       contact_email: raw.contact_email?.trim() || undefined,
-      organisation: raw.organisation?.trim() || undefined,
     });
   });
 

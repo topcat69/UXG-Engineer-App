@@ -14,6 +14,10 @@ export async function importSitesCsv(formData: FormData): Promise<ImportSitesRes
   if (!(file instanceof File) || file.size === 0) {
     return { ok: false, message: "Choose a CSV file first." };
   }
+  const clientId = formData.get("clientId");
+  if (typeof clientId !== "string" || !clientId) {
+    return { ok: false, message: "Select a client first — every site belongs to one." };
+  }
 
   const text = await file.text();
   const { rows, errors } = parseSitesCsv(text);
@@ -22,8 +26,12 @@ export async function importSitesCsv(formData: FormData): Promise<ImportSitesRes
     return { ok: false, message: errors[0] ?? "No valid rows found." };
   }
 
+  // A whole CSV batch is one client's sites (e.g. FootAsylum's 200 stores in
+  // one file) — client_id isn't a column in the CSV itself, see sites.ts.
+  const rowsWithClient = rows.map((row) => ({ ...row, client_id: clientId }));
+
   const supabase = await createClient();
-  const { data, error } = await supabase.from("sites").insert(rows).select("id");
+  const { data, error } = await supabase.from("sites").insert(rowsWithClient).select("id");
   if (error) return { ok: false, message: error.message };
 
   revalidatePath("/office/import");

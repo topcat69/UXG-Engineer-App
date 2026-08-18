@@ -9,14 +9,17 @@ const JOB_TYPES = ["install", "survey"];
 
 export function ImportWizard({
   projects,
+  clients,
   allSiteIds,
 }: {
   projects: { id: string; name: string }[];
+  clients: { id: string; name: string }[];
   allSiteIds: string[];
 }) {
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importedSiteIds, setImportedSiteIds] = useState<string[]>([]);
   const [isImporting, startImport] = useTransition();
+  const [importClientId, setImportClientId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [target, setTarget] = useState<"imported" | "all">("imported");
@@ -57,9 +60,24 @@ export function ImportWizard({
           Required column: <code>name</code>. Optional: <code>address_line1</code>,{" "}
           <code>address_line2</code>, <code>town</code>, <code>postcode</code>, <code>latitude</code>,{" "}
           <code>longitude</code>, <code>access_notes</code>, <code>contact_name</code>,{" "}
-          <code>contact_phone</code>, <code>organisation</code>.
+          <code>contact_phone</code>, <code>contact_email</code>. A whole file is imported as one
+          client&apos;s sites — pick which client below.
         </p>
-        <form action={handleImport} className="flex items-center gap-2">
+        <form action={handleImport} className="flex flex-wrap items-center gap-2">
+          <select
+            name="clientId"
+            value={importClientId}
+            onChange={(e) => setImportClientId(e.target.value)}
+            required
+            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+          >
+            <option value="">Client…</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
           <input
             ref={fileInputRef}
             type="file"
@@ -68,7 +86,7 @@ export function ImportWizard({
             required
             className="text-sm"
           />
-          <Button type="submit" size="sm" disabled={isImporting}>
+          <Button type="submit" size="sm" disabled={isImporting || !importClientId}>
             {isImporting ? "Importing…" : "Import"}
           </Button>
         </form>

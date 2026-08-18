@@ -1607,3 +1607,85 @@ Supabase Cloud's free tier caps Storage at 1GB; this app captures several
 photos plus video per job, so even 50 jobs/month will likely cross that
 within weeks — budget for Supabase Pro (~$25/mo) once real jobs start
 landing, not as a "someday" upgrade.
+
+## Addendum, 2026-08-18 — Clients, manual creation, and the deploy checklist that surfaced it
+
+Deploying to the real VM surfaced a gap no earlier phase had hit: this app
+had **no way to create a Project, Site, or Job by hand at all** — the only
+path was CSV import, and Project specifically had no creation UI or CSV
+path either, only ever seeded via `seed.sql` (local dev) or the AppSheet
+migration script. That was fine while every phase's testing ran against
+seeded/imported data; it broke the moment a real, empty production
+database needed its first project to exist. The request that followed
+reshaped the data model, not just the UI:
+
+**Client is a new, central, reusable entity — independent of Project.**
+A Project ("Jobs 2026") is a time/organisational container that can hold
+jobs for many different clients at once, so it never gets a `client_id`.
+What a job is actually *for* flows through its **site** instead: a site is
+the real-world location work happens at (a client's individual store, or
+the client itself when there's no separate site — e.g. add one site named
+after the client). Every site now requires `client_id` (not null), so a
+job's client is always derivable via `job -> site -> client` for
+reporting — concretely, "which of FootAsylum's 200 stores did we visit,"
+the example that drove this — without a redundant `client_id` stored
+directly on jobs that could drift out of sync with the site.
+
+**`sites.organisation` (free text) and `projects.client_name` (free text)
+are both dropped**, not kept alongside the new relationship. They were the
+ad-hoc predecessors of a real Client entity; keeping them would mean two
+parallel, driftable ways to say the same thing. `20260116000000_clients.sql`
+backfills any pre-existing site rows onto a placeholder "Unknown" client
+before making `client_id` required, rather than assuming this is always a
+fresh empty database — cheap insurance that cost nothing given this
+session's own prior lesson (the migration-collision and pnpm-build bugs
+both traced back to assumptions about environments never actually
+exercised for real).
+
+**The AppSheet migration script (`scripts/lib/run-migration.ts`) gets its
+own client resolution, separate from the office CSV importer's.** The
+office importer assumes a whole CSV batch is one client's sites (pick a
+Client once for the file — matches how someone would actually hand over
+"here are FootAsylum's 200 stores" in practice). `sites.csv` in an AppSheet
+export predates Clients existing at all and carries the old `organisation`
+column *per site*, not per file, so `run-migration.ts` reads it directly
+via `parseCsvRows` (bypassing `parseSitesCsv`, which no longer knows about
+`organisation`) and resolves-or-creates a client per unique organisation
+name, falling back to "Unknown" for rows with none — get-or-create by name
+so a re-run doesn't create duplicate client rows.
+
+**New UI, matching the existing Templates/Users management-page pattern**
+rather than inventing a new one:
+- `/office/clients` — list + create form + CSV import (required column
+  `name`, optional contact fields — same shape as the existing sites
+  importer). Click into a client for its detail page listing/adding sites.
+- `/office/projects` — list + create form. Previously nonexistent.
+- `/office/jobs`'s new "New Job" button — a collapsible inline form
+  (Project → Client → Site, the last two cascading — → Job type), calling
+  a new single-row `createJob` action (the `generateJobs` bulk-CSV path's
+  sibling, same `nextJobNumber` scheme) and redirecting straight to the
+  created job's detail page. Deliberately doesn't duplicate template
+  application inline — the job detail page already has that, so creation
+  just gets you there instead of rebuilding it.
+
+CSV import isn't removed — the user was explicit that manual creation has
+to work standalone, not that bulk import should go away — it's just no
+longer the *only* path, and the sites importer now requires picking a
+Client for the batch since `client_id` is no longer optional.
+
+**Client surfaced everywhere a job's Site already was**: the jobs list
+table, job detail page (header line and the Site section), the Reports
+page's job picker, and the jobs CSV export (`jobsToCsv`'s new `client`
+column, between `priority` and `site`).
+
+**Not verified against a live browser, real Supabase, or the actual VM in
+this session** — same Docker-unavailable constraint as every prior
+addendum here. `pnpm typecheck`, `pnpm lint`, and `pnpm test` are clean
+(207 passed — the 4 new client CSV parser tests — same 2 pre-existing
+Supabase-dependent failures as always). Concretely still needed before
+this is live: `supabase db push` on the real project to apply
+`20260116000000_clients.sql` (the same step already needed to unblock
+login after the earlier migration-collision fix), then a real walkthrough
+— create a client, add a site, create a job against it, confirm the
+Calendar/Monday hooks still fire correctly with a job created this way
+rather than via CSV import.

@@ -90,6 +90,36 @@ export type Database = {
           },
         ]
       }
+      clients: {
+        Row: {
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string | null
+          id: string
+          name: string
+          notes: string | null
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+        }
+        Update: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+        }
+        Relationships: []
+      }
       install_forms: {
         Row: {
           client_name: string | null
@@ -531,7 +561,6 @@ export type Database = {
       }
       projects: {
         Row: {
-          client_name: string | null
           created_at: string | null
           end_date: string | null
           id: string
@@ -540,7 +569,6 @@ export type Database = {
           status: string | null
         }
         Insert: {
-          client_name?: string | null
           created_at?: string | null
           end_date?: string | null
           id?: string
@@ -549,7 +577,6 @@ export type Database = {
           status?: string | null
         }
         Update: {
-          client_name?: string | null
           created_at?: string | null
           end_date?: string | null
           id?: string
@@ -657,6 +684,7 @@ export type Database = {
           access_notes: string | null
           address_line1: string | null
           address_line2: string | null
+          client_id: string
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
@@ -665,7 +693,6 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           name: string
-          organisation: string | null
           postcode: string | null
           town: string | null
         }
@@ -673,6 +700,7 @@ export type Database = {
           access_notes?: string | null
           address_line1?: string | null
           address_line2?: string | null
+          client_id: string
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
@@ -681,7 +709,6 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           name: string
-          organisation?: string | null
           postcode?: string | null
           town?: string | null
         }
@@ -689,6 +716,7 @@ export type Database = {
           access_notes?: string | null
           address_line1?: string | null
           address_line2?: string | null
+          client_id?: string
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
@@ -697,11 +725,18 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           name?: string
-          organisation?: string | null
           postcode?: string | null
           town?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sites_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       status_events: {
         Row: {

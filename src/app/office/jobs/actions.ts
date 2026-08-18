@@ -6,8 +6,45 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
 import { sendJobAssignedEmail } from "@/lib/email/send-job-emails";
+import { nextJobNumber } from "@/lib/jobs/job-number";
 
 export type ActionResult = { ok: true; message: string } | { ok: false; message: string };
+
+export type CreateJobResult = { ok: true; jobId: string } | { ok: false; message: string };
+
+/**
+ * Single-job counterpart to the CSV importer's bulk generateJobs (see
+ * office/import/actions.ts) — same job_number scheme, same draft starting
+ * status, just one row instead of many. The job only needs project_id and
+ * site_id: a job's client is always derivable via site_id -> sites.client_id
+ * rather than stored redundantly on the job itself (see
+ * 20260116000000_clients.sql).
+ */
+export async function createJob(projectId: string, siteId: string, jobType: string): Promise<CreateJobResult> {
+  if (!projectId) return { ok: false, message: "Select a project." };
+  if (!siteId) return { ok: false, message: "Select a site." };
+  if (!jobType) return { ok: false, message: "Select a job type." };
+
+  const supabase = await createClient();
+  const { count } = await supabase.from("jobs").select("id", { count: "exact", head: true });
+  const year = new Date().getFullYear();
+
+  const { data, error } = await supabase
+    .from("jobs")
+    .insert({
+      job_number: nextJobNumber(count ?? 0, year, 1),
+      project_id: projectId,
+      site_id: siteId,
+      job_type: jobType,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/office/jobs");
+  return { ok: true, jobId: data.id };
+}
 
 export async function bulkAssignJobs(jobIds: string[], engineerId: string): Promise<ActionResult> {
   if (jobIds.length === 0) return { ok: false, message: "No jobs selected." };

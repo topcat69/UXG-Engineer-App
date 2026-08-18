@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { buildLookup } from "@/lib/migration/csv-helpers";
+import { buildLookup, parseCsvRows } from "@/lib/migration/csv-helpers";
 import { parseAssetsCsv, resolveAssetRows } from "@/lib/migration/parse-assets";
 import { parseInstallFormsCsv, resolveInstallFormRows } from "@/lib/migration/parse-install-forms";
 import { parseIssuesCsv, resolveIssueRows } from "@/lib/migration/parse-issues";
@@ -19,6 +19,22 @@ export type MigrationSummary = {
 function readIfExists(dir: string, filename: string): string | null {
   const filePath = path.join(dir, filename);
   return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : null;
+}
+
+/**
+ * Every site now requires a client_id (see 20260116000000_clients.sql), but
+ * Clients didn't exist when this AppSheet migration path was written —
+ * sites.csv only ever carried the old free-text `organisation` column, one
+ * per site rather than one per whole file, unlike the office CSV importer's
+ * "one client per batch" assumption. Get-or-create by name so a re-run
+ * doesn't create duplicate client rows for the same organisation.
+ */
+async function resolveClientId(supabase: ScriptAdminClient, name: string): Promise<string> {
+  const { data: existing } = await supabase.from("clients").select("id").ilike("name", name).limit(1).maybeSingle();
+  if (existing) return existing.id;
+  const { data: created, error } = await supabase.from("clients").insert({ name }).select("id").single();
+  if (error || !created) throw new Error(`Failed to create client "${name}": ${error?.message}`);
+  return created.id;
 }
 
 /**
@@ -113,7 +129,31 @@ export async function runMigration(dir: string, supabase: ScriptAdminClient): Pr
     const { rows, errors: parseErrors } = parseSitesCsv(sitesCsv);
     errors.push(...parseErrors.map((e) => `sites.csv: ${e}`));
     if (rows.length > 0) {
-      const { data, error } = await supabase.from("sites").insert(rows).select("id, name");
+      // sites.csv predates client_id existing at all -- it carried the old
+      // free-text organisation column, one per site (not one per whole
+      // file, unlike the office importer's assumption), so resolve it here
+      // rather than in parseSitesCsv itself, which no longer knows about
+      // organisation at all. Rows with no organisation value fall back to
+      // a shared "Unknown" placeholder client rather than failing outright.
+      const orgByName = new Map<string, string>();
+      for (const raw of parseCsvRows(sitesCsv).data) {
+        const name = raw.name?.trim();
+        const org = raw.organisation?.trim();
+        if (name && org) orgByName.set(name.toLowerCase(), org);
+      }
+      const clientIdByOrg = new Map<string, string>();
+      const rowsWithClient = [];
+      for (const row of rows) {
+        const org = orgByName.get(row.name.toLowerCase()) ?? "Unknown";
+        let clientId = clientIdByOrg.get(org.toLowerCase());
+        if (!clientId) {
+          clientId = await resolveClientId(supabase, org);
+          clientIdByOrg.set(org.toLowerCase(), clientId);
+        }
+        rowsWithClient.push({ ...row, client_id: clientId });
+      }
+
+      const { data, error } = await supabase.from("sites").insert(rowsWithClient).select("id, name");
       if (error) {
         errors.push(`sites.csv: insert failed: ${error.message}`);
       } else {

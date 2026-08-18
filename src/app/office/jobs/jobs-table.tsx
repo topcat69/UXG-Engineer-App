@@ -24,7 +24,7 @@ export type JobRow = {
   priority: string | null;
   scheduled_start: string | null;
   assigned_to: string | null;
-  site: { name: string } | null;
+  site: { name: string; client: { name: string } | null } | null;
   project: { name: string } | null;
   assigned: { name: string } | null;
 };
@@ -135,6 +135,7 @@ export function JobsTable({ jobs, engineers }: { jobs: JobRow[]; engineers: { id
               <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
             </TableHead>
             <TableHead>Job #</TableHead>
+            <TableHead>Client</TableHead>
             <TableHead>Site</TableHead>
             <TableHead>Project</TableHead>
             <TableHead>Type</TableHead>
@@ -146,7 +147,7 @@ export function JobsTable({ jobs, engineers }: { jobs: JobRow[]; engineers: { id
         <TableBody>
           {jobs.length === 0 && (
             <TableRow>
-              <TableCell colSpan={8} className="text-muted-foreground text-center">
+              <TableCell colSpan={9} className="text-muted-foreground text-center">
                 No jobs match these filters.
               </TableCell>
             </TableRow>
@@ -161,6 +162,7 @@ export function JobsTable({ jobs, engineers }: { jobs: JobRow[]; engineers: { id
                   {job.job_number}
                 </Link>
               </TableCell>
+              <TableCell>{job.site?.client?.name ?? "—"}</TableCell>
               <TableCell>{job.site?.name ?? "—"}</TableCell>
               <TableCell>{job.project?.name ?? "—"}</TableCell>
               <TableCell>{job.job_type}</TableCell>

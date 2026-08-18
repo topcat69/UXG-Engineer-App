@@ -48,12 +48,13 @@ async function main() {
   console.log(`Seeding ${JOB_COUNT} jobs and ${MEDIA_COUNT} media_assets rows...`);
 
   const { data: project } = await admin.from("projects").select("id").limit(1).single();
+  const { data: client } = await admin.from("clients").select("id").limit(1).single();
   const { data: engineer } = await admin.from("users").select("id").eq("email", "engineer@opoc.test").single();
-  if (!project || !engineer) throw new Error("Seed data missing — run `pnpm db:reset` first.");
+  if (!project || !client || !engineer) throw new Error("Seed data missing — run `pnpm db:reset` first.");
 
   const { data: site, error: siteError } = await admin
     .from("sites")
-    .insert({ name: `${TAG} Site` })
+    .insert({ name: `${TAG} Site`, client_id: client.id })
     .select("id")
     .single();
   if (siteError || !site) throw new Error(`Failed to create load-test site: ${siteError?.message}`);

@@ -39,7 +39,9 @@ export async function GET(request: Request) {
   const { data: jobs, error } = await applyJobListFilters(
     supabase
       .from("jobs")
-      .select("job_number, status, job_type, priority, scheduled_start, site:sites(name), project:projects(name), assigned:users!jobs_assigned_to_fkey(name)")
+      .select(
+        "job_number, status, job_type, priority, scheduled_start, site:sites(name, client:clients(name)), project:projects(name), assigned:users!jobs_assigned_to_fkey(name)",
+      )
       .order("created_at", { ascending: false })
       .limit(EXPORT_ROW_LIMIT),
     filters,
@@ -51,6 +53,7 @@ export async function GET(request: Request) {
     status: job.status,
     job_type: job.job_type,
     priority: job.priority,
+    client: job.site?.client?.name ?? "",
     site: job.site?.name ?? "",
     project: job.project?.name ?? "",
     assigned_to: job.assigned?.name ?? "",

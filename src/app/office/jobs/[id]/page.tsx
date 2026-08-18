@@ -39,7 +39,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase
       .from("jobs")
       .select(
-        "*, site:sites(*), project:projects(name), assigned:users!jobs_assigned_to_fkey(name, email)",
+        "*, site:sites(*, client:clients(id, name)), project:projects(name), assigned:users!jobs_assigned_to_fkey(name, email)",
       )
       .eq("id", id)
       .single(),
@@ -80,6 +80,15 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <Link href={`/office/jobs?project_id=${job.project_id ?? ""}`} className="underline">
               {job.project?.name ?? "No project"}
             </Link>
+            {job.site?.client && (
+              <>
+                {" "}
+                ·{" "}
+                <Link href={`/office/clients/${job.site.client.id}`} className="underline">
+                  {job.site.client.name}
+                </Link>
+              </>
+            )}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -100,7 +109,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="flex flex-col gap-2">
           <h2 className="font-medium">Site</h2>
-          <p className="text-sm">{job.site?.name}</p>
+          <p className="text-sm">
+            {job.site?.name}
+            {job.site?.client && <span className="text-muted-foreground"> ({job.site.client.name})</span>}
+          </p>
           <p className="text-muted-foreground text-sm">
             {[job.site?.address_line1, job.site?.town, job.site?.postcode].filter(Boolean).join(", ")}
           </p>

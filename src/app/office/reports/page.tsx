@@ -46,7 +46,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const query = applyJobListFilters(
     supabase
       .from("jobs")
-      .select("id, job_number, status, scheduled_start, site:sites(name), project:projects(name)", { count: "exact" })
+      .select(
+        "id, job_number, status, scheduled_start, site:sites(name, client:clients(name)), project:projects(name)",
+        { count: "exact" },
+      )
       .order("created_at", { ascending: false })
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
     filters,
@@ -111,6 +114,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <TableHeader>
           <TableRow>
             <TableHead>Job #</TableHead>
+            <TableHead>Client</TableHead>
             <TableHead>Site</TableHead>
             <TableHead>Project</TableHead>
             <TableHead>Status</TableHead>
@@ -121,7 +125,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <TableBody>
           {(jobs ?? []).length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="text-muted-foreground text-center">
+              <TableCell colSpan={7} className="text-muted-foreground text-center">
                 No jobs match these filters.
               </TableCell>
             </TableRow>
@@ -133,6 +137,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   {job.job_number}
                 </Link>
               </TableCell>
+              <TableCell>{job.site?.client?.name ?? "—"}</TableCell>
               <TableCell>{job.site?.name ?? "—"}</TableCell>
               <TableCell>{job.project?.name ?? "—"}</TableCell>
               <TableCell>

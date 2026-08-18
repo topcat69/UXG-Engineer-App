@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { applyJobListFilters, hasAnyFilter, parseJobListFilters, type JobListSearchParams } from "@/lib/jobs/list-query";
+import { CreateJobForm } from "./create-job-form";
 import { JobsTable, type JobRow } from "./jobs-table";
 
 const PAGE_SIZE = 50;
@@ -39,7 +40,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     supabase
       .from("jobs")
       .select(
-        "id, job_number, job_type, status, priority, scheduled_start, assigned_to, site:sites(name), project:projects(name), assigned:users!jobs_assigned_to_fkey(name)",
+        "id, job_number, job_type, status, priority, scheduled_start, assigned_to, site:sites(name, client:clients(name)), project:projects(name), assigned:users!jobs_assigned_to_fkey(name)",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
@@ -47,11 +48,14 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     filters,
   );
 
-  const [{ data: jobs, count, error }, { data: projects }, { data: engineers }] = await Promise.all([
-    query,
-    supabase.from("projects").select("id, name").order("name"),
-    supabase.from("users").select("id, name").eq("role", "engineer").eq("active", true).order("name"),
-  ]);
+  const [{ data: jobs, count, error }, { data: projects }, { data: engineers }, { data: clients }, { data: sites }] =
+    await Promise.all([
+      query,
+      supabase.from("projects").select("id, name").order("name"),
+      supabase.from("users").select("id, name").eq("role", "engineer").eq("active", true).order("name"),
+      supabase.from("clients").select("id, name").order("name"),
+      supabase.from("sites").select("id, name, client_id").order("name"),
+    ]);
 
   if (error) {
     return <p className="text-destructive">Failed to load jobs: {error.message}</p>;
@@ -76,6 +80,8 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
           </a>
         </div>
       </div>
+
+      <CreateJobForm projects={projects ?? []} clients={clients ?? []} sites={sites ?? []} />
 
       <form className="flex flex-wrap items-end gap-2" method="get">
         <div className="flex flex-col gap-1">

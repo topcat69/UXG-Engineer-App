@@ -17,6 +17,7 @@ declare
   manager_id uuid := '00000000-0000-0000-0000-000000000002';
   engineer_id uuid := '00000000-0000-0000-0000-000000000003';
   project_id uuid := gen_random_uuid();
+  client_id uuid := gen_random_uuid();
   site_ids uuid[];
   site_id uuid;
   job_id uuid;
@@ -63,13 +64,17 @@ begin
     (engineer_id, 'engineer@opoc.test', 'Eve Engineer', 'engineer', true)
   on conflict (id) do update set name = excluded.name, role = excluded.role, active = excluded.active;
 
-  -- 1 project
-  insert into projects (id, name, client_name, start_date, status)
-  values (project_id, 'Signage Rollout — Phase 1', 'Acme Retail', current_date - 60, 'active');
+  -- 1 client, 1 project (independent of each other -- a project can span
+  -- many clients' jobs, so it never references client_id directly; a job's
+  -- client comes via its site instead, see 20260116000000_clients.sql)
+  insert into clients (id, name) values (client_id, 'Acme Retail');
+
+  insert into projects (id, name, start_date, status)
+  values (project_id, 'Signage Rollout — Phase 1', current_date - 60, 'active');
 
   -- 40 sites
   with ins as (
-    insert into sites (name, address_line1, town, postcode, latitude, longitude, organisation)
+    insert into sites (name, address_line1, town, postcode, latitude, longitude, client_id)
     select
       'Site ' || n,
       n || ' High Street',
@@ -77,7 +82,7 @@ begin
       'TE' || n || ' 1AA',
       51.5 + (n * 0.001),
       -0.1 + (n * 0.001),
-      'Acme Retail'
+      client_id
     from generate_series(1, 40) as n
     returning id
   )

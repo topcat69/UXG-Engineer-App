@@ -3,9 +3,9 @@ import { parseSitesCsv } from "./sites";
 
 describe("parseSitesCsv", () => {
   it("parses valid rows including optional columns", () => {
-    const csv = `name,address_line1,town,postcode,latitude,longitude,organisation,contact_email
-Site A,1 High St,Testford,TE1 1AA,51.5,-0.1,Acme,dave@acme.example
-Site B,,,,,,,`;
+    const csv = `name,address_line1,town,postcode,latitude,longitude,contact_email
+Site A,1 High St,Testford,TE1 1AA,51.5,-0.1,dave@acme.example
+Site B,,,,,,`;
     const { rows, errors } = parseSitesCsv(csv);
     expect(errors).toHaveLength(0);
     expect(rows).toHaveLength(2);
@@ -16,7 +16,6 @@ Site B,,,,,,,`;
       postcode: "TE1 1AA",
       latitude: 51.5,
       longitude: -0.1,
-      organisation: "Acme",
       contact_email: "dave@acme.example",
     });
     expect(rows[1]).toMatchObject({ name: "Site B" });

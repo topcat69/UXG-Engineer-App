@@ -5,13 +5,24 @@ export type JobExportRow = {
   status: string;
   job_type: string;
   priority: string | null;
+  client: string;
   site: string;
   project: string;
   assigned_to: string;
   scheduled_start: string | null;
 };
 
-const COLUMNS = ["job_number", "status", "job_type", "priority", "site", "project", "assigned_to", "scheduled_start"];
+const COLUMNS = [
+  "job_number",
+  "status",
+  "job_type",
+  "priority",
+  "client",
+  "site",
+  "project",
+  "assigned_to",
+  "scheduled_start",
+];
 
 /**
  * Papa.unparse already handles embedded commas/quotes/newlines correctly —
