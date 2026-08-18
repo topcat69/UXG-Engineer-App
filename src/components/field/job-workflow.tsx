@@ -11,6 +11,7 @@ import {
   checkIn,
   saveInstallFormDraft,
   saveJobDetailsDraft,
+  startTravelling,
   submitJob,
   submitJobDetails,
   toggleTask,
@@ -53,7 +54,11 @@ import { PhotoSlot } from "./photo-slot";
 import { SignatureCapture } from "./signature-capture";
 
 const AUTOSAVE_INTERVAL_MS = 15_000;
-const NOT_YET_ON_SITE: readonly string[] = ["draft", "scheduled", "dispatched", "accepted", "travelling"];
+// Two distinct spec-required timestamps, two distinct pre-site statuses:
+// BEFORE_TRAVEL shows "Start Travelling" (-> "travelling", actual_travel_start);
+// once "travelling", the Check In button below takes over (-> "in_progress", actual_start).
+const BEFORE_TRAVEL: readonly string[] = ["draft", "scheduled", "dispatched", "accepted"];
+const NOT_YET_ON_SITE: readonly string[] = [...BEFORE_TRAVEL, "travelling"];
 
 export function JobWorkflow({
   jobId,
@@ -85,9 +90,11 @@ export function JobWorkflow({
   // unconditionally and the unused one just sits idle at its empty default.
   const [installValues, setInstallValues] = useState<InstallFormValues>(EMPTY_INSTALL_FORM);
   const [detailsValues, setDetailsValues] = useState<JobDetailsValues>(EMPTY_JOB_DETAILS);
+  const [isStartingTravel, setIsStartingTravel] = useState(false);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [travelError, setTravelError] = useState<string | null>(null);
   const [checkInError, setCheckInError] = useState<string | null>(null);
   const hydrated = useRef(false);
 
@@ -193,6 +200,22 @@ export function JobWorkflow({
     );
   }
 
+  async function handleStartTravel() {
+    setIsStartingTravel(true);
+    setTravelError(null);
+    try {
+      const position = await getCurrentPosition();
+      if (!position) {
+        setTravelError("Location is required to start travelling — enable location services and try again.");
+        return;
+      }
+      await startTravelling(jobId, { latitude: position.coords.latitude, longitude: position.coords.longitude });
+      onMutated?.();
+    } finally {
+      setIsStartingTravel(false);
+    }
+  }
+
   async function handleCheckIn() {
     setIsCheckingIn(true);
     setCheckInError(null);
@@ -291,7 +314,16 @@ export function JobWorkflow({
         )}
       </div>
 
-      {NOT_YET_ON_SITE.includes(job.status) && (
+      {BEFORE_TRAVEL.includes(job.status) && (
+        <div className="flex flex-col gap-2">
+          <Button onClick={handleStartTravel} disabled={isStartingTravel}>
+            {isStartingTravel ? "Starting…" : "Start Travelling"}
+          </Button>
+          {travelError && <p className="text-destructive text-sm">{travelError}</p>}
+        </div>
+      )}
+
+      {job.status === "travelling" && (
         <div className="flex flex-col gap-2">
           <Button onClick={handleCheckIn} disabled={isCheckingIn}>
             {isCheckingIn ? "Checking in…" : "Check In & Start Work"}

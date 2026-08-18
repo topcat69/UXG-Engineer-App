@@ -490,6 +490,7 @@ export type Database = {
         Row: {
           actual_end: string | null
           actual_start: string | null
+          actual_travel_start: string | null
           assigned_to: string | null
           calendar_event_id: string | null
           check_in_lat: number | null
@@ -513,11 +514,14 @@ export type Database = {
           site_id: string
           source_issue_id: string | null
           status: Database["public"]["Enums"]["job_status"]
+          travel_start_lat: number | null
+          travel_start_lng: number | null
           updated_at: string | null
         }
         Insert: {
           actual_end?: string | null
           actual_start?: string | null
+          actual_travel_start?: string | null
           assigned_to?: string | null
           calendar_event_id?: string | null
           check_in_lat?: number | null
@@ -541,11 +545,14 @@ export type Database = {
           site_id: string
           source_issue_id?: string | null
           status?: Database["public"]["Enums"]["job_status"]
+          travel_start_lat?: number | null
+          travel_start_lng?: number | null
           updated_at?: string | null
         }
         Update: {
           actual_end?: string | null
           actual_start?: string | null
+          actual_travel_start?: string | null
           assigned_to?: string | null
           calendar_event_id?: string | null
           check_in_lat?: number | null
@@ -569,6 +576,8 @@ export type Database = {
           site_id?: string
           source_issue_id?: string | null
           status?: Database["public"]["Enums"]["job_status"]
+          travel_start_lat?: number | null
+          travel_start_lng?: number | null
           updated_at?: string | null
         }
         Relationships: [

@@ -40,7 +40,7 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
     await Promise.all([
       supabase
         .from("jobs")
-        .select("job_number, job_type, status, scheduled_start, actual_start, actual_end, site:sites(name, address_line1, address_line2, town, postcode), project:projects(name)")
+        .select("job_number, job_type, status, scheduled_start, actual_travel_start, actual_start, actual_end, site:sites(name, address_line1, address_line2, town, postcode), project:projects(name)")
         .eq("id", jobId)
         .single(),
       supabase.from("install_forms").select("*").eq("job_id", jobId).maybeSingle(),
@@ -70,6 +70,7 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
   doc.text(`Project: ${job.project?.name ?? "—"}`);
   doc.text(`Job type: ${job.job_type}`);
   doc.text(`Status: ${job.status}`);
+  if (job.actual_travel_start) doc.text(`Travel started: ${new Date(job.actual_travel_start).toLocaleString("en-GB")}`);
   if (job.actual_start) doc.text(`Started: ${new Date(job.actual_start).toLocaleString("en-GB")}`);
   if (job.actual_end) doc.text(`Completed: ${new Date(job.actual_end).toLocaleString("en-GB")}`);
   doc.fillColor("black");

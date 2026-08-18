@@ -26,6 +26,57 @@ function batchTimestamps(now: Date, count: number): string[] {
 export type GeoPoint = { latitude: number; longitude: number };
 
 /**
+ * "Commence job from beginning of journey" — the spec's other required
+ * timestamp, distinct from checkIn's "commence job at customer site"
+ * below. Transitions status to "travelling" and stamps
+ * actual_travel_start/travel_start_lat/lng, same shape as checkIn (job
+ * write + status_event for the audit trail) but with no geofence check,
+ * since the engineer isn't at the site yet.
+ */
+export async function startTravelling(jobId: string, point: GeoPoint): Promise<void> {
+  const job = await db.jobs.get(jobId);
+  if (!job) throw new Error("Job not found locally");
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const [patchCreatedAt, eventCreatedAt] = batchTimestamps(now, 2);
+
+  await db.transaction("rw", [db.jobs, db.outbox], async () => {
+    await db.jobs.update(jobId, {
+      status: "travelling",
+      actual_travel_start: nowIso,
+      travel_start_lat: point.latitude,
+      travel_start_lng: point.longitude,
+    });
+
+    await db.outbox.add({
+      id: uuid(),
+      type: "job_patch",
+      jobId,
+      patch: {
+        actual_travel_start: nowIso,
+        travel_start_lat: point.latitude,
+        travel_start_lng: point.longitude,
+      },
+      createdAt: patchCreatedAt,
+      attempts: 0,
+    });
+    await db.outbox.add({
+      id: uuid(),
+      type: "status_event",
+      jobId,
+      fromStatus: job.status,
+      toStatus: "travelling",
+      reason: "Started travelling",
+      occurredAt: nowIso,
+      latitude: point.latitude,
+      longitude: point.longitude,
+      createdAt: eventCreatedAt,
+      attempts: 0,
+    });
+  });
+}
+
+/**
  * Check In and Start Work chained into one tap, per the AppSheet action
  * spec ("Chain Check In → Start Work so a single tap does both — every tap
  * you remove from the field workflow is worth more than any feature you

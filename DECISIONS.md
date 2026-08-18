@@ -1873,3 +1873,59 @@ not verified against a live browser or the real VM — needs a real
 phone walkthrough for the GPS-required check-in/submit paths in
 particular, since geolocation permission prompts don't reproduce in
 this sandbox.
+
+## 2026-08-18 — Split "commence journey" from "commence at site" into two real timestamps
+
+The one item explicitly deferred from the addendum above — "flagged rather
+than silently dropped" — turned out to matter for reporting, so it's built
+now rather than left as a UI-only workaround.
+
+**Schema**: `20260118000000_travel_start.sql` adds `jobs.actual_travel_start`,
+`jobs.travel_start_lat`, `jobs.travel_start_lng` — a direct parallel to the
+existing `actual_start`/`check_in_lat`/`check_in_lng` (site arrival), not a
+repurposing of them. The `job_status` enum already had a `'travelling'`
+value sitting unused since Phase 1 (`draft → scheduled → dispatched →
+accepted → travelling → on_site → in_progress → …`) — this is the first
+feature to actually populate it. `database.types.ts` hand-edited to match
+(no Docker/local Supabase in this sandbox to run `supabase gen types`).
+
+**Field app**: a new `startTravelling()` action (`field-actions.ts`) mirrors
+`checkIn()`'s exact shape — optimistic Dexie write, `job_patch` +
+`status_event` outbox ops, GPS compulsory (same rule as the previous
+addendum's check-in/submit fix, applied here too rather than left as an
+inconsistency) — but skips the geofence-variance calculation `checkIn` does,
+since the engineer isn't at the site yet for a distance-to-site number to
+mean anything. `job-workflow.tsx` now shows two sequential buttons instead
+of one: **Start Travelling** for `draft`/`scheduled`/`dispatched`/`accepted`
+(→ `travelling`), then **Check In & Start Work** once status is
+`travelling` (→ `in_progress`, unchanged from before). `BEFORE_TRAVEL` and
+`NOT_YET_ON_SITE` are both still used for their original purposes (autosave
+gating, the "no further action" catch-all) — `NOT_YET_ON_SITE` is just
+`[...BEFORE_TRAVEL, "travelling"]` now instead of a flat list, so nothing
+downstream of it changed behaviour.
+
+**Reports**: `completion-report.ts`'s cover section — the reason this was
+worth doing now rather than later — gained a "Travel started" line above
+"Started"/"Completed", reading straight off the new column. The
+`status_events` audit trail (already rendered as-is on the office job
+detail page's "Status timeline") picks up the new `'travelling'` transition
+automatically, with no code change needed there — it was already a generic
+render of whatever transitions exist.
+
+**Deliberately not touched**: the dashboard's `computeAverageTimeOnSiteMinutes`
+still measures `actual_start` → `actual_end` ("time on site"), and the jobs
+CSV export still doesn't include either timestamp — it didn't include
+`actual_start` before this pass either. A "time travelling" metric or a CSV
+column would be new reporting surface, not part of what was asked for here;
+worth a follow-up if wanted, not bundled in.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 226 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox (no working Docker/local Supabase here), no
+regressions. One test fixture (`db.test.ts`) needed the three new columns
+added to its literal job row — Dexie's `EntityTable.put()` typing requires
+every column, not just the ones a given test cares about. Needs
+`supabase db push` for `20260118000000_travel_start.sql` on the real
+project before this reaches the VM, then a real-device walkthrough: tap
+Start Travelling, confirm the status badge and PDF's "Travel started" line
+both reflect it, then Check In as before.
