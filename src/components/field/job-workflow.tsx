@@ -213,6 +213,8 @@ export function JobWorkflow({
       }
       await startTravelling(jobId, point);
       onMutated?.();
+    } catch (err) {
+      setTravelError(err instanceof Error ? err.message : "Something went wrong starting travel — please try again.");
     } finally {
       setIsStartingTravel(false);
     }
@@ -244,6 +246,8 @@ export function JobWorkflow({
       }
       await checkIn(jobId, geofenceVarianceM, point);
       onMutated?.();
+    } catch (err) {
+      setCheckInError(err instanceof Error ? err.message : "Something went wrong checking in — please try again.");
     } finally {
       setIsCheckingIn(false);
     }
@@ -295,6 +299,8 @@ export function JobWorkflow({
         await submitJob(jobId, currentInstallRow(), point, currentUser.id);
       }
       onMutated?.();
+    } catch (err) {
+      setErrors([err instanceof Error ? err.message : "Something went wrong submitting — please try again."]);
     } finally {
       setIsSubmitting(false);
     }

@@ -2029,3 +2029,24 @@ in the app, not two.
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 230 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-19 — "I click Start Travelling and nothing happens": missing catch blocks
+
+Reported symptom: tapping Start Travelling did nothing visible — no
+status change, no error. `handleStartTravel`/`handleCheckIn`/
+`handleSubmit` in `job-workflow.tsx` each only had `try { ... } finally
+{ ... }` — no `catch`. Any exception thrown inside (a Dexie write
+failure, `startTravelling`'s "Job not found locally" guard, anything)
+was an unhandled promise rejection: the `finally` still reset the
+loading flag, so the button reverted to its normal state, but no error
+state was ever set — exactly "nothing happens" from the engineer's
+side, whatever the underlying cause turns out to be. Added a `catch`
+to all three, setting the existing error-display state
+(`travelError`/`checkInError`/`errors`) from `err.message`, so any
+future failure is visible instead of silent — this doesn't fix
+whatever the original error was, it makes it show up, which is the
+prerequisite for diagnosing it at all.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 230 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.
