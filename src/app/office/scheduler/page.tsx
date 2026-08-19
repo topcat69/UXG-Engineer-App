@@ -20,7 +20,7 @@ export default async function SchedulerPage({
     supabase
       .from("users")
       .select("id, name, max_jobs_per_day")
-      .eq("role", "engineer")
+      .in("role", ["engineer", "manager"])
       .eq("active", true)
       .order("name"),
     supabase

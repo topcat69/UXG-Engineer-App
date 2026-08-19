@@ -2301,3 +2301,30 @@ is schema + straightforward save-action/textarea wiring around an
 already-established pattern), so no new unit tests. Needs
 `supabase db push` for `20260119000000_job_information.sql` on the real
 project before this reaches the VM.
+
+## 2026-08-19 — Jobs can be assigned to managers, not just engineers
+
+Every assignment picker (job detail page's Assign/Schedule panel, the
+jobs list's bulk-assign dropdown, the scheduler board's lanes) queried
+`users` with `.eq("role", "engineer")` — a manager never appeared as an
+option anywhere a job gets assigned. Broadened all three to
+`.in("role", ["engineer", "manager"])`. Deliberately left the dashboard's
+"Engineer workload" chart query untouched — that one's specifically a
+per-engineer metric (`computeEngineerWorkload` in `metrics.ts`), a
+different question ("how loaded is each engineer") from "who can this
+job be assigned to," and broadening it would have silently changed what
+the chart means rather than fixed the reported gap.
+
+No RLS or role-gating changes needed: the `assigned_to = auth.uid()`
+policies (`sites`/`jobs`/`job_details`/`signatures`/etc.) were never
+role-restricted in the first place, and `/my-jobs` (the field app) has
+no role check either — a manager assigned a job already gets the same
+"my job" access an engineer would, for free. Also fixed two labels that
+said "Engineer" for what's now a broader picker: the office job page's
+"Assigned to" field label (was "Engineer") and the jobs list's bulk-assign
+`aria-label` (was "Assign to engineer").
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 249 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions. No new pure logic (query
+filter + label text changes only), so no new unit tests.

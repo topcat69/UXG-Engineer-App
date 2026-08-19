@@ -55,7 +55,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("share_links").select("token, expires_at, revoked").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("job_tasks").select("id, label, is_done").eq("job_id", id).order("position"),
     supabase.from("job_templates").select("id, name").order("name"),
-    supabase.from("users").select("id, name").eq("role", "engineer").eq("active", true).order("name"),
+    supabase.from("users").select("id, name").in("role", ["engineer", "manager"]).eq("active", true).order("name"),
   ]);
 
   if (error || !job) notFound();

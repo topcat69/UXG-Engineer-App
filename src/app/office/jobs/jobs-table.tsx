@@ -83,7 +83,7 @@ export function JobsTable({ jobs, engineers }: { jobs: JobRow[]; engineers: { id
 
           <div className="flex items-center gap-2">
             <select
-              aria-label="Assign to engineer"
+              aria-label="Assign to"
               value={engineerId}
               onChange={(e) => setEngineerId(e.target.value)}
               className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"

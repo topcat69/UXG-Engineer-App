@@ -64,7 +64,7 @@ export function AssignSchedulePanel({
   return (
     <div className="flex flex-col items-end gap-2 text-sm">
       <div className="flex flex-col items-end gap-1">
-        <label className="text-muted-foreground text-xs">Engineer</label>
+        <label className="text-muted-foreground text-xs">Assigned to</label>
         <select
           value={engineerId}
           onChange={(e) => setEngineerId(e.target.value)}
