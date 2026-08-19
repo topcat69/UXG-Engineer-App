@@ -15,6 +15,8 @@ import {
   type DashboardJob,
   type Engineer,
 } from "@/lib/dashboard/metrics";
+import { buildJobMapMarkers, type RawMapJob } from "@/lib/dashboard/map-markers";
+import JobsMap from "@/components/jobs-map-loader";
 
 const CHART_COLOR = "#F3941D";
 
@@ -26,27 +28,35 @@ export function DashboardClient({
   initialJobs,
   initialIssues,
   engineers,
+  initialMapJobs,
 }: {
   initialJobs: DashboardJob[];
   initialIssues: DashboardIssue[];
   engineers: Engineer[];
+  initialMapJobs: RawMapJob[];
 }) {
   const [jobs, setJobs] = useState(initialJobs);
   const [issues, setIssues] = useState(initialIssues);
+  const [mapJobs, setMapJobs] = useState(initialMapJobs);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const router = useRouter();
 
   const refetch = useCallback(async () => {
     const supabase = createClient();
-    const [{ data: freshJobs }, { data: freshIssues }] = await Promise.all([
+    const [{ data: freshJobs }, { data: freshIssues }, { data: freshMapJobs }] = await Promise.all([
       supabase
         .from("jobs")
         .select("id, status, parent_job_id, scheduled_start, actual_start, actual_end, assigned_to")
         .neq("status", "draft"),
       supabase.from("issues").select("job_id, category, status, revisit_job_id, created_at"),
+      supabase
+        .from("jobs")
+        .select("id, job_number, status, site:sites(name, latitude, longitude), assigned:users!jobs_assigned_to_fkey(name)")
+        .neq("status", "draft"),
     ]);
     if (freshJobs) setJobs(freshJobs);
     if (freshIssues) setIssues(freshIssues);
+    if (freshMapJobs) setMapJobs(freshMapJobs);
     setLastUpdated(new Date());
   }, []);
 
@@ -67,6 +77,7 @@ export function DashboardClient({
     };
   }, [refetch]);
 
+  const mapMarkers = buildJobMapMarkers(mapJobs);
   const firstTimeFix = computeFirstTimeFixRate(jobs);
   const completedVsScheduled = computeCompletedVsScheduled(jobs);
   const avgTimeOnSiteMinutes = computeAverageTimeOnSiteMinutes(jobs);
@@ -118,6 +129,21 @@ export function DashboardClient({
           onClick={() => router.push(jobsHref({ status: "closed" }))}
         />
       </div>
+
+      <ChartCard title="Job locations" subtitle="Every job with a site on the map — click a marker to open it">
+        {mapMarkers.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No jobs with a located site yet.</p>
+        ) : (
+          <>
+            <JobsMap markers={mapMarkers} />
+            <div className="text-muted-foreground mt-2 flex gap-4 text-xs">
+              <LegendDot color="#F3941D" label="Travelling / on site / in progress" />
+              <LegendDot color="#16a34a" label="Approved / closed" />
+              <LegendDot color="#6b7280" label="Everything else" />
+            </div>
+          </>
+        )}
+      </ChartCard>
 
       <ChartCard title="Engineer workload" subtitle="Active jobs per engineer right now">
         <ResponsiveContainer width="100%" height={220}>
@@ -259,5 +285,14 @@ function ChartCard({ title, subtitle, children }: { title: string; subtitle: str
       <p className="text-muted-foreground mb-2 text-xs">{subtitle}</p>
       {children}
     </div>
+  );
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+      {label}
+    </span>
   );
 }

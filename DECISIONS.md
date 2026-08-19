@@ -2179,3 +2179,50 @@ every addendum in this sandbox, no regressions. Not verified against a
 real insecure-HTTP browser session from this sandbox (no browser here) —
 worth a real-device retest of Start Travelling, Check In, Submit, and a
 photo/signature capture once deployed, all of which touch this code path.
+
+## 2026-08-19 — Live job-locations map on the dashboard
+
+Added a map to `/office/dashboard` plotting every non-draft job that has
+a site with coordinates on file, reusing infrastructure that already
+existed rather than adding new dependencies: Leaflet (already used for
+the single-site map on job detail pages, `site-map.tsx`) and the
+dashboard's existing Realtime subscription (`dashboard-client.tsx`
+already refetches everything on any `jobs`/`issues` change — the map's
+data just rides the same subscription, one more parallel query in the
+same `refetch` callback rather than a second channel).
+
+**New pure module**, `lib/dashboard/map-markers.ts` (unit tested, no
+Supabase/Leaflet involved): `buildJobMapMarkers()` drops jobs whose site
+has no `latitude`/`longitude` (this app has no on-render geocoding step —
+that's specifically an engineer-GPS fallback, see the postcode addendum,
+not something the dashboard does for every site on every load) and
+categorizes the rest into three map-specific buckets —
+`on_site` (travelling/on_site/in_progress — colored to match the
+dashboard's own chart orange), `completed` (approved/closed, green), and
+`other` (everything else, grey). Deliberately a separate categorization
+from `metrics.ts`'s `ACTIVE_STATUSES` (used for the workload chart) — the
+two answer different questions ("not yet finished" vs. "engineer is
+there right now") and conflating them would have made one or the other
+wrong.
+
+**New map component**, `components/jobs-map.tsx` (+ `jobs-map-loader.tsx`,
+same `dynamic(..., { ssr: false })` pattern as `site-map-loader.tsx`,
+since react-leaflet touches `window` at import time): colored dots via
+`L.divIcon` instead of Leaflet's single default pin, since the entire
+point of an at-a-glance map is reading status without opening every
+popup; a `FitBounds` helper (using `useMap()`) keeps every marker in
+frame automatically as the live-updating set changes, rather than
+requiring a manual re-pan after every Realtime refresh. Each marker's
+popup links straight to the job detail page — same drill-through
+convention as every other chart on this dashboard.
+
+Not verified in a real browser from this sandbox (no browser here,
+Leaflet needs one) — confirmed only that `/office/dashboard` still
+serves without a server error. Worth a real visual check once deployed:
+markers appear at the right sites, colors update live as a job's status
+changes, and popups link correctly.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 249 passed (5 new: `map-markers.test.ts`), same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions.
