@@ -2014,3 +2014,18 @@ sandbox, no regressions. Not verified against the real postcodes.io API
 from this sandbox (no outbound network to it here) — worth a real-device
 smoke test once deployed: turn off GPS, confirm Start Travelling still
 succeeds and pulls a sensible location from the job's site postcode.
+
+## 2026-08-19 — Project name links to its jobs
+
+"Click a project name, see its jobs" — `/office/jobs` already had full
+`project_id` filtering (`applyJobListFilters`/`parseJobListFilters`,
+already wired to the jobs list's own "Project" dropdown), so rather than
+build a second, parallel jobs-table view under `/office/projects/[id]`,
+the project name and job-count cell in `ProjectsManager` now just link to
+`/office/jobs?project_id={id}` — the existing filtered, paginated,
+CSV-exportable jobs list, with the project pre-selected. One jobs table
+in the app, not two.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 230 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.

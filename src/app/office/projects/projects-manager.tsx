@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,14 +53,22 @@ export function ProjectsManager({
         <tbody>
           {projects.map((p) => (
             <tr key={p.id} className="border-b">
-              <td className="py-2 font-medium">{p.name}</td>
+              <td className="py-2 font-medium">
+                <Link href={`/office/jobs?project_id=${p.id}`} className="hover:underline">
+                  {p.name}
+                </Link>
+              </td>
               <td className="py-2">
                 <Badge variant="secondary">{p.status}</Badge>
               </td>
               <td className="py-2 text-muted-foreground">
                 {[p.start_date, p.end_date].filter(Boolean).join(" – ") || "—"}
               </td>
-              <td className="py-2 text-muted-foreground">{jobCounts[p.id] ?? 0}</td>
+              <td className="py-2 text-muted-foreground">
+                <Link href={`/office/jobs?project_id=${p.id}`} className="hover:underline">
+                  {jobCounts[p.id] ?? 0}
+                </Link>
+              </td>
             </tr>
           ))}
           {projects.length === 0 && (
