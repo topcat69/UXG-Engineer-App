@@ -3,6 +3,7 @@
 import imageCompression from "browser-image-compression";
 import { db } from "./db";
 import { extensionForMime, mediaKindForFile, MAX_VIDEO_BYTES } from "./media-kind";
+import { geocodePostcode } from "@/lib/geo/postcode";
 
 /**
  * Compress client-side to ~1600px long edge, ~0.8 quality, before it enters
@@ -43,6 +44,37 @@ export function getCurrentPosition(): Promise<GeolocationPosition | null> {
       { enableHighAccuracy: true, timeout: 10_000 },
     );
   });
+}
+
+export type ResolvedLocation = { latitude: number; longitude: number };
+export type SiteForLocationFallback = { latitude?: number | null; longitude?: number | null; postcode?: string | null };
+
+/**
+ * Live GPS, falling back to the site's known location, then to geocoding
+ * its postcode — per spec: "geo location needs to be done on either
+ * geolocation or postcode." A live fix is always preferred (more accurate,
+ * and reflects the engineer's actual position); the fallbacks exist so
+ * Start Travelling/Check In/Submit never hard-block just because the
+ * browser refused the Geolocation API outright — most commonly because the
+ * app isn't served over HTTPS yet, which the device's own location
+ * permission has no bearing on (see DECISIONS.md).
+ */
+/** The fallback half on its own — used by handleCheckIn, which needs to
+ * know separately whether a fix came from live GPS (only that case feeds
+ * the geofence-variance check, which is meaningless against a fallback
+ * that's derived from the site's own coordinates in the first place). */
+export async function siteLocationFallback(site: SiteForLocationFallback | undefined): Promise<ResolvedLocation | null> {
+  if (site?.latitude != null && site?.longitude != null) {
+    return { latitude: site.latitude, longitude: site.longitude };
+  }
+  if (site?.postcode) return geocodePostcode(site.postcode);
+  return null;
+}
+
+export async function resolveJobLocation(site: SiteForLocationFallback | undefined): Promise<ResolvedLocation | null> {
+  const position = await getCurrentPosition();
+  if (position) return { latitude: position.coords.latitude, longitude: position.coords.longitude };
+  return siteLocationFallback(site);
 }
 
 export type EnqueueMediaResult = { ok: true } | { ok: false; error: string };

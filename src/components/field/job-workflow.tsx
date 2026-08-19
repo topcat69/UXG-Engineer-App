@@ -16,7 +16,7 @@ import {
   submitJobDetails,
   toggleTask,
 } from "@/lib/offline/field-actions";
-import { getCurrentPosition } from "@/lib/offline/media-capture";
+import { getCurrentPosition, resolveJobLocation, siteLocationFallback } from "@/lib/offline/media-capture";
 import { distanceMeters } from "@/lib/geo/distance";
 import {
   EMPTY_INSTALL_FORM,
@@ -204,12 +204,14 @@ export function JobWorkflow({
     setIsStartingTravel(true);
     setTravelError(null);
     try {
-      const position = await getCurrentPosition();
-      if (!position) {
-        setTravelError("Location is required to start travelling — enable location services and try again.");
+      const point = await resolveJobLocation(site);
+      if (!point) {
+        setTravelError(
+          "Location is required to start travelling — enable location services, or make sure this site has a postcode set, and try again.",
+        );
         return;
       }
-      await startTravelling(jobId, { latitude: position.coords.latitude, longitude: position.coords.longitude });
+      await startTravelling(jobId, point);
       onMutated?.();
     } finally {
       setIsStartingTravel(false);
@@ -220,24 +222,27 @@ export function JobWorkflow({
     setIsCheckingIn(true);
     setCheckInError(null);
     try {
+      // Geofence variance only means anything against a *live* fix — a
+      // fallback derived from the site's own coordinates would always
+      // compare the site to itself and report a false "on site" of 0m.
       const position = await getCurrentPosition();
-      if (!position) {
-        setCheckInError("Location is required to check in — enable location services and try again.");
+      let geofenceVarianceM: number | null = null;
+      let point: { latitude: number; longitude: number } | null = null;
+      if (position) {
+        point = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+        if (site?.latitude != null && site?.longitude != null) {
+          geofenceVarianceM = distanceMeters(point.latitude, point.longitude, site.latitude, site.longitude);
+        }
+      } else {
+        point = await siteLocationFallback(site);
+      }
+      if (!point) {
+        setCheckInError(
+          "Location is required to check in — enable location services, or make sure this site has a postcode set, and try again.",
+        );
         return;
       }
-      let geofenceVarianceM: number | null = null;
-      if (site?.latitude != null && site?.longitude != null) {
-        geofenceVarianceM = distanceMeters(
-          position.coords.latitude,
-          position.coords.longitude,
-          site.latitude,
-          site.longitude,
-        );
-      }
-      await checkIn(jobId, geofenceVarianceM, {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      });
+      await checkIn(jobId, geofenceVarianceM, point);
       onMutated?.();
     } finally {
       setIsCheckingIn(false);
@@ -265,18 +270,23 @@ export function JobWorkflow({
           : `${incompleteTasks.length} tasks are not yet checked off.`,
       );
     }
-    // Fetched here (not deferred into the try block below) so a missing GPS
-    // fix shows up alongside every other reason submission is blocked,
-    // rather than failing silently after the office believes the form was
-    // otherwise ready.
-    const position = await getCurrentPosition();
-    if (!position) validationErrors.push("Location is required — enable location services and try again.");
+    // Resolved here (not deferred into the try block below) so a missing
+    // location shows up alongside every other reason submission is
+    // blocked, rather than failing silently after the office believes the
+    // form was otherwise ready. Falls back to the site's known location
+    // (or its geocoded postcode) if live GPS isn't available — see
+    // resolveJobLocation.
+    const point = await resolveJobLocation(site);
+    if (!point) {
+      validationErrors.push(
+        "Location is required — enable location services, or make sure this site has a postcode set, and try again.",
+      );
+    }
     setErrors(validationErrors);
-    if (validationErrors.length > 0 || !position) return;
+    if (validationErrors.length > 0 || !point) return;
 
     setIsSubmitting(true);
     try {
-      const point = { latitude: position.coords.latitude, longitude: position.coords.longitude };
       if (detailsMode) {
         await saveJobDetailsDraft(currentDetailsRow());
         await submitJobDetails(jobId, jobType as JobDetailsType, currentDetailsRow(), point, currentUser.id);

@@ -1951,3 +1951,66 @@ version.
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 226 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-19 — Compulsory GPS was hard-blocking every engineer, because the VM has no HTTPS yet
+
+Real-device testing surfaced a serious regression: **every** engineer, on
+**every** browser/device, got "Location is required" on Start
+Travelling/Check In/Submit, even with the device's own Location Services
+switched on. Root cause isn't a permission problem at all — the
+Geolocation API refuses to run outside a "secure context" (HTTPS, or
+`localhost`), in every modern browser, regardless of the device's own
+location toggle. The VM is still serving the app over plain
+`http://46.62.253.203:3000` (`Caddyfile` still has the placeholder domain
+— TLS was never turned on, per the deploy addendum above). Making GPS
+compulsory (see the earlier "field-test fixes" addendum) was the right
+call in isolation, but it converted a silent pre-existing gap into a hard
+block on every field action, for every user, until that HTTPS work
+happens.
+
+Rather than revert compulsory-GPS as a stopgap (the user's alternative
+offer), the fix requested was a location fallback chain, since "the geo
+location needs to be done on either geolocation or postcode":
+
+1. **Live GPS** (`getCurrentPosition`) — preferred when available, most
+   accurate, reflects the engineer's actual position.
+2. **The site's own stored coordinates** (`sites.latitude/longitude`) —
+   already present for CSV-imported sites, free (no network call).
+3. **Geocoding the site's postcode** (`sites.postcode`) via
+   `api.postcodes.io` (new: `src/lib/geo/postcode.ts`) — UK-only, free, no
+   API key, chosen because every site/job in this app is UK-based. Covers
+   sites created through the newer manual Clients UI, which never had
+   `latitude`/`longitude` populated (`createSiteForClient` only ever set
+   name/address/postcode/contact fields — confirmed while tracing this,
+   not previously flagged).
+
+New `resolveJobLocation(site)` (`src/lib/offline/media-capture.ts`) chains
+all three and is now what Start Travelling and Submit call instead of raw
+`getCurrentPosition()`. Check In is the one exception: geofence-variance
+checking (`geofence_variance_m`, compares the device's position against
+the site's known position to flag "checked in from somewhere else")
+requires a fix that's independent of the site's own coordinates — running
+it against a fallback that *is* the site's coordinates would always report
+0m variance, falsely implying a verified on-site check-in that never
+actually happened. So Check In calls `getCurrentPosition()` directly
+first, computes geofence variance only from a genuine live fix, and only
+reaches into `siteLocationFallback` (the non-GPS two-tier fallback, split
+out so Check In can use it without re-attempting GPS a second time) when
+live GPS comes back empty — in which case geofence variance is correctly
+left `null` rather than a misleading 0.
+
+This isn't just a stopgap despite being prompted by the pre-HTTPS state:
+once the VM has real HTTPS and live GPS succeeds everywhere, this fallback
+chain simply never gets reached — tier 1 always wins. No follow-up
+"revert" step needed once HTTPS lands; the fallback stays in place
+permanently as a legitimate degraded-but-still-real-location path (e.g. a
+device with GPS genuinely turned off, or a poor signal indoors) rather
+than being HTTPS-specific code to remove later.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 230 passed (4 new: `postcode.test.ts`, mocking `fetch`), same 2
+pre-existing Supabase-dependent failures as every addendum in this
+sandbox, no regressions. Not verified against the real postcodes.io API
+from this sandbox (no outbound network to it here) — worth a real-device
+smoke test once deployed: turn off GPS, confirm Start Travelling still
+succeeds and pulls a sensible location from the job's site postcode.
