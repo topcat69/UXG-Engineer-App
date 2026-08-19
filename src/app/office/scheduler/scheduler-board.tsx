@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
+import { formatTimeRange } from "@/lib/scheduler/week";
 import { rescheduleJob } from "./actions";
 
 type JobRow = {
@@ -148,10 +149,14 @@ function FragmentRow({
                 data-job-id={job.id}
                 onDragStart={(e) => e.dataTransfer.setData("text/plain", job.id)}
                 className="cursor-grab rounded border bg-card p-1 text-xs shadow-sm active:cursor-grabbing"
-                title={`${job.job_number} · ${job.site?.name ?? ""}`}
+                title={`${job.job_number} · ${job.site?.name ?? ""} · ${lane.label}`}
               >
                 <div className="font-medium">{job.job_number}</div>
                 <div className="text-muted-foreground truncate">{job.site?.name}</div>
+                {job.scheduled_start && (
+                  <div className="text-muted-foreground">{formatTimeRange(job.scheduled_start, job.scheduled_end)}</div>
+                )}
+                {lane.engineerId && <div className="text-muted-foreground truncate">{lane.label}</div>}
                 <Badge variant="secondary" className="mt-0.5 text-[10px]">
                   {job.status}
                 </Badge>

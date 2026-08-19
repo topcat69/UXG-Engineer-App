@@ -2050,3 +2050,21 @@ prerequisite for diagnosing it at all.
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 230 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-19 — Scheduler cards show time slot and assignee
+
+Cards on `/office/scheduler` only ever showed job number, site name, and
+status — the engineer was implied by which lane the card sat in, but
+never stated on the card itself, and the scheduled time wasn't shown at
+all. Added a `formatTimeRange` helper (`lib/scheduler/week.ts`, "14:00 –
+16:00" from `scheduled_start`/`scheduled_end`, local time — falls back
+to a single time when there's no end) and an explicit engineer-name line
+(read straight off `lane.label` — the lane a card sits in already
+determines its assignee, so no extra query/join was needed) on each
+card, plus both in the card's hover title.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 232 passed (2 new: `formatTimeRange`, assuming a UTC test
+environment same as this sandbox/CI, matching the rest of the app's
+local-time display convention), same 2 pre-existing Supabase-dependent
+failures as every addendum in this sandbox, no regressions.
