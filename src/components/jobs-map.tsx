@@ -14,8 +14,7 @@ import type { JobMapMarker, MapCategory } from "@/lib/dashboard/map-markers";
 // dots stay legible against busy OSM tiles at a glance.
 const CATEGORY_COLORS: Record<MapCategory, string> = {
   on_site: "#FF7A00",
-  completed: "#22c55e",
-  other: "#9ca3af",
+  scheduled: "#2563eb",
 };
 
 function iconFor(category: MapCategory): L.DivIcon {

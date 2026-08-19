@@ -130,16 +130,15 @@ export function DashboardClient({
         />
       </div>
 
-      <ChartCard title="Job locations" subtitle="Every job with a site on the map — click a marker to open it">
+      <ChartCard title="Job locations" subtitle="Scheduled and in-progress jobs on the map — click a marker to open it">
         {mapMarkers.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No jobs with a located site yet.</p>
+          <p className="text-muted-foreground text-sm">No scheduled or in-progress jobs with a located site yet.</p>
         ) : (
           <>
             <JobsMap markers={mapMarkers} />
             <div className="text-muted-foreground mt-2 flex gap-4 text-xs">
               <LegendDot color="#FF7A00" label="Travelling / on site / in progress" />
-              <LegendDot color="#22c55e" label="Approved / closed" />
-              <LegendDot color="#9ca3af" label="Everything else" />
+              <LegendDot color="#2563eb" label="Scheduled" />
             </div>
           </>
         )}

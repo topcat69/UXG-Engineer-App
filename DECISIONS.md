@@ -2420,3 +2420,25 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 260 passed (3 new: `engineer-queue.test.ts`), same 2 pre-existing
 Supabase-dependent failures as every addendum in this sandbox, no
 regressions.
+
+## 2026-08-19 — Dashboard map scoped to scheduled/active jobs only
+
+The dashboard map previously plotted every non-draft job with a located
+site, including closed/approved/cancelled ones, colored into 3 buckets
+(on_site/completed/other). Per feedback, closed jobs don't need to be on
+a "where is the work happening" map at all — narrowed `buildJobMapMarkers()`
+(`lib/dashboard/map-markers.ts`) to only plot `scheduled` and
+`travelling`/`on_site`/`in_progress` jobs; everything else (dispatched,
+accepted, on_hold, submitted, under_review, approved, closed, cancelled)
+is filtered out entirely rather than shown in a dulled "other" color.
+
+`MapCategory` shrank from 3 values to 2 (`scheduled` | `on_site`) since
+those are the only categories that can ever appear now — `scheduled` gets
+its own blue dot (`jobs-map.tsx`'s `CATEGORY_COLORS`) rather than being
+lumped into the old gray "everything else" bucket, so it's now
+distinguishable from the orange "actively being worked" dot. Dashboard
+legend (`dashboard-client.tsx`) updated to match: 2 entries instead of 3.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 261 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.
