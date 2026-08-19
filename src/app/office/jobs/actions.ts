@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
 import { sendJobAssignedEmail } from "@/lib/email/send-job-emails";
 import { nextJobNumber } from "@/lib/jobs/job-number";
+import { maxJobSequenceForYear } from "@/lib/jobs/next-job-number";
 
 export type ActionResult = { ok: true; message: string } | { ok: false; message: string };
 
@@ -26,13 +27,13 @@ export async function createJob(projectId: string, siteId: string, jobType: stri
   if (!jobType) return { ok: false, message: "Select a job type." };
 
   const supabase = await createClient();
-  const { count } = await supabase.from("jobs").select("id", { count: "exact", head: true });
   const year = new Date().getFullYear();
+  const maxSeq = await maxJobSequenceForYear(supabase, year);
 
   const { data, error } = await supabase
     .from("jobs")
     .insert({
-      job_number: nextJobNumber(count ?? 0, year, 1),
+      job_number: nextJobNumber(maxSeq, year, 1),
       project_id: projectId,
       site_id: siteId,
       job_type: jobType,

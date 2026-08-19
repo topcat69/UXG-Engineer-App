@@ -2442,3 +2442,45 @@ legend (`dashboard-client.tsx`) updated to match: 2 entries instead of 3.
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 261 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-19 — Fix "duplicate key value violates unique constraint jobs_job_number_key"
+
+Creating a job (and duplicating one, creating a revisit, and bulk CSV job
+generation) picked the next job_number from a plain `count(*)` of the
+`jobs` table — not the actual highest sequence number in use. That drifts
+from reality in two ways this app already hits in normal use: (1) deleting
+any job (Delete job, `office/jobs/[id]/actions.ts`) drops the row count
+below the highest sequence number already handed out, so the next job
+reuses an already-taken `UXG-{year}-NNNN`; (2) once jobs exist from a
+prior year, the row count includes them too, further inflating/deflating
+the count relative to what's actually free for the *current* year. Either
+way, the next insert can collide with an existing row and trip
+`jobs_job_number_key`.
+
+Fixed at the root: added `parseMaxSequence()` (`lib/jobs/job-number.ts`,
+unit tested) — parses the numeric suffix off every `UXG-{year}-NNNN` job
+number and returns the true highest one in use for that year, ignoring
+anything that doesn't match the scheme (defensive against AppSheet-
+migrated job numbers) — and a thin wrapper, `maxJobSequenceForYear()`
+(`lib/jobs/next-job-number.ts`), that queries `jobs` for the current
+year's numbers and feeds them through it. All 4 call sites that mint a
+job_number (`office/jobs/actions.ts`'s `createJob`, `office/import/actions.ts`'s
+`generateJobs`, `lib/jobs/duplicate-job.ts`, `lib/jobs/create-revisit.ts`)
+now compute the base from this instead of a row count.
+
+`nextJobNumber()` itself (the pure padding/formatting function) is
+unchanged — only what gets fed into its `currentMax` parameter changed,
+so its own tests still pass; renamed that parameter from `existingCount`
+to `currentMax` since a stale name would now describe something the
+function never receives.
+
+Deliberately not done: still not concurrency-safe (two office users
+generating a job in the same instant could still collide) — an accepted
+tradeoff at this scale per the AppSheet build guide's own note, unchanged
+from before. A proper fix would need a Postgres sequence or `SELECT ...
+FOR UPDATE`, which is a bigger change than this bug warrants.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 266 passed (5 new: `parseMaxSequence` cases in
+`job-number.test.ts`), same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.

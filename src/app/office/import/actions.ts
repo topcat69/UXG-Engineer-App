@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseSitesCsv } from "@/lib/csv/sites";
 import { nextJobNumber } from "@/lib/jobs/job-number";
+import { maxJobSequenceForYear } from "@/lib/jobs/next-job-number";
 
 export type ImportSitesResult =
   | { ok: true; message: string; siteIds: string[] }
@@ -52,11 +53,11 @@ export async function generateJobs(
   if (!jobType) return { ok: false, message: "Select a job type." };
 
   const supabase = await createClient();
-  const { count } = await supabase.from("jobs").select("id", { count: "exact", head: true });
   const year = new Date().getFullYear();
+  const maxSeq = await maxJobSequenceForYear(supabase, year);
 
   const rows = siteIds.map((siteId, i) => ({
-    job_number: nextJobNumber(count ?? 0, year, i + 1),
+    job_number: nextJobNumber(maxSeq, year, i + 1),
     project_id: projectId,
     site_id: siteId,
     job_type: jobType,

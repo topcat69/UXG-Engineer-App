@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { nextJobNumber } from "./job-number";
+import { maxJobSequenceForYear } from "./next-job-number";
 
 type AnySupabaseClient = SupabaseClient<Database>;
 
@@ -28,11 +29,12 @@ export async function createRevisitJob(
   reason: string,
   userId: string | null,
 ): Promise<CreateRevisitResult> {
-  const { count } = await supabase.from("jobs").select("id", { count: "exact", head: true });
+  const year = new Date().getFullYear();
+  const maxSeq = await maxJobSequenceForYear(supabase, year);
   const { data: revisit, error } = await supabase
     .from("jobs")
     .insert({
-      job_number: nextJobNumber(count ?? 0, new Date().getFullYear(), 1),
+      job_number: nextJobNumber(maxSeq, year, 1),
       project_id: parent.project_id,
       site_id: parent.site_id,
       job_type: parent.job_type,

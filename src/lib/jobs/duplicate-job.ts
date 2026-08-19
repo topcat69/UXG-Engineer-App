@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { nextJobNumber } from "./job-number";
+import { maxJobSequenceForYear } from "./next-job-number";
 import { cloneTasksForJob } from "./clone-tasks";
 
 type AnySupabaseClient = SupabaseClient<Database>;
@@ -27,11 +28,12 @@ export type DuplicateJobResult = { newJobId: string } | { error: string };
  * as a revisit's provenance is.
  */
 export async function duplicateJob(supabase: AnySupabaseClient, source: SourceJob, userId: string | null): Promise<DuplicateJobResult> {
-  const { count } = await supabase.from("jobs").select("id", { count: "exact", head: true });
+  const year = new Date().getFullYear();
+  const maxSeq = await maxJobSequenceForYear(supabase, year);
   const { data: duplicate, error } = await supabase
     .from("jobs")
     .insert({
-      job_number: nextJobNumber(count ?? 0, new Date().getFullYear(), 1),
+      job_number: nextJobNumber(maxSeq, year, 1),
       project_id: source.project_id,
       site_id: source.site_id,
       job_type: source.job_type,
