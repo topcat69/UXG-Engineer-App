@@ -2226,3 +2226,42 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 249 passed (5 new: `map-markers.test.ts`), same 2 pre-existing
 Supabase-dependent failures as every addendum in this sandbox, no
 regressions.
+
+## 2026-08-19 — Sites created through the Clients UI had no coordinates at all
+
+Reported immediately after the map shipped: "No jobs with a located site
+yet" despite 4 jobs existing. Root cause: `createSiteForClient` and
+`updateSiteForClient` (`office/clients/actions.ts`) never set
+`latitude`/`longitude` — they only ever came from CSV import, which
+carries pre-geocoded columns in the source file (`lib/csv/sites.ts`).
+Every site made through the newer manual Clients UI (this session's own
+earlier work) was silently missing coordinates — a gap the map's own
+addendum had flagged as a caveat, but the map exposed it as a visible
+"nothing here" the moment it shipped, so worth fixing now rather than
+leaving as a known gap.
+
+Both actions now geocode the site's postcode server-side via the same
+`geocodePostcode()` (`lib/geo/postcode.ts`, `api.postcodes.io`) already
+built for the engineer GPS-fallback work — it has no `"use client"`
+pragma, just a plain `fetch`, so it works identically from a server
+action. Best-effort in both directions: a site with no postcode, or an
+unrecognised one, still saves successfully with no coordinates (matches
+this app's established "downstream integration never blocks the core
+action" contract); on **update**, a failed lookup leaves any existing
+`latitude`/`longitude` untouched rather than nulling them out — a
+transient geocoding hiccup shouldn't un-plot a site that was already on
+the map. `updateSiteForClient` deliberately re-geocodes on every save,
+not just when the postcode value changes, so it doubles as the backfill
+path for the 4 already-created sites: re-opening and saving each one
+(no edits needed) now picks up coordinates. Both actions also
+`revalidatePath("/office/dashboard")` so the map reflects a newly-geocoded
+site without a manual refresh.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 249 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions. No new pure logic here
+(this is server-action wiring around an already-tested `geocodePostcode`),
+so no new unit tests. Not verified against the live postcodes.io API from
+this sandbox (no outbound network here) — confirmed by inspection that
+the existing `geocodePostcode` test suite already covers its success/
+failure/network-error paths.

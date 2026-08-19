@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { parseClientsCsv } from "@/lib/csv/clients";
+import { geocodePostcode } from "@/lib/geo/postcode";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
@@ -99,6 +100,13 @@ export async function createSiteForClient(
   const name = input.name.trim();
   if (!name) return { ok: false, message: "Name is required." };
 
+  const postcode = input.postcode?.trim() || undefined;
+  // Best-effort — a site with no/unrecognised postcode is still created,
+  // it just won't have coordinates yet (no marker on the dashboard map,
+  // and check-in falls back to live GPS only rather than GPS-or-postcode;
+  // see the postcode-fallback and dashboard-map addenda in DECISIONS.md).
+  const coords = postcode ? await geocodePostcode(postcode) : null;
+
   const supabase = await createSupabaseClient();
   const { data, error } = await supabase
     .from("sites")
@@ -107,15 +115,18 @@ export async function createSiteForClient(
       name,
       address_line1: input.address_line1?.trim() || undefined,
       town: input.town?.trim() || undefined,
-      postcode: input.postcode?.trim() || undefined,
+      postcode,
       contact_name: input.contact_name?.trim() || undefined,
       contact_phone: input.contact_phone?.trim() || undefined,
+      latitude: coords?.latitude ?? undefined,
+      longitude: coords?.longitude ?? undefined,
     })
     .select("*")
     .single();
   if (error) return { ok: false, message: error.message };
 
   revalidatePath(`/office/clients/${clientId}`);
+  revalidatePath("/office/dashboard");
   return { ok: true, site: data };
 }
 
@@ -136,6 +147,16 @@ export async function updateSiteForClient(
   const name = input.name.trim();
   if (!name) return { ok: false, message: "Name is required." };
 
+  const postcode = input.postcode?.trim() || null;
+  // Re-geocoded on every save (not just when the postcode value changes) —
+  // this doubles as the backfill path for sites created before this app
+  // knew how to geocode at all: re-saving one now picks up coordinates.
+  // A failed/unrecognised lookup leaves latitude/longitude untouched
+  // rather than nulling out coordinates a previous successful save set —
+  // a transient geocoding hiccup shouldn't be able to un-plot a site that
+  // was already on the map.
+  const coords = postcode ? await geocodePostcode(postcode) : null;
+
   const supabase = await createSupabaseClient();
   const { data, error } = await supabase
     .from("sites")
@@ -143,9 +164,10 @@ export async function updateSiteForClient(
       name,
       address_line1: input.address_line1?.trim() || null,
       town: input.town?.trim() || null,
-      postcode: input.postcode?.trim() || null,
+      postcode,
       contact_name: input.contact_name?.trim() || null,
       contact_phone: input.contact_phone?.trim() || null,
+      ...(coords ? { latitude: coords.latitude, longitude: coords.longitude } : {}),
     })
     .eq("id", siteId)
     .select("*")
@@ -153,6 +175,7 @@ export async function updateSiteForClient(
   if (error) return { ok: false, message: error.message };
 
   revalidatePath(`/office/clients/${clientId}`);
+  revalidatePath("/office/dashboard");
   return { ok: true, site: data };
 }
 
