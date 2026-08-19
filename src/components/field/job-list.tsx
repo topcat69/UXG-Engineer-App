@@ -4,6 +4,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/offline/db";
 import { humanize } from "@/lib/format/text";
+import { isInEngineerQueue } from "@/lib/jobs/engineer-queue";
 
 export function JobList({
   currentUserId,
@@ -13,7 +14,10 @@ export function JobList({
   onOpenJob: (jobId: string) => void;
 }) {
   const jobs = useLiveQuery(
-    () => db.jobs.where("assigned_to").equals(currentUserId).sortBy("scheduled_start"),
+    async () => {
+      const rows = await db.jobs.where("assigned_to").equals(currentUserId).sortBy("scheduled_start");
+      return rows.filter((job) => isInEngineerQueue(job.status));
+    },
     [currentUserId],
     undefined,
   );

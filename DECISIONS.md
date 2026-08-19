@@ -2392,3 +2392,31 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 257 passed, same 2 pre-existing Supabase-dependent failures
 (`rls.test.ts` generateLink, `migration.test.ts` x2 timeouts) as every
 addendum in this sandbox, no regressions.
+
+## 2026-08-19 — Checked-out and cancelled jobs drop off the engineer's queue
+
+The field app's "My Jobs" list (`components/field/job-list.tsx`) showed
+every job assigned to the engineer regardless of status — once a job was
+checked out (the "Check Out & Submit" button, which sets status to
+`submitted`) it stayed in the list alongside active work, and a cancelled
+job never left either.
+
+Added a new pure helper, `lib/jobs/engineer-queue.ts`'s `isInEngineerQueue()`
+(unit tested), and filtered the Dexie query in `job-list.tsx` through it.
+It excludes `submitted`, `under_review`, `approved`, `closed`, and
+`cancelled` — everything from the point a job is checked out onward, plus
+cancelled. Deliberately a new, narrower set rather than reusing
+`dashboard/metrics.ts`'s `ACTIVE_STATUSES`: that set already excludes
+`on_hold`, which should still show up here — a paused job is still
+something the engineer is assigned to work on, not a finished one.
+
+Deliberately not done: sync-down (`lib/offline/sync-down.ts`) still pulls
+every job assigned to the engineer regardless of status, unchanged — this
+only affects what's *displayed* in the queue, not what's cached locally,
+so a job's data stays available offline immediately after submission
+without a separate re-sync.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 260 passed (3 new: `engineer-queue.test.ts`), same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions.
