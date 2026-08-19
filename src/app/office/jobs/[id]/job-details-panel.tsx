@@ -4,16 +4,22 @@ import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { showsSiteplanAndEquipment, showsSlaRequirement, usesJobDetails, type JobDetailsType } from "@/lib/forms/job-form";
-import { addJobEquipment, deleteJobEquipment, updateSlaRequirement, uploadJobDocument, type JobEquipmentRow } from "./actions";
+import { addJobEquipment, deleteJobEquipment, updateJobInformation, updateSlaRequirement, uploadJobDocument, type JobEquipmentRow } from "./actions";
 
-type JobDetailsData = { rams_storage_path: string | null; site_plan_storage_path: string | null; sla_requirement_detail: string | null } | null;
+type JobDetailsData = {
+  rams_storage_path: string | null;
+  site_plan_storage_path: string | null;
+  sla_requirement_detail: string | null;
+  job_information: string | null;
+} | null;
 
 /**
- * Office-side "Info on system" prep: RAMS/site plan uploads, the SLA
- * requirement note, and the equipment list — reference material the field
- * app shows read-only to the engineer (see job-workflow.tsx's
- * JobDetailsSection). Returns null for job types that don't use job_details
- * (survey) rather than the caller needing to guard every render site.
+ * Office-side "Job Information" prep (formerly "Info on system"): RAMS/site
+ * plan uploads, free-text job notes, the SLA requirement note, and the
+ * equipment list — reference material the field app shows read-only to the
+ * engineer (see job-workflow.tsx's JobDetailsSection). Returns null for job
+ * types that don't use job_details (survey) rather than the caller needing
+ * to guard every render site.
  */
 export function JobDetailsPanel({
   jobId,
@@ -30,6 +36,7 @@ export function JobDetailsPanel({
   const [model, setModel] = useState("");
   const [serial, setSerial] = useState("");
   const [slaDetail, setSlaDetail] = useState(jobDetails?.sla_requirement_detail ?? "");
+  const [jobInfo, setJobInfo] = useState(jobDetails?.job_information ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const ramsInputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +64,13 @@ export function JobDetailsPanel({
     });
   }
 
+  function handleSaveJobInfo() {
+    startTransition(async () => {
+      const result = await updateJobInformation(jobId, jobInfo);
+      setMessage(result.message);
+    });
+  }
+
   function handleAddEquipment() {
     startTransition(async () => {
       const result = await addJobEquipment(jobId, model, serial);
@@ -80,7 +94,15 @@ export function JobDetailsPanel({
 
   return (
     <section className="flex flex-col gap-3 rounded-md border p-3">
-      <h2 className="font-medium">Info on system (prepared for the engineer)</h2>
+      <h2 className="font-medium">Job Information</h2>
+
+      <div className="flex flex-col gap-2">
+        <span className="text-muted-foreground text-xs">Details about the job (shown to the engineer)</span>
+        <Textarea value={jobInfo} onChange={(e) => setJobInfo(e.target.value)} rows={4} />
+        <Button type="button" size="sm" disabled={isPending} onClick={handleSaveJobInfo} className="self-start">
+          Save
+        </Button>
+      </div>
 
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-1">

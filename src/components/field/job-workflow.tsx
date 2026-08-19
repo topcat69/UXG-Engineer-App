@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import { db, type InstallFormRow, type JobDetailsRow, type MediaQueueItem } from "@/lib/offline/db";
+import { generateId } from "@/lib/offline/id";
 import {
   checkIn,
   saveInstallFormDraft,
@@ -129,7 +130,7 @@ export function JobWorkflow({
 
   function currentInstallRow(): InstallFormRow {
     return {
-      id: formRow?.id ?? crypto.randomUUID(),
+      id: formRow?.id ?? generateId(),
       job_id: jobId,
       player_serial: installValues.player_serial || null,
       screen_serial: installValues.screen_serial || null,
@@ -150,7 +151,7 @@ export function JobWorkflow({
 
   function currentDetailsRow(): JobDetailsRow {
     return {
-      id: detailsRow?.id ?? crypto.randomUUID(),
+      id: detailsRow?.id ?? generateId(),
       job_id: jobId,
       player_serial: detailsValues.player_serial || null,
       screen_serial: detailsValues.screen_serial || null,
@@ -163,6 +164,7 @@ export function JobWorkflow({
       rams_storage_path: detailsRow?.rams_storage_path ?? null,
       site_plan_storage_path: detailsRow?.site_plan_storage_path ?? null,
       sla_requirement_detail: detailsRow?.sla_requirement_detail ?? null,
+      job_information: detailsRow?.job_information ?? null,
       parking_notified: detailsValues.parking_notified,
       reported_to_site_manager: detailsValues.reported_to_site_manager,
       revisit_required: detailsValues.revisit_required === "" ? null : detailsValues.revisit_required === "yes",
@@ -579,7 +581,10 @@ function JobDetailsSection({
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-md border p-3">
-        <p className="mb-2 text-sm font-medium">Info on system</p>
+        <p className="mb-2 text-sm font-medium">Job Information</p>
+        {detailsRow?.job_information && (
+          <p className="mb-2 text-sm whitespace-pre-wrap">{detailsRow.job_information}</p>
+        )}
         <p className="text-sm">
           Customer contact: {[site?.contact_name, site?.contact_phone, site?.contact_email].filter(Boolean).join(" · ") || "Not on file"}
         </p>

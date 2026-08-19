@@ -268,6 +268,7 @@ export type Database = {
           issue_detail: string | null
           issues_found: boolean | null
           job_id: string | null
+          job_information: string | null
           mount_type: string | null
           network_type: string | null
           parking_notified: boolean | null
@@ -291,6 +292,7 @@ export type Database = {
           issue_detail?: string | null
           issues_found?: boolean | null
           job_id?: string | null
+          job_information?: string | null
           mount_type?: string | null
           network_type?: string | null
           parking_notified?: boolean | null
@@ -314,6 +316,7 @@ export type Database = {
           issue_detail?: string | null
           issues_found?: boolean | null
           job_id?: string | null
+          job_information?: string | null
           mount_type?: string | null
           network_type?: string | null
           parking_notified?: boolean | null

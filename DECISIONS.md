@@ -2265,3 +2265,39 @@ so no new unit tests. Not verified against the live postcodes.io API from
 this sandbox (no outbound network here) — confirmed by inspection that
 the existing `geocodePostcode` test suite already covers its success/
 failure/network-error paths.
+
+## 2026-08-19 — "Info on system" renamed to "Job Information" + free-text job notes
+
+Renamed the office-side prep panel (`job-details-panel.tsx`) and the
+field app's matching read-only panel (`job-workflow.tsx`'s
+`JobDetailsSection`) from "Info on system" to "Job Information" — kept
+both in sync rather than renaming only the one explicitly named, since
+they're the same conceptual section shown on either side of the same
+data (mismatched labels between office and field would just be
+confusing). Added a new `job_details.job_information` column
+(`20260119000000_job_information.sql`, plain `text` — Postgres has no
+practical length limit, matching "unlimited chars") with a save action
+(`updateJobInformation`, mirroring the existing `updateSlaRequirement`
+exactly) and a textarea in the office panel; the field app shows it
+read-only at the top of Job Information, above the customer-contact
+line, using `whitespace-pre-wrap` so line breaks the office typed
+survive to the engineer's screen. Scoped to the same job types the panel
+already covers (install/sla/maintenance/delivery via `job_details`) —
+survey keeps its separate, untouched `install_forms` path.
+
+**Found and fixed while touching this file**: `job-workflow.tsx`'s
+`currentInstallRow()`/`currentDetailsRow()` still called raw
+`crypto.randomUUID()` directly for a new row's id (used when
+`formRow`/`detailsRow` is `undefined` — the very first autosave on a job
+nobody has saved to yet) — missed in the earlier crypto.randomUUID/
+crypto.subtle addendum, which fixed every *other* call site but not
+these two. Same fix: routed through `generateId()` (`lib/offline/id.ts`).
+Would have broken the first autosave tick on any job over plain HTTP.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 249 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions. No new pure logic (this
+is schema + straightforward save-action/textarea wiring around an
+already-established pattern), so no new unit tests. Needs
+`supabase db push` for `20260119000000_job_information.sql` on the real
+project before this reaches the VM.

@@ -213,7 +213,7 @@ export async function deleteJobTask(taskId: string, jobId: string): Promise<Acti
 
 /**
  * Uploads RAMS or a site plan document (office-prepared reference material
- * for the field app's "Info on system" section, see 20260117000000_job_details.sql)
+ * for the field app's "Job Information" section, see 20260117000000_job_details.sql)
  * and points job_details' matching *_storage_path column at it. Reuses the
  * existing 'media' bucket / jobs/{job_id}/{filename} path convention (see
  * media-capture.ts) rather than a new bucket — same storage policies apply.
@@ -248,6 +248,18 @@ export async function updateSlaRequirement(jobId: string, detail: string): Promi
   const { error } = await supabase
     .from("job_details")
     .upsert({ job_id: jobId, sla_requirement_detail: detail.trim() || null }, { onConflict: "job_id" });
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/office/jobs/${jobId}`);
+  return { ok: true, message: "Saved." };
+}
+
+/** Free-text job notes the office adds while preparing the job — shown read-only to the engineer in the field app's Job Information panel. */
+export async function updateJobInformation(jobId: string, detail: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("job_details")
+    .upsert({ job_id: jobId, job_information: detail.trim() || null }, { onConflict: "job_id" });
   if (error) return { ok: false, message: error.message };
 
   revalidatePath(`/office/jobs/${jobId}`);
