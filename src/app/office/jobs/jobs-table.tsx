@@ -14,6 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { JOB_TYPE_LABELS } from "@/lib/forms/job-form";
+import { humanize } from "@/lib/format/text";
 import { bulkAssignJobs, bulkScheduleJobs } from "./actions";
 
 export type JobRow = {
@@ -165,9 +167,9 @@ export function JobsTable({ jobs, engineers }: { jobs: JobRow[]; engineers: { id
               <TableCell>{job.site?.client?.name ?? "—"}</TableCell>
               <TableCell>{job.site?.name ?? "—"}</TableCell>
               <TableCell>{job.project?.name ?? "—"}</TableCell>
-              <TableCell>{job.job_type}</TableCell>
+              <TableCell>{JOB_TYPE_LABELS[job.job_type as keyof typeof JOB_TYPE_LABELS] ?? humanize(job.job_type)}</TableCell>
               <TableCell>
-                <Badge variant="secondary">{job.status}</Badge>
+                <Badge variant="secondary">{humanize(job.status)}</Badge>
               </TableCell>
               <TableCell>{job.assigned?.name ?? "Unassigned"}</TableCell>
               <TableCell>

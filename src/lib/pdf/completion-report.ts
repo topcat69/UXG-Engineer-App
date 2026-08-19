@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import PDFDocument from "pdfkit";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import { JOB_TYPE_LABELS } from "@/lib/forms/job-form";
+import { humanize } from "@/lib/format/text";
 import { formatGpsTimestampOverlay } from "./overlay-text";
 
 type AnySupabaseClient = SupabaseClient<Database>;
@@ -20,6 +22,22 @@ type ManifestEntry = { label: string; sha256: string };
  */
 function sha256Hex(buffer: Buffer): string {
   return createHash("sha256").update(buffer).digest("hex");
+}
+
+/**
+ * Formats one form-answer field for the "Form answers" section, or null to
+ * skip it entirely (unanswered). Booleans render as Yes/No — this used to
+ * print pdfkit's default `${value}` interpolation of `true`/`false`
+ * literally, most visibly on "Revisit required". Pass/fail fields are
+ * stored lowercase ("pass"/"fail"/"na") and need humanizing; every other
+ * string field (serials, notes, the Select-driven fields) is already in
+ * its intended display casing.
+ */
+function formatFieldValue(label: string, value: string | boolean | null): string | null {
+  if (value === null || value === "") return null;
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (label === "Player boot test" || label === "Content displaying") return humanize(value);
+  return value;
 }
 
 /** Exported for job-archive.ts, which needs the same original bytes this file already downloads for embedding. */
@@ -68,8 +86,8 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
     `Address: ${[job.site?.address_line1, job.site?.address_line2, job.site?.town, job.site?.postcode].filter(Boolean).join(", ")}`,
   );
   doc.text(`Project: ${job.project?.name ?? "—"}`);
-  doc.text(`Job type: ${job.job_type}`);
-  doc.text(`Status: ${job.status}`);
+  doc.text(`Job type: ${JOB_TYPE_LABELS[job.job_type as keyof typeof JOB_TYPE_LABELS] ?? humanize(job.job_type)}`);
+  doc.text(`Status: ${humanize(job.status)}`);
   if (job.actual_travel_start) doc.text(`Travel started: ${new Date(job.actual_travel_start).toLocaleString("en-GB")}`);
   if (job.actual_start) doc.text(`Started: ${new Date(job.actual_start).toLocaleString("en-GB")}`);
   if (job.actual_end) doc.text(`Completed: ${new Date(job.actual_end).toLocaleString("en-GB")}`);
@@ -94,8 +112,8 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
       ["Engineer notes", installForm.engineer_notes],
     ];
     for (const [label, value] of fields) {
-      if (value === null || value === "") continue;
-      doc.text(`${label}: ${value}`);
+      const formatted = formatFieldValue(label, value);
+      if (formatted !== null) doc.text(`${label}: ${formatted}`);
     }
   }
 
@@ -120,8 +138,8 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
       ["Engineer notes", jobDetails.engineer_notes],
     ];
     for (const [label, value] of fields) {
-      if (value === null || value === "") continue;
-      doc.text(`${label}: ${value}`);
+      const formatted = formatFieldValue(label, value);
+      if (formatted !== null) doc.text(`${label}: ${formatted}`);
     }
   }
 
@@ -130,7 +148,7 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
     doc.moveDown().fontSize(14).text("Issues raised");
     doc.fontSize(10);
     for (const issue of issues) {
-      doc.text(`[${issue.severity}, ${issue.status}] ${issue.description}`);
+      doc.text(`[${humanize(issue.severity)}, ${humanize(issue.status ?? "")}] ${issue.description}`);
     }
   }
 
@@ -146,7 +164,7 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
     manifest.push({ label: `${isVideo ? "Video" : "Photo"}: ${photo.slot}`, sha256: sha256Hex(bytes) });
 
     doc.addPage();
-    doc.fontSize(12).text(photo.slot.replace("photo_", "").replace(/_/g, " "));
+    doc.fontSize(12).text(humanize(photo.slot.replace("photo_", "")));
     if (isVideo) {
       doc.fontSize(10).text("Video captured on site — see the job record for playback.");
     } else {

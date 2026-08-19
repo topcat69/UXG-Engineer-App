@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatTimeRange } from "@/lib/scheduler/week";
+import { humanize } from "@/lib/format/text";
 import { rescheduleJob } from "./actions";
 
 type JobRow = {
@@ -158,7 +159,7 @@ function FragmentRow({
                 )}
                 {lane.engineerId && <div className="text-muted-foreground truncate">{lane.label}</div>}
                 <Badge variant="secondary" className="mt-0.5 text-[10px]">
-                  {job.status}
+                  {humanize(job.status)}
                 </Badge>
               </div>
             ))}

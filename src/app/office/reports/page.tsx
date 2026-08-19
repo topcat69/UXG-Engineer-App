@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { applyJobListFilters, hasAnyFilter, parseJobListFilters, type JobListSearchParams } from "@/lib/jobs/list-query";
+import { humanize } from "@/lib/format/text";
 
 const PAGE_SIZE = 50;
 const JOB_STATUSES: Database["public"]["Enums"]["job_status"][] = [
@@ -95,7 +96,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             <option value="">All</option>
             {JOB_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {humanize(s)}
               </option>
             ))}
           </select>
@@ -141,7 +142,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               <TableCell>{job.site?.name ?? "—"}</TableCell>
               <TableCell>{job.project?.name ?? "—"}</TableCell>
               <TableCell>
-                <Badge variant="secondary">{job.status}</Badge>
+                <Badge variant="secondary">{humanize(job.status)}</Badge>
               </TableCell>
               <TableCell>{job.scheduled_start ? new Date(job.scheduled_start).toLocaleString() : "—"}</TableCell>
               <TableCell>

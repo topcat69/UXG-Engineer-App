@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { humanize } from "@/lib/format/text";
 import { createProject, type ProjectRow } from "./actions";
 
 const STATUSES = ["active", "on_hold", "completed"];
@@ -59,7 +60,7 @@ export function ProjectsManager({
                 </Link>
               </td>
               <td className="py-2">
-                <Badge variant="secondary">{p.status}</Badge>
+                <Badge variant="secondary">{humanize(p.status ?? "")}</Badge>
               </td>
               <td className="py-2 text-muted-foreground">
                 {[p.start_date, p.end_date].filter(Boolean).join(" – ") || "—"}
@@ -120,7 +121,7 @@ export function ProjectsManager({
             >
               {STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {humanize(s)}
                 </option>
               ))}
             </select>

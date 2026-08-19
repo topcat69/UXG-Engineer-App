@@ -3,6 +3,7 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/offline/db";
+import { humanize } from "@/lib/format/text";
 
 export function JobList({
   currentUserId,
@@ -43,7 +44,7 @@ export function JobList({
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{job.job_number}</span>
-                  <Badge variant="secondary">{job.status}</Badge>
+                  <Badge variant="secondary">{humanize(job.status)}</Badge>
                 </div>
                 <p className="text-muted-foreground text-sm">{site?.name ?? "Unknown site"}</p>
                 <p className="text-muted-foreground text-sm">

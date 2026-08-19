@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import type { Database } from "@/lib/supabase/database.types";
+import { humanize } from "@/lib/format/text";
 import { changeUserRole, createUser, setUserActive, type UserRow } from "./actions";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
@@ -104,16 +105,16 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
                     >
                       {ALL_ROLES.map((r) => (
                         <option key={r} value={r}>
-                          {r}
+                          {humanize(r)}
                         </option>
                       ))}
                     </select>
                   ) : (
-                    <Badge variant="secondary">{u.role}</Badge>
+                    <Badge variant="secondary">{humanize(u.role)}</Badge>
                   )}
                 </td>
                 <td className="py-2">
-                  <Badge variant={u.active ? "secondary" : "outline"}>{u.active ? "active" : "deactivated"}</Badge>
+                  <Badge variant={u.active ? "secondary" : "outline"}>{u.active ? "Active" : "Deactivated"}</Badge>
                 </td>
                 <td className="py-2">
                   {manageable && (
@@ -165,7 +166,7 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
             >
               {creatableRoles.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {humanize(r)}
                 </option>
               ))}
             </select>

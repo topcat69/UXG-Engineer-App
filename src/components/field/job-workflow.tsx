@@ -18,6 +18,7 @@ import {
 } from "@/lib/offline/field-actions";
 import { getCurrentPosition, resolveJobLocation, siteLocationFallback } from "@/lib/offline/media-capture";
 import { distanceMeters } from "@/lib/geo/distance";
+import { humanize } from "@/lib/format/text";
 import {
   EMPTY_INSTALL_FORM,
   MOUNT_TYPES,
@@ -317,7 +318,7 @@ export function JobWorkflow({
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-semibold">{job.job_number}</h1>
-          <Badge variant="secondary">{job.status}</Badge>
+          <Badge variant="secondary">{humanize(job.status)}</Badge>
         </div>
         <p className="text-muted-foreground text-sm">{site?.name}</p>
         <p className="text-muted-foreground text-sm">
@@ -485,11 +486,11 @@ function InstallFormSection({
       )}
 
       <Field label="Player boot test">
-        <Select value={values.player_boot_test} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, player_boot_test: v }))} />
+        <Select value={values.player_boot_test} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, player_boot_test: v }))} labelFor={humanize} />
       </Field>
 
       <Field label="Content displaying">
-        <Select value={values.content_displaying} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, content_displaying: v }))} />
+        <Select value={values.content_displaying} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, content_displaying: v }))} labelFor={humanize} />
       </Field>
 
       <PhotoGrid jobId={jobId} slots={PHOTO_SLOTS} currentUser={currentUser} mediaBySlot={mediaBySlot} onMutated={onMutated} />
@@ -672,10 +673,10 @@ function JobDetailsSection({
             </Field>
           )}
           <Field label="Player boot test">
-            <Select value={values.player_boot_test} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, player_boot_test: v }))} />
+            <Select value={values.player_boot_test} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, player_boot_test: v }))} labelFor={humanize} />
           </Field>
           <Field label="Content displaying">
-            <Select value={values.content_displaying} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, content_displaying: v }))} />
+            <Select value={values.content_displaying} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, content_displaying: v }))} labelFor={humanize} />
           </Field>
         </>
       )}
@@ -753,7 +754,7 @@ function PhotoGrid({
       <p className="mb-2 text-sm font-medium">Photos</p>
       <div className="grid grid-cols-3 gap-3">
         {slots.map((slot) => (
-          <PhotoSlot key={slot} jobId={jobId} slot={slot} label={slot.replace("photo_", "").replace(/_/g, " ")} capturedBy={currentUser.id} items={mediaBySlot.get(slot) ?? []} onCaptured={onMutated} />
+          <PhotoSlot key={slot} jobId={jobId} slot={slot} label={humanize(slot.replace("photo_", ""))} capturedBy={currentUser.id} items={mediaBySlot.get(slot) ?? []} onCaptured={onMutated} />
         ))}
       </div>
     </div>
@@ -806,10 +807,13 @@ function Select({
   value,
   options,
   onChange,
+  labelFor,
 }: {
   value: string;
   options: readonly string[];
   onChange: (value: string) => void;
+  /** Most option lists (mount type, power source, ...) are already authored in the display casing they want; only pass this when the raw values are stored-format lowercase (e.g. PASS_FAIL). */
+  labelFor?: (value: string) => string;
 }) {
   return (
     <select
@@ -820,7 +824,7 @@ function Select({
       <option value="">Select…</option>
       {options.map((o) => (
         <option key={o} value={o}>
-          {o}
+          {labelFor ? labelFor(o) : o}
         </option>
       ))}
     </select>

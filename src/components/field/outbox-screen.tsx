@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/lib/offline/db";
 import { summarizeOutbox } from "@/lib/offline/outbox";
 import { estimateStorage } from "@/lib/offline/persistent-storage";
+import { humanize } from "@/lib/format/text";
 
 const WARN_USAGE_RATIO = 0.8;
 
@@ -123,7 +124,7 @@ export function OutboxScreen({ onBack, onRetry }: { onBack: () => void; onRetry:
                 <li key={m.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
                   <span>{m.kind === "signature" ? "Signature" : `Photo: ${m.slot.replace("photo_", "").replace(/_/g, " ")}`}</span>
                   <div className="flex items-center gap-2">
-                    <Badge variant={m.status === "failed" ? "destructive" : "secondary"}>{m.status}</Badge>
+                    <Badge variant={m.status === "failed" ? "destructive" : "secondary"}>{humanize(m.status)}</Badge>
                     <span className="text-muted-foreground text-xs">{formatBytes(m.bytes)}</span>
                   </div>
                 </li>

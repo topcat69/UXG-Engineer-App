@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isShareLinkValid } from "@/lib/share-links/validity";
+import { humanize } from "@/lib/format/text";
 
 const INSTALL_PHOTO_SLOTS = [
   "photo_before",
@@ -80,7 +81,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
       </div>
 
       <div className="flex items-center gap-2">
-        <Badge variant="secondary">{job.status}</Badge>
+        <Badge variant="secondary">{humanize(job.status)}</Badge>
         {job.scheduled_start && (
           <span className="text-muted-foreground text-sm">{new Date(job.scheduled_start).toLocaleDateString()}</span>
         )}
@@ -105,7 +106,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
                   <img
                     key={photo.slot}
                     src={photo.url}
-                    alt={photo.slot.replace("photo_", "").replace(/_/g, " ")}
+                    alt={humanize(photo.slot.replace("photo_", ""))}
                     className="aspect-square rounded-md border object-cover"
                   />
                 ))}

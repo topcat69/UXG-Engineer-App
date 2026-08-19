@@ -2068,3 +2068,53 @@ clean — 232 passed (2 new: `formatTimeRange`, assuming a UTC test
 environment same as this sandbox/CI, matching the rest of the app's
 local-time display convention), same 2 pre-existing Supabase-dependent
 failures as every addendum in this sandbox, no regressions.
+
+## 2026-08-19 — Capitalization pass: raw enum values across the whole app
+
+"A lot of items don't have capitalisation" — audited every place a stored
+lowercase/snake_case value (job status, qa_status, issue severity/status,
+user role, pass/fail answers, photo slot names, active/deactivated) was
+rendered straight to a user instead of going through a display label.
+Added one shared helper, `humanize()` (`src/lib/format/text.ts`):
+`"in_progress"` → `"In Progress"`, `"na"` → `"N/A"` (special-cased —
+"Na" would read wrong), single words just get capitalized. Deliberately
+narrow: only for stored enum-ish values, never applied to free text,
+names, or the Select option lists in `install-form.ts`/`job-form.ts`,
+which are already authored in their intended display casing on purpose
+(e.g. "Existing socket" — title-casing that would be a *change*, not a
+fix). `job_type` specifically was routed through the existing
+`JOB_TYPE_LABELS` map instead of the generic helper, since "sla" needs to
+become "SLA", not "Sla".
+
+Applied across every render site found by grepping for raw
+`.status`/`.severity`/`.role`/`.job_type`/pass-fail renders: office job
+list/detail/scheduler/QA queue/reports/projects/users pages and their
+filter dropdowns, the office header's role display, the public share
+page, the field app's job list/workflow/outbox screen (including the
+PASS_FAIL `<Select>`, which needed a new optional `labelFor` prop on the
+shared `Select` component so its stored-lowercase values could display
+capitalized without touching the other option lists that pass through
+it), and the completion PDF's cover section/form-answers/issues/photo
+labels.
+
+**A real bug fell out of this, not just cosmetic**: the PDF's form-answers
+loop did `` doc.text(`${label}: ${value}`) `` for every field
+indiscriminately, so a boolean field (`revisit_required`,
+`parking_notified`, `reported_to_site_manager`, `issues_found`) printed
+pdfkit's literal string coercion — "Revisit required: true" /
+"...: false" — never "Yes"/"No" like every other boolean field in this
+app renders. Fixed via a new `formatFieldValue(label, value)` that
+branches on the value's actual type (boolean → Yes/No; the two pass/fail
+fields → `humanize`; everything else passed through as-is) instead of one
+undifferentiated interpolation for a tuple typed `string | boolean | null`.
+
+Deliberately left alone: CSV export values (`lib/csv/export.ts`) and the
+field app's one mid-sentence status render ("This job is on hold." —
+correct English lowercase there, not a bug) — capitalizing either would
+be a regression, not a fix, and "where appropriate" excludes both.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 237 passed (5 new: `humanize` covering snake_case splitting, the
+"na" special case, idempotency, and an empty string), same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions.

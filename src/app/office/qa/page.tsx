@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
+import { humanize } from "@/lib/format/text";
 import { QaRow } from "./qa-row";
 
 export default async function QaQueuePage() {
@@ -37,7 +38,7 @@ export default async function QaQueuePage() {
                   <Link href={`/office/jobs/${job.id}`} className="font-medium underline-offset-2 hover:underline">
                     {job.job_number}
                   </Link>
-                  <Badge variant="secondary">{job.status}</Badge>
+                  <Badge variant="secondary">{humanize(job.status)}</Badge>
                   {hasFailure && <Badge variant="destructive">Flagged</Badge>}
                 </div>
                 <span className="text-muted-foreground text-sm">

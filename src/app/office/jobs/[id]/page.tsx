@@ -13,7 +13,8 @@ import { TaskPanel } from "./task-panel";
 import { ShareLinkPanel } from "./share-link-panel";
 import { JobDetailsPanel } from "./job-details-panel";
 import { AssignSchedulePanel } from "./assign-schedule-panel";
-import { usesJobDetails, photoSlotsFor, type JobDetailsType } from "@/lib/forms/job-form";
+import { usesJobDetails, photoSlotsFor, JOB_TYPE_LABELS, type JobDetailsType } from "@/lib/forms/job-form";
+import { humanize } from "@/lib/format/text";
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -72,11 +73,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold">{job.job_number}</h1>
-            <Badge variant="secondary">{job.status}</Badge>
-            {job.qa_status !== "pending" && <Badge variant="outline">QA: {job.qa_status}</Badge>}
+            <Badge variant="secondary">{humanize(job.status)}</Badge>
+            {job.qa_status !== "pending" && <Badge variant="outline">QA: {humanize(job.qa_status ?? "")}</Badge>}
           </div>
           <p className="text-muted-foreground text-sm">
-            {job.job_type} · Priority {job.priority} ·{" "}
+            {JOB_TYPE_LABELS[job.job_type as keyof typeof JOB_TYPE_LABELS] ?? humanize(job.job_type)} · Priority{" "}
+            {job.priority} ·{" "}
             <Link href={`/office/jobs?project_id=${job.project_id ?? ""}`} className="underline">
               {job.project?.name ?? "No project"}
             </Link>
@@ -138,8 +140,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             {(statusEvents ?? []).map((event) => (
               <li key={event.id} className="border-l-2 pl-3 text-sm">
                 <span className="font-medium">
-                  {event.from_status ? `${event.from_status} → ` : ""}
-                  {event.to_status}
+                  {event.from_status ? `${humanize(event.from_status)} → ` : ""}
+                  {humanize(event.to_status)}
                 </span>
                 <span className="text-muted-foreground">
                   {" "}
@@ -164,8 +166,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <FormField label="Power source" value={installForm.power_source} />
               <FormField label="Network" value={installForm.network_type} />
               <FormField label="WiFi signal" value={installForm.wifi_signal} />
-              <FormField label="Player boot test" value={installForm.player_boot_test} />
-              <FormField label="Content displaying" value={installForm.content_displaying} />
+              <FormField label="Player boot test" value={humanize(installForm.player_boot_test ?? "")} />
+              <FormField label="Content displaying" value={humanize(installForm.content_displaying ?? "")} />
               <FormField label="Issues found" value={installForm.issues_found ? "Yes" : "No"} />
               <FormField label="Client name" value={installForm.client_name} />
             </dl>
@@ -189,8 +191,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   <FormField label="Power source" value={jobDetails.power_source} />
                   <FormField label="Network" value={jobDetails.network_type} />
                   <FormField label="WiFi signal" value={jobDetails.wifi_signal} />
-                  <FormField label="Player boot test" value={jobDetails.player_boot_test} />
-                  <FormField label="Content displaying" value={jobDetails.content_displaying} />
+                  <FormField label="Player boot test" value={humanize(jobDetails.player_boot_test ?? "")} />
+                  <FormField label="Content displaying" value={humanize(jobDetails.content_displaying ?? "")} />
                 </>
               )}
               <FormField label="Parking notified" value={jobDetails.parking_notified ? "Yes" : "No"} />
@@ -224,7 +226,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   <div className="bg-muted flex h-20 items-center justify-center rounded text-muted-foreground">
                     {asset ? (asset.media_type === "video" ? "🎥" : "📷") : "—"}
                   </div>
-                  <span className="font-medium">{slot.replace("photo_", "").replace(/_/g, " ")}</span>
+                  <span className="font-medium">{humanize(slot.replace("photo_", ""))}</span>
                   {asset ? (
                     <span className="text-muted-foreground">
                       {new Date(asset.captured_at).toLocaleDateString()}
@@ -245,7 +247,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                 <div className="bg-muted flex h-20 items-center justify-center rounded text-muted-foreground">
                   {asset.media_type === "video" ? "🎥" : "📷"}
                 </div>
-                <span className="font-medium">{asset.slot}</span>
+                <span className="font-medium">{humanize(asset.slot.replace("photo_", ""))}</span>
               </div>
             ))}
           </div>
@@ -260,9 +262,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <li key={issue.id} className="rounded-md border p-3 text-sm">
               <div className="flex items-center gap-2">
                 <Badge variant={issue.severity === "critical" || issue.severity === "high" ? "destructive" : "secondary"}>
-                  {issue.severity}
+                  {humanize(issue.severity)}
                 </Badge>
-                <span className="text-muted-foreground">{issue.status}</span>
+                <span className="text-muted-foreground">{humanize(issue.status ?? "")}</span>
                 <span className="text-muted-foreground">
                   · {issue.created_at ? new Date(issue.created_at).toLocaleDateString() : "unknown date"}
                   {issue.raised_by_user?.name ? ` · ${issue.raised_by_user.name}` : ""}

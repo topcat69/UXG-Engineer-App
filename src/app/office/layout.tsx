@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireOfficeUser } from "@/lib/auth/current-user";
 import { signOut } from "@/lib/auth/actions";
+import { humanize } from "@/lib/format/text";
 import { UxgLogo } from "@/components/branding/uxg-logo";
 
 const NAV = [
@@ -34,7 +35,7 @@ export default async function OfficeLayout({ children }: { children: React.React
         </div>
         <div className="flex items-center gap-3 text-sm">
           <span className="text-muted-foreground">
-            {user.name} · {user.role}
+            {user.name} · {humanize(user.role)}
           </span>
           <form action={signOut}>
             <button type="submit" className="text-muted-foreground hover:text-foreground underline">

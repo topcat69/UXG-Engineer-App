@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { applyJobListFilters, hasAnyFilter, parseJobListFilters, type JobListSearchParams } from "@/lib/jobs/list-query";
 import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
+import { humanize } from "@/lib/format/text";
 import { CreateJobForm } from "./create-job-form";
 import { JobsTable, type JobRow } from "./jobs-table";
 
@@ -109,7 +110,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
             <option value="">All</option>
             {JOB_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {humanize(s)}
               </option>
             ))}
           </select>
