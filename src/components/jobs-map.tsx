@@ -10,20 +10,20 @@ import type { JobMapMarker, MapCategory } from "@/lib/dashboard/map-markers";
 
 // Distinct colored dots per category rather than Leaflet's single default
 // pin icon — the whole point of a "where are the jobs" map is reading
-// status at a glance without opening every popup. Orange matches the
-// dashboard's own chart color (dashboard-client.tsx's CHART_COLOR).
+// status at a glance without opening every popup. Bright/saturated so
+// dots stay legible against busy OSM tiles at a glance.
 const CATEGORY_COLORS: Record<MapCategory, string> = {
-  on_site: "#F3941D",
-  completed: "#16a34a",
-  other: "#6b7280",
+  on_site: "#FF7A00",
+  completed: "#22c55e",
+  other: "#9ca3af",
 };
 
 function iconFor(category: MapCategory): L.DivIcon {
   return L.divIcon({
     className: "",
-    html: `<span style="display:block;width:14px;height:14px;border-radius:9999px;background:${CATEGORY_COLORS[category]};border:2px solid white;box-shadow:0 0 3px rgba(0,0,0,0.6)"></span>`,
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    html: `<span style="display:block;width:16px;height:16px;border-radius:9999px;background:${CATEGORY_COLORS[category]};border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.7)"></span>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
   });
 }
 

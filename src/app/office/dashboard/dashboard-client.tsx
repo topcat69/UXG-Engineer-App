@@ -137,9 +137,9 @@ export function DashboardClient({
           <>
             <JobsMap markers={mapMarkers} />
             <div className="text-muted-foreground mt-2 flex gap-4 text-xs">
-              <LegendDot color="#F3941D" label="Travelling / on site / in progress" />
-              <LegendDot color="#16a34a" label="Approved / closed" />
-              <LegendDot color="#6b7280" label="Everything else" />
+              <LegendDot color="#FF7A00" label="Travelling / on site / in progress" />
+              <LegendDot color="#22c55e" label="Approved / closed" />
+              <LegendDot color="#9ca3af" label="Everything else" />
             </div>
           </>
         )}
