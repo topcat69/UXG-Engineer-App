@@ -2,7 +2,7 @@
 // calls, no Leaflet, so it's independently testable, same convention as
 // metrics.ts.
 
-export type MapCategory = "scheduled" | "on_site";
+export type MapCategory = "scheduled" | "on_site" | "revisit";
 
 /** Engineer is currently there or travelling to it right now — the map's "happening now" color. */
 const ON_SITE_STATUSES = new Set(["travelling", "on_site", "in_progress"]);
@@ -10,14 +10,29 @@ const ON_SITE_STATUSES = new Set(["travelling", "on_site", "in_progress"]);
 /** Everything the dashboard map plots — anything not scheduled or actively being worked stays off the map entirely (no dot at all, not just a dulled one): closed/cancelled/etc. jobs aren't "where the work is happening" any more. */
 const VISIBLE_STATUSES = new Set(["scheduled", ...ON_SITE_STATUSES]);
 
-export function categorizeJobStatus(status: string): MapCategory {
+export function categorizeJobStatus(status: string): "scheduled" | "on_site" {
   return ON_SITE_STATUSES.has(status) ? "on_site" : "scheduled";
+}
+
+/**
+ * A revisit (parent_job_id set — raised from a QA rejection or a
+ * blocks_completion issue) gets its own map color that takes priority over
+ * the plain scheduled/on_site split: knowing "this is a redo" at a glance
+ * matters more on the map than which stage it's at, and it stays its own
+ * status the whole way through (scheduled/travelling/etc.) rather than a
+ * distinct status value, per parent_job_id already being the source of
+ * truth for "is this a revisit" elsewhere (dashboard revisit-rate metric,
+ * jobs list ?is_revisit= drill-through).
+ */
+export function categorizeJob(status: string, isRevisit: boolean): MapCategory {
+  return isRevisit ? "revisit" : categorizeJobStatus(status);
 }
 
 export type RawMapJob = {
   id: string;
   job_number: string;
   status: string;
+  parent_job_id: string | null;
   site: { name: string; latitude: number | null; longitude: number | null } | null;
   assigned: { name: string } | null;
 };
@@ -53,6 +68,6 @@ export function buildJobMapMarkers(jobs: RawMapJob[]): JobMapMarker[] {
       assignedName: j.assigned?.name ?? null,
       latitude: j.site!.latitude!,
       longitude: j.site!.longitude!,
-      category: categorizeJobStatus(j.status),
+      category: categorizeJob(j.status, j.parent_job_id != null),
     }));
 }

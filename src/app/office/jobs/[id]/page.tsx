@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import SiteMap from "@/components/site-map-loader";
 import { createClient } from "@/lib/supabase/server";
@@ -66,6 +67,17 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   if (error || !job) notFound();
 
+  // Revisit traceability: which job this one was raised from (if any), and
+  // which job(s) were raised from this one (e.g. a QA rejection's follow-up).
+  // Queried separately from the main batch since it needs job.parent_job_id,
+  // which isn't known until the main query above resolves.
+  const [{ data: parentJob }, { data: revisitChildren }] = await Promise.all([
+    job.parent_job_id
+      ? supabase.from("jobs").select("id, job_number").eq("id", job.parent_job_id).single()
+      : Promise.resolve({ data: null }),
+    supabase.from("jobs").select("id, job_number").eq("parent_job_id", id),
+  ]);
+
   const mediaBySlot = new Map((media ?? []).map((m) => [m.slot, m]));
   const base = appBaseUrl();
   const now = new Date().toISOString();
@@ -75,12 +87,42 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="flex flex-col gap-6">
+      {job.qa_status === "rejected" && job.qa_notes && (
+        <div className="border-destructive/50 bg-destructive/5 rounded-md border p-3 text-sm">
+          <p className="text-destructive font-medium">Rejected by QA</p>
+          <p className="mt-1">{job.qa_notes}</p>
+          {(revisitChildren ?? []).length > 0 && (
+            <p className="text-muted-foreground mt-2">
+              Revisit created:{" "}
+              {(revisitChildren ?? []).map((child, i) => (
+                <span key={child.id}>
+                  {i > 0 && ", "}
+                  <Link href={`/office/jobs/${child.id}`} className="underline">
+                    {child.job_number}
+                  </Link>
+                </span>
+              ))}
+            </p>
+          )}
+        </div>
+      )}
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold">{job.job_number}</h1>
             <Badge variant="secondary">{humanize(job.status)}</Badge>
             {job.qa_status !== "pending" && <Badge variant="outline">QA: {humanize(job.qa_status ?? "")}</Badge>}
+            {parentJob && (
+              <Link href={`/office/jobs/${parentJob.id}`} className="text-xs underline">
+                Revisit of {parentJob.job_number}
+              </Link>
+            )}
+            {job.qa_status !== "rejected" &&
+              (revisitChildren ?? []).map((child) => (
+                <Link key={child.id} href={`/office/jobs/${child.id}`} className="text-xs underline">
+                  Revisit: {child.job_number}
+                </Link>
+              ))}
           </div>
           <EditJobPanel
             jobId={job.id}

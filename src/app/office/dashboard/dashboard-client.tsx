@@ -51,7 +51,9 @@ export function DashboardClient({
       supabase.from("issues").select("job_id, category, status, revisit_job_id, created_at"),
       supabase
         .from("jobs")
-        .select("id, job_number, status, site:sites(name, latitude, longitude), assigned:users!jobs_assigned_to_fkey(name)")
+        .select(
+          "id, job_number, status, parent_job_id, site:sites(name, latitude, longitude), assigned:users!jobs_assigned_to_fkey(name)",
+        )
         .neq("status", "draft"),
     ]);
     if (freshJobs) setJobs(freshJobs);
@@ -139,6 +141,7 @@ export function DashboardClient({
             <div className="text-muted-foreground mt-2 flex gap-4 text-xs">
               <LegendDot color="#FF7A00" label="Travelling / on site / in progress" />
               <LegendDot color="#2563eb" label="Scheduled" />
+              <LegendDot color="#0d9488" label="Revisit" />
             </div>
           </>
         )}

@@ -70,15 +70,27 @@ export async function rejectJob(jobId: string, reason: string): Promise<ActionRe
     .single();
   if (!job) return { ok: false, message: "Job not found." };
 
+  // status moves to "draft" too, not just qa_status — otherwise the job
+  // never leaves the QA queue (which lists submitted/under_review) and
+  // sits there forever looking like it's still awaiting review.
   const { error: rejectError } = await supabase
     .from("jobs")
-    .update({ qa_status: "rejected", qa_notes: reason })
+    .update({ status: "draft", qa_status: "rejected", qa_notes: reason })
     .eq("id", jobId);
   if (rejectError) return { ok: false, message: rejectError.message };
 
+  await supabase.from("status_events").insert({
+    job_id: jobId,
+    from_status: job.status,
+    to_status: "draft",
+    user_id: user.id,
+    reason: `QA rejected: ${reason}`,
+  });
+
   // Reject -> Revisit: create a linked follow-up job, per the AppSheet action
-  // spec. The rejected job's own `status` doesn't change (qa_status does) —
-  // it stays as the historical record of what was reviewed and rejected.
+  // spec — parent_job_id ties the two together so the rejection is
+  // traceable from either job (see the "Revisit of ..." / "Revisit created: ..."
+  // links on the job detail page).
   const revisit = await createRevisitJob(
     supabase,
     { id: jobId, job_number: job.job_number, project_id: job.project_id, site_id: job.site_id, job_type: job.job_type },
@@ -90,5 +102,5 @@ export async function rejectJob(jobId: string, reason: string): Promise<ActionRe
   revalidatePath("/office/qa");
   revalidatePath("/office/jobs");
   revalidatePath(`/office/jobs/${jobId}`);
-  return { ok: true, message: "Rejected. Revisit created." };
+  return { ok: true, message: "Rejected and returned to draft. Revisit created." };
 }

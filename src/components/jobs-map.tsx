@@ -15,6 +15,7 @@ import type { JobMapMarker, MapCategory } from "@/lib/dashboard/map-markers";
 const CATEGORY_COLORS: Record<MapCategory, string> = {
   on_site: "#FF7A00",
   scheduled: "#2563eb",
+  revisit: "#0d9488",
 };
 
 function iconFor(category: MapCategory): L.DivIcon {

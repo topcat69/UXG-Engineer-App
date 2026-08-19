@@ -15,6 +15,7 @@ type JobRow = {
   assigned_to: string | null;
   scheduled_start: string | null;
   scheduled_end: string | null;
+  parent_job_id: string | null;
   site: { name: string } | null;
 };
 
@@ -97,6 +98,10 @@ export function SchedulerBoard({
         <Legend bucket="done" label="Approved / closed" />
         <Legend bucket="hold" label="On hold" />
         <Legend bucket="cancelled" label="Cancelled" />
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-full bg-teal-500" />
+          Revisit (badge on top of its status colour)
+        </span>
       </div>
     </div>
   );
@@ -178,9 +183,16 @@ function FragmentRow({
                     <div className="text-muted-foreground">{formatScheduleRange(job.scheduled_start, job.scheduled_end)}</div>
                   )}
                   {lane.engineerId && <div className="text-muted-foreground truncate">{lane.label}</div>}
-                  <Badge variant="secondary" className="mt-0.5 text-[10px]">
-                    {humanize(job.status)}
-                  </Badge>
+                  <div className="mt-0.5 flex flex-wrap gap-1">
+                    <Badge variant="secondary" className="text-[10px]">
+                      {humanize(job.status)}
+                    </Badge>
+                    {job.parent_job_id && (
+                      <Badge variant="outline" className="border-teal-500 bg-teal-50 text-[10px] text-teal-700">
+                        Revisit
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               );
             })}

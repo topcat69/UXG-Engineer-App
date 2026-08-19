@@ -2608,3 +2608,58 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 277 passed (4 new: `media-capture.test.ts`'s `deleteMediaItem`
 cases), same 2 pre-existing Supabase-dependent failures as every addendum
 in this sandbox, no regressions.
+
+## 2026-08-19 — QA reject: back to draft, out of the queue, traceable revisit
+
+Rejecting a job in QA only ever set `qa_status: "rejected"` — the job's own
+`status` never changed, so it stayed `submitted`/`under_review` forever and
+never left the QA queue (`office/qa/page.tsx` filters on exactly those two
+statuses). Fixed the root cause: `rejectJob` (`office/qa/actions.ts`) now
+also sets `status: "draft"`, which both drops it out of the queue and
+matches the requested "rejected jobs go back to draft" behavior. A
+`status_events` row is now inserted too (previously reject didn't write
+one at all, unlike approve) — `reason: "QA rejected: {reason}"` — so it
+shows in the job's status timeline like every other transition.
+
+Two design choices were checked with the user rather than assumed, since
+each had a much higher-risk alternative:
+
+- **Not a new `job.status = "revisit"` enum value.** A revisit job goes
+  through the exact same lifecycle as any other job (draft → scheduled →
+  ... → closed); "is this a revisit" is already fully derivable from
+  `parent_job_id` (set by the pre-existing `createRevisitJob`, and already
+  the source of truth for the dashboard's revisit-rate metric and the jobs
+  list's `?is_revisit=` drill-through). Added `categorizeJob(status,
+  isRevisit)` (`lib/dashboard/map-markers.ts`, unit tested) which overrides
+  to a `"revisit"` map category regardless of status — teal
+  (`#0d9488`), taking priority over the scheduled/on-site colors — and a
+  teal "Revisit" badge on scheduler cards (`scheduler-board.tsx`) alongside
+  the normal status badge, both driven off `parent_job_id`, both wired
+  through their existing dashboard/scheduler Supabase queries (added
+  `parent_job_id` to the selected columns). Avoided a migration and an
+  audit of every status-based filter in the app (QA/engineer queues,
+  dashboard active counts, field-app gating) that a real new status value
+  would have needed.
+- **Not a new `job.status = "rejected"` enum value.** `qa_status` already
+  supports `"rejected"` and already carries the outcome; `job.status` only
+  needed to change to `"draft"` to fix the actual bug (never leaving the
+  queue). No migration needed.
+
+**Traceability**, per the request that "everything can be traced from a
+workflow point of view": the job detail page (`office/jobs/[id]/page.tsx`)
+now queries the job's parent (if `parent_job_id` is set) and any children
+(jobs with `parent_job_id` = this job), and shows: a "Revisit of {parent
+job#}" link next to the status badges; a "Revisit: {child job#}" link the
+same way when this job spawned one outside of a rejection (e.g. the
+blocks_completion issue webhook); and, when `qa_status === "rejected"`, a
+prominent red box **above** the job header with the full rejection reason
+(`qa_notes`, previously stored but never displayed anywhere at all) plus a
+link to the revisit it produced — addressing "recorded at the top rather
+than appending at the bottom": the reason still appears in the status
+timeline lower down too (that's the existing audit-trail feature, kept
+intentionally), but it no longer requires scrolling to find at all.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 280 passed (3 new: `categorizeJob`/revisit cases in
+`map-markers.test.ts`), same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.

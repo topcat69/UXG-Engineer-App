@@ -20,7 +20,9 @@ export default async function DashboardPage() {
     supabase.from("users").select("id, name").eq("role", "engineer").eq("active", true).order("name"),
     supabase
       .from("jobs")
-      .select("id, job_number, status, site:sites(name, latitude, longitude), assigned:users!jobs_assigned_to_fkey(name)")
+      .select(
+        "id, job_number, status, parent_job_id, site:sites(name, latitude, longitude), assigned:users!jobs_assigned_to_fkey(name)",
+      )
       .neq("status", "draft"),
   ]);
 
