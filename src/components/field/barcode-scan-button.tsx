@@ -28,6 +28,16 @@ export function BarcodeScanButton({ onScan }: { onScan: (value: string) => void 
     let cancelled = false;
 
     async function start() {
+      // getUserMedia (like crypto.randomUUID/geolocation elsewhere in this
+      // app) is a secure-context-only API — `navigator.mediaDevices` itself
+      // is undefined on a plain-HTTP origin in most browsers, not just
+      // permission-denied. Checking for it upfront gives a message that
+      // actually explains why, instead of a generic "camera unavailable"
+      // that reads like a hardware fault.
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError("Camera scanning needs a secure (HTTPS) connection — enter the serial manually below.");
+        return;
+      }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         if (cancelled) {

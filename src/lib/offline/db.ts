@@ -50,6 +50,12 @@ export type OutboxOperation = OutboxBase &
     // supabase/migrations/20260108000000_media_pending_delta.sql for why this
     // is a delta rather than an absolute set.
     | { type: "media_pending_delta"; jobId: string; delta: number }
+    // Removing a photo/video/signature the engineer already captured but
+    // decided against, before submission. Only queued when the item had
+    // already reached "uploaded" (see deleteMediaItem in media-capture.ts) —
+    // an item still local-only is just deleted from mediaQueue directly,
+    // nothing to undo server-side.
+    | { type: "media_delete"; jobId: string; mediaId: string; kind: "photo" | "video" | "signature"; storagePath: string }
   );
 
 export type MediaQueueItem = {

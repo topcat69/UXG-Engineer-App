@@ -2545,3 +2545,66 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 273 passed (7 new: `jobDayKeys`/`formatScheduleRange` cases in
 `week.test.ts`), same 2 pre-existing Supabase-dependent failures as every
 addendum in this sandbox, no regressions.
+
+## 2026-08-19 — Field app: camera scan error, N/A dropdowns, photo delete/view/library
+
+Four separate field-app reports fixed together:
+
+**"Cannot access camera" scanning a serial.** Root cause is the same
+secure-context restriction this session has hit repeatedly (crypto.randomUUID,
+geolocation): `navigator.mediaDevices` is `undefined` on the VM's plain-HTTP
+origin in most browsers, not a permission or hardware problem.
+`barcode-scan-button.tsx` now checks for `navigator.mediaDevices?.getUserMedia`
+upfront and shows "Camera scanning needs a secure (HTTPS) connection — enter
+the serial manually below" instead of a generic "camera unavailable" — the
+manual serial text field next to the Scan button already exists and still
+works, so this was never actually a dead end, just an unexplained one. Real
+fix is HTTPS at sign-off, same as the other two.
+
+**N/A missing from most dropdowns.** `PASS_FAIL` already had `na`, but
+`MOUNT_TYPES`/`POWER_SOURCES`/`NETWORK_TYPES`/`WIFI_SIGNALS`
+(`lib/forms/install-form.ts` and the duplicate set in `lib/forms/job-form.ts`
+for sla/maintenance/delivery) didn't — an engineer had no way to answer
+"mount type" etc. when it genuinely doesn't apply to a job. Added `"N/A"` to
+all four lists in both files. No validation changes needed — the existing
+required-field checks only test for *any* value chosen, and N/A satisfies
+that like any other option.
+
+**Photo library access on mobile.** `photo-slot.tsx`'s file input had
+`capture="environment"`, which on most mobile browsers skips the native
+picker's "choose from library" option entirely and jumps straight into the
+camera. Dropped the attribute (kept `accept="image/*,video/*"`) — the native
+picker still offers "Take photo" alongside "Photo library", nothing lost, one
+option gained.
+
+**View + delete a photo before submission.** `Thumbnail` was a static
+80×80 image with no interaction. Tapping it now opens a full-size preview
+modal (`PhotoPreviewModal`, video included); a small ✕ overlay deletes it
+after a confirm, calling a new `deleteMediaItem()` (`lib/offline/media-capture.ts`,
+unit tested). Deletion has to account for `drainMediaQueue` running on its
+own independent retry loop (per the "media never blocks submission" rule) —
+a photo can finish uploading to Storage before the engineer even taps
+Submit. So: an item still local-only is just removed from `mediaQueue`
+plus a compensating `media_pending_delta: -1` (undoing the `+1` queued at
+capture); an already-`uploaded` item instead queues a new `media_delete`
+outbox op (`lib/offline/outbox.ts`) that removes the Storage object and its
+`media_assets`/`signatures` row on next drain — no delta needed there since
+upload already decremented `media_pending`. Added the missing DELETE RLS
+policies for `media_assets`/`signatures`/`storage.objects` (only
+select/insert/update existed before — `20260120000000_media_delete_policies.sql`,
+scoped identically to the existing policies). The gallery re-renders via the
+existing `useLiveQuery` on `db.mediaQueue` in `job-workflow.tsx` — no extra
+plumbing needed since Dexie's live query already tracks writes to that
+table.
+
+Deliberately not done: signature deletion isn't wired into any UI (the
+outbox op supports it for correctness/symmetry, but `signature-capture.tsx`
+has no multi-item gallery to delete from — signatures are still captured
+once, same as before). No new migration needed beyond the DELETE policies —
+`job_details`/`install_forms` columns for the N/A-eligible fields already
+accept any string.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 277 passed (4 new: `media-capture.test.ts`'s `deleteMediaItem`
+cases), same 2 pre-existing Supabase-dependent failures as every addendum
+in this sandbox, no regressions.

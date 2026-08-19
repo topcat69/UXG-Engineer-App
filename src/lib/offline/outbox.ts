@@ -90,6 +90,14 @@ async function applyOperation(supabase: ReturnType<typeof createClient>, op: Out
       if (error) throw error;
       return;
     }
+    case "media_delete": {
+      const { error: removeError } = await supabase.storage.from("media").remove([op.storagePath]);
+      if (removeError) throw removeError;
+      const table = op.kind === "signature" ? "signatures" : "media_assets";
+      const { error: deleteError } = await supabase.from(table).delete().eq("id", op.mediaId);
+      if (deleteError) throw deleteError;
+      return;
+    }
   }
 }
 

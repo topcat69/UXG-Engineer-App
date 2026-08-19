@@ -36,10 +36,10 @@ export const EMPTY_INSTALL_FORM: InstallFormValues = {
   client_name: "",
 };
 
-export const MOUNT_TYPES = ["Wall", "Ceiling", "Freestanding", "Totem"];
-export const POWER_SOURCES = ["Existing socket", "New spur", "Requires electrician"];
-export const NETWORK_TYPES = ["WiFi", "Ethernet"];
-export const WIFI_SIGNALS = ["Excellent", "Good", "Weak", "None"];
+export const MOUNT_TYPES = ["Wall", "Ceiling", "Freestanding", "Totem", "N/A"];
+export const POWER_SOURCES = ["Existing socket", "New spur", "Requires electrician", "N/A"];
+export const NETWORK_TYPES = ["WiFi", "Ethernet", "N/A"];
+export const WIFI_SIGNALS = ["Excellent", "Good", "Weak", "None", "N/A"];
 export const PASS_FAIL: readonly string[] = ["pass", "fail", "na"];
 
 export const PHOTO_SLOTS = [

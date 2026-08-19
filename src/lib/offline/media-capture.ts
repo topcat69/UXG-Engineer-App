@@ -150,6 +150,47 @@ export async function enqueueMedia(params: {
   return { ok: true };
 }
 
+/**
+ * Removes a captured photo/video before submission, per the field app's
+ * "let me delete a photo I got wrong" request. drainMediaQueue runs on its
+ * own independent retry loop and can upload an item before the engineer
+ * ever taps Submit, so a delete has to account for both cases: an item
+ * that's still local-only just needs its mediaQueue row (and the +1
+ * media_pending_delta queued at capture time) undone; one that already
+ * reached Storage/media_assets needs a media_delete outbox op so the next
+ * drain removes it server-side too — media_pending was already
+ * decremented when it uploaded, so no delta is queued for that case.
+ */
+export async function deleteMediaItem(itemId: string): Promise<void> {
+  const item = await db.mediaQueue.get(itemId);
+  if (!item) return;
+
+  await db.transaction("rw", [db.mediaQueue, db.outbox], async () => {
+    await db.mediaQueue.delete(itemId);
+    if (item.status === "uploaded") {
+      await db.outbox.add({
+        id: generateId(),
+        type: "media_delete",
+        jobId: item.jobId,
+        mediaId: item.id,
+        kind: item.kind,
+        storagePath: item.storagePath,
+        createdAt: new Date().toISOString(),
+        attempts: 0,
+      });
+    } else {
+      await db.outbox.add({
+        id: generateId(),
+        type: "media_pending_delta",
+        jobId: item.jobId,
+        delta: -1,
+        createdAt: new Date().toISOString(),
+        attempts: 0,
+      });
+    }
+  });
+}
+
 export async function enqueueSignature(params: {
   jobId: string;
   blob: Blob;
