@@ -21,6 +21,7 @@ export function SignatureCapture({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const padRef = useRef<SignaturePadLib | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -38,6 +39,7 @@ export function SignatureCapture({
     const pad = padRef.current;
     if (!pad || pad.isEmpty()) return;
     setIsSaving(true);
+    setError(null);
     try {
       const blob: Blob = await new Promise((resolve, reject) => {
         canvasRef.current!.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png");
@@ -51,6 +53,8 @@ export function SignatureCapture({
       });
       pad.clear();
       onCaptured?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong saving the signature — please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -72,6 +76,7 @@ export function SignatureCapture({
         </Button>
         {captured && <span className="text-sm text-green-700">✅ Signature captured</span>}
       </div>
+      {error && <p className="text-destructive text-sm">{error}</p>}
     </div>
   );
 }

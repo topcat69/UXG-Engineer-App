@@ -3,9 +3,10 @@
 import { db, type InstallFormRow, type JobDetailsRow, type JobStatus } from "./db";
 import { detectAutoIssues, installFormRowToValues } from "@/lib/forms/install-form";
 import { detectAutoIssues as detectJobDetailsAutoIssues, jobDetailsRowToValues, type JobDetailsType } from "@/lib/forms/job-form";
+import { generateId } from "./id";
 
 function uuid(): string {
-  return crypto.randomUUID();
+  return generateId();
 }
 
 /**

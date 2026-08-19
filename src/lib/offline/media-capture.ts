@@ -4,6 +4,8 @@ import imageCompression from "browser-image-compression";
 import { db } from "./db";
 import { extensionForMime, mediaKindForFile, MAX_VIDEO_BYTES } from "./media-kind";
 import { geocodePostcode } from "@/lib/geo/postcode";
+import { generateId } from "./id";
+import { bytesToHex, sha256Bytes } from "./sha256";
 
 /**
  * Compress client-side to ~1600px long edge, ~0.8 quality, before it enters
@@ -19,12 +21,20 @@ export async function compressImage(file: File | Blob): Promise<Blob> {
   });
 }
 
+/**
+ * crypto.subtle is spec-gated to secure contexts (HTTPS/localhost) just
+ * like crypto.randomUUID (see id.ts) — undefined on plain HTTP, which
+ * would otherwise throw "Cannot read properties of undefined (reading
+ * 'digest')" on every photo/signature capture. Falls back to the pure-JS
+ * implementation (sha256.ts) rather than skipping the hash entirely.
+ */
 export async function sha256Hex(blob: Blob): Promise<string> {
   const buffer = await blob.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  if (typeof crypto !== "undefined" && crypto.subtle) {
+    const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+    return bytesToHex(new Uint8Array(hashBuffer));
+  }
+  return bytesToHex(sha256Bytes(new Uint8Array(buffer)));
 }
 
 /**
@@ -110,7 +120,7 @@ export async function enqueueMedia(params: {
 
   await db.transaction("rw", [db.mediaQueue, db.outbox], async () => {
     await db.mediaQueue.add({
-      id: crypto.randomUUID(),
+      id: generateId(),
       jobId: params.jobId,
       kind,
       slot: params.slot,
@@ -128,7 +138,7 @@ export async function enqueueMedia(params: {
       attempts: 0,
     });
     await db.outbox.add({
-      id: crypto.randomUUID(),
+      id: generateId(),
       type: "media_pending_delta",
       jobId: params.jobId,
       delta: 1,
@@ -153,7 +163,7 @@ export async function enqueueSignature(params: {
 
   await db.transaction("rw", [db.mediaQueue, db.outbox], async () => {
     await db.mediaQueue.add({
-      id: crypto.randomUUID(),
+      id: generateId(),
       jobId: params.jobId,
       kind: "signature",
       slot: "signature",
@@ -173,7 +183,7 @@ export async function enqueueSignature(params: {
       signerRole: params.signerRole,
     });
     await db.outbox.add({
-      id: crypto.randomUUID(),
+      id: generateId(),
       type: "media_pending_delta",
       jobId: params.jobId,
       delta: 1,

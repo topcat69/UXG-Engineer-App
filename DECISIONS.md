@@ -2118,3 +2118,64 @@ clean — 237 passed (5 new: `humanize` covering snake_case splitting, the
 "na" special case, idempotency, and an empty string), same 2 pre-existing
 Supabase-dependent failures as every addendum in this sandbox, no
 regressions.
+
+## 2026-08-19 — Start Travelling threw "crypto.randomUUID is not a function"
+
+The catch-block fix from the previous addendum did its job: it turned a
+silent failure into a visible one, which showed the real cause instead
+of guessing further. Root cause is a third instance of the exact same
+class of bug as the geolocation fallback work: `crypto.randomUUID()` is
+spec-gated to secure contexts (HTTPS/localhost), same as
+`navigator.geolocation` — it's simply `undefined` on plain HTTP, which is
+how the VM is still serving the app. Every offline write generates ids
+via `crypto.randomUUID()` (`field-actions.ts`'s `uuid()` helper,
+`media-capture.ts`'s media/signature queue entries, `job-workflow.tsx`'s
+form-row ids), so this wasn't unique to Start Travelling — it would have
+broken check-in, submit, task toggling, and photo/signature capture too,
+the moment any of them needed a fresh id rather than reusing an existing
+row's.
+
+Fixed with `generateId()` (`src/lib/offline/id.ts`): tries
+`crypto.randomUUID()` first, falls back to building a UUID v4 from
+`crypto.getRandomValues()` (not secure-context-gated) when that's
+missing, and only falls back further to `Math.random()` if Web Crypto is
+entirely absent. All five browser-side `crypto.randomUUID()` call sites
+now go through it (the two server-side ones — `resend.ts`'s Node runtime,
+`metrics.test.ts`'s Vitest/Node environment — don't have a browser
+"secure context" restriction at all, so they're untouched and correctly
+so).
+
+**Investigating this surfaced a second, more serious instance of the
+same bug**: `sha256Hex()` in `media-capture.ts` used `crypto.subtle`,
+which is *also* secure-context-gated — meaning every photo and signature
+capture would throw the same way, not just Start Travelling. This one
+needed more than a fallback function call, since there's no equivalent
+non-gated Web Crypto hashing primitive to fall back to. Added a pure-JS
+SHA-256 implementation (`src/lib/offline/sha256.ts`, FIPS 180-4, no
+dependencies) used only when `crypto.subtle` is unavailable — verified
+against four standard test vectors cross-checked against Node's own
+`crypto.createHash("sha256")` rather than transcribed from memory (one
+transcription slip while drafting the test — a truncated expected hash —
+was caught by regenerating the vectors programmatically instead of
+eyeballing long hex strings). The stored hash was already documented as
+informational-only elsewhere in this codebase (`completion-report.ts`:
+"never trusted from `media_assets.sha256`... always recomputed from the
+downloaded bytes"), but it should still be a genuine SHA-256, not a
+different, weaker algorithm silently standing in for it — so this keeps
+the same data contract, not a downgraded one.
+
+**Also fixed while in this code**: `photo-slot.tsx` and
+`signature-capture.tsx` had the identical missing-`catch`-block pattern
+already fixed in `job-workflow.tsx` two addenda ago — `try { ... }
+finally { ... }`, no `catch`, so a thrown error (like this one) would
+have silently reverted the UI with no message. Both now surface
+`err.message` through error state, `signature-capture.tsx` gaining an
+error display it didn't have at all before.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 244 passed (7 new: 3 for `generateId`'s three fallback tiers, 4
+SHA-256 test vectors), same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions. Not verified against a
+real insecure-HTTP browser session from this sandbox (no browser here) —
+worth a real-device retest of Start Travelling, Check In, Submit, and a
+photo/signature capture once deployed, all of which touch this code path.

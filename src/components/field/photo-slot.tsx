@@ -44,6 +44,8 @@ export function PhotoSlot({
       } else {
         setError(result.error);
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong saving this — please try again.");
     } finally {
       setIsSaving(false);
     }
