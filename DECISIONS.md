@@ -1929,3 +1929,25 @@ every column, not just the ones a given test cares about. Needs
 project before this reaches the VM, then a real-device walkthrough: tap
 Start Travelling, confirm the status badge and PDF's "Travel started" line
 both reflect it, then Check In as before.
+
+## 2026-08-19 — Sign out was missing from the office UI entirely
+
+There was no way to sign out anywhere in the app — confirmed by grepping
+for `signOut`/`logout` across `src` and finding nothing. Added
+`signOut()` (`src/lib/auth/actions.ts`, a plain server action calling
+`supabase.auth.signOut()` then redirecting to `/login`) and a "Sign out"
+link in the office layout's header, next to the existing `{name} · {role}`
+text — a plain `<form action={signOut}>` since the layout is already a
+server component, no client component needed for this.
+
+Scoped to the office UI only, since that's what was asked. The field app
+(`/my-jobs`) still has no sign-out — deliberately not added here, since it
+needs its own thought first: it's offline-first with an outbox of
+unsynced mutations, so signing out while offline/mid-outbox is a real
+design question (warn and block? sign out anyway and lose the local
+session's context on next sign-in?) rather than a copy-paste of the office
+version.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 226 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireOfficeUser } from "@/lib/auth/current-user";
+import { signOut } from "@/lib/auth/actions";
 import { UxgLogo } from "@/components/branding/uxg-logo";
 
 const NAV = [
@@ -31,9 +32,16 @@ export default async function OfficeLayout({ children }: { children: React.React
             ))}
           </nav>
         </div>
-        <span className="text-muted-foreground text-sm">
-          {user.name} · {user.role}
-        </span>
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-muted-foreground">
+            {user.name} · {user.role}
+          </span>
+          <form action={signOut}>
+            <button type="submit" className="text-muted-foreground hover:text-foreground underline">
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
       <main className="flex-1 p-6">{children}</main>
     </div>
