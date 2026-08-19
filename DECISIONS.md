@@ -2328,3 +2328,34 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 249 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions. No new pure logic (query
 filter + label text changes only), so no new unit tests.
+
+## 2026-08-19 — Scheduler cards colored by status
+
+Cards on `/office/scheduler` all looked identical regardless of status —
+only the small text badge (already humanized, see the capitalization
+addendum) said what state a job was in. Added a new pure module,
+`lib/scheduler/status-colors.ts` (unit tested): `statusColorBucket()`
+buckets every job status into one of seven colors — deliberately finer
+than the dashboard map's 3-category `categorizeJobStatus()`
+(`map-markers.ts`), since a day-planning board benefits from telling
+"on hold" and "cancelled" apart from a plain "scheduled" card, which the
+map's coarser split doesn't need to. Cards get a light background tint +
+colored left border per bucket; a legend row under the board explains
+the seven colors.
+
+**A real Tailwind gotcha surfaced while building the legend**: the first
+draft derived each legend dot's solid color by string-replacing
+`"border-l-"` with `"bg-"` on the card's own class string at runtime
+(e.g. `"border-l-blue-500"` → `"bg-blue-500"`). That's silently broken —
+Tailwind's build-time scanner only generates CSS for class names it
+finds as *literal strings* in source; a class name assembled by string
+manipulation at runtime never appears literally anywhere, so no CSS
+rule would exist for it and the dot would render with no color at all,
+with no error to catch it. Fixed by adding a second literal map,
+`STATUS_SWATCH_CLASSES`, with its own explicit `"bg-*-500"` string per
+bucket, rather than deriving one map's classes from the other's.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 257 passed (8 new: `status-colors.test.ts`), same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions.

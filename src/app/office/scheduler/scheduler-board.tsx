@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatTimeRange } from "@/lib/scheduler/week";
+import { statusColorBucket, STATUS_COLOR_CLASSES, STATUS_SWATCH_CLASSES, type StatusColorBucket } from "@/lib/scheduler/status-colors";
 import { humanize } from "@/lib/format/text";
 import { rescheduleJob } from "./actions";
 
@@ -88,6 +89,15 @@ export function SchedulerBoard({
           ))}
         </div>
       </div>
+      <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        <Legend bucket="draft" label="Draft" />
+        <Legend bucket="upcoming" label="Scheduled / dispatched / accepted" />
+        <Legend bucket="active" label="Travelling / on site / in progress" />
+        <Legend bucket="review" label="Submitted / under review" />
+        <Legend bucket="done" label="Approved / closed" />
+        <Legend bucket="hold" label="On hold" />
+        <Legend bucket="cancelled" label="Cancelled" />
+      </div>
     </div>
   );
 }
@@ -149,8 +159,8 @@ function FragmentRow({
                 data-testid="scheduler-card"
                 data-job-id={job.id}
                 onDragStart={(e) => e.dataTransfer.setData("text/plain", job.id)}
-                className="cursor-grab rounded border bg-card p-1 text-xs shadow-sm active:cursor-grabbing"
-                title={`${job.job_number} · ${job.site?.name ?? ""} · ${lane.label}`}
+                className={`cursor-grab rounded border border-l-4 p-1 text-xs shadow-sm active:cursor-grabbing ${STATUS_COLOR_CLASSES[statusColorBucket(job.status)]}`}
+                title={`${job.job_number} · ${job.site?.name ?? ""} · ${lane.label} · ${humanize(job.status)}`}
               >
                 <div className="font-medium">{job.job_number}</div>
                 <div className="text-muted-foreground truncate">{job.site?.name}</div>
@@ -167,5 +177,14 @@ function FragmentRow({
         );
       })}
     </>
+  );
+}
+
+function Legend({ bucket, label }: { bucket: StatusColorBucket; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className={`inline-block h-2.5 w-2.5 rounded-full ${STATUS_SWATCH_CLASSES[bucket]}`} />
+      {label}
+    </span>
   );
 }
