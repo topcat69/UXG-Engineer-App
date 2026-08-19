@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
-import { formatTimeRange } from "@/lib/scheduler/week";
+import { formatScheduleRange, jobDayKeys } from "@/lib/scheduler/week";
 import { statusColorBucket, STATUS_COLOR_CLASSES, STATUS_SWATCH_CLASSES, type StatusColorBucket } from "@/lib/scheduler/status-colors";
 import { humanize } from "@/lib/format/text";
 import { rescheduleJob } from "./actions";
@@ -45,7 +45,7 @@ export function SchedulerBoard({
     return jobs.filter((j) => {
       if (!j.scheduled_start) return false;
       const jobLaneKey = j.assigned_to ?? "unassigned";
-      return jobLaneKey === laneKey && j.scheduled_start.slice(0, 10) === day;
+      return jobLaneKey === laneKey && jobDayKeys(j.scheduled_start, j.scheduled_end).includes(day);
     });
   }
 
@@ -152,27 +152,38 @@ function FragmentRow({
               dragOverKey === cellKey ? "bg-accent border-primary" : ""
             } ${isPending ? "opacity-60" : ""}`}
           >
-            {cellJobs.map((job) => (
-              <div
-                key={job.id}
-                draggable
-                data-testid="scheduler-card"
-                data-job-id={job.id}
-                onDragStart={(e) => e.dataTransfer.setData("text/plain", job.id)}
-                className={`cursor-grab rounded border border-l-4 p-1 text-xs shadow-sm active:cursor-grabbing ${STATUS_COLOR_CLASSES[statusColorBucket(job.status)]}`}
-                title={`${job.job_number} · ${job.site?.name ?? ""} · ${lane.label} · ${humanize(job.status)}`}
-              >
-                <div className="font-medium">{job.job_number}</div>
-                <div className="text-muted-foreground truncate">{job.site?.name}</div>
-                {job.scheduled_start && (
-                  <div className="text-muted-foreground">{formatTimeRange(job.scheduled_start, job.scheduled_end)}</div>
-                )}
-                {lane.engineerId && <div className="text-muted-foreground truncate">{lane.label}</div>}
-                <Badge variant="secondary" className="mt-0.5 text-[10px]">
-                  {humanize(job.status)}
-                </Badge>
-              </div>
-            ))}
+            {cellJobs.map((job) => {
+              const spanDays = job.scheduled_start ? jobDayKeys(job.scheduled_start, job.scheduled_end) : [];
+              const dayIndex = spanDays.indexOf(day) + 1;
+              return (
+                <div
+                  key={job.id}
+                  draggable
+                  data-testid="scheduler-card"
+                  data-job-id={job.id}
+                  onDragStart={(e) => e.dataTransfer.setData("text/plain", job.id)}
+                  className={`cursor-grab rounded border border-l-4 p-1 text-xs shadow-sm active:cursor-grabbing ${STATUS_COLOR_CLASSES[statusColorBucket(job.status)]}`}
+                  title={`${job.job_number} · ${job.site?.name ?? ""} · ${lane.label} · ${humanize(job.status)}`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-medium">{job.job_number}</span>
+                    {spanDays.length > 1 && (
+                      <span className="text-muted-foreground shrink-0 text-[10px]">
+                        Day {dayIndex}/{spanDays.length}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-muted-foreground truncate">{job.site?.name}</div>
+                  {job.scheduled_start && (
+                    <div className="text-muted-foreground">{formatScheduleRange(job.scheduled_start, job.scheduled_end)}</div>
+                  )}
+                  {lane.engineerId && <div className="text-muted-foreground truncate">{lane.label}</div>}
+                  <Badge variant="secondary" className="mt-0.5 text-[10px]">
+                    {humanize(job.status)}
+                  </Badge>
+                </div>
+              );
+            })}
           </div>
         );
       })}

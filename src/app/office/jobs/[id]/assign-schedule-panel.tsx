@@ -24,35 +24,42 @@ export function AssignSchedulePanel({
   assignedTo,
   assignedName,
   scheduledStart,
+  scheduledEnd,
   engineers,
 }: {
   jobId: string;
   assignedTo: string | null;
   assignedName: string | null;
   scheduledStart: string | null;
+  scheduledEnd: string | null;
   engineers: Engineer[];
 }) {
   const [editing, setEditing] = useState(false);
   const [engineerId, setEngineerId] = useState(assignedTo ?? "");
   const [scheduledLocal, setScheduledLocal] = useState(toLocalInputValue(scheduledStart));
-  const [duration, setDuration] = useState(2);
+  const [scheduledEndLocal, setScheduledEndLocal] = useState(toLocalInputValue(scheduledEnd));
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSave() {
     startTransition(async () => {
-      const result = await assignAndScheduleJob(jobId, engineerId || null, scheduledLocal, duration);
+      const result = await assignAndScheduleJob(jobId, engineerId || null, scheduledLocal, scheduledEndLocal);
       setMessage(result.ok ? (result.warning ?? null) : result.message);
       if (result.ok) setEditing(false);
     });
   }
 
   if (!editing) {
+    const endLabel =
+      scheduledStart && scheduledEnd && scheduledStart.slice(0, 10) !== scheduledEnd.slice(0, 10)
+        ? ` → ${new Date(scheduledEnd).toLocaleString()}`
+        : "";
     return (
       <div className="text-right text-sm">
         <p>Assigned: {assignedName ?? "Unassigned"}</p>
         <p className="text-muted-foreground">
           {scheduledStart ? new Date(scheduledStart).toLocaleString() : "Not scheduled"}
+          {endLabel}
         </p>
         <button type="button" onClick={() => setEditing(true)} className="text-xs underline">
           Assign / schedule
@@ -88,15 +95,14 @@ export function AssignSchedulePanel({
         />
       </div>
       <div className="flex flex-col items-end gap-1">
-        <label className="text-muted-foreground text-xs">Duration (hours)</label>
+        <label className="text-muted-foreground text-xs">Scheduled end</label>
         <input
-          type="number"
-          min={0.5}
-          step={0.5}
-          value={duration}
-          onChange={(e) => setDuration(Number(e.target.value) || 2)}
-          className="border-input h-8 w-20 rounded-md border bg-transparent px-2 text-sm"
+          type="datetime-local"
+          value={scheduledEndLocal}
+          onChange={(e) => setScheduledEndLocal(e.target.value)}
+          className="border-input h-8 rounded-md border bg-transparent px-2 text-sm"
         />
+        <span className="text-muted-foreground text-[10px]">Can be a later date for a multi-day job</span>
       </div>
       <div className="flex gap-2">
         <Button type="button" size="sm" disabled={isPending} onClick={handleSave}>

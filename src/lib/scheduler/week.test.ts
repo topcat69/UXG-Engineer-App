@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, formatTimeRange, isoDate, mondayOf } from "./week";
+import { addDays, formatScheduleRange, formatTimeRange, isoDate, jobDayKeys, mondayOf } from "./week";
 
 describe("mondayOf", () => {
   it("returns the same date when given a Monday", () => {
@@ -32,5 +32,45 @@ describe("formatTimeRange", () => {
 
   it("falls back to a single time when there's no end", () => {
     expect(formatTimeRange("2026-08-19T14:00:00Z", null)).toBe("14:00");
+  });
+});
+
+describe("jobDayKeys", () => {
+  it("returns just the start date for a same-day job", () => {
+    expect(jobDayKeys("2026-08-19T09:00:00Z", "2026-08-19T17:00:00Z")).toEqual(["2026-08-19"]);
+  });
+
+  it("returns just the start date when there's no end", () => {
+    expect(jobDayKeys("2026-08-19T09:00:00Z", null)).toEqual(["2026-08-19"]);
+  });
+
+  it("returns every date in the span for a multi-day job", () => {
+    expect(jobDayKeys("2026-08-17T09:00:00Z", "2026-08-19T17:00:00Z")).toEqual([
+      "2026-08-17",
+      "2026-08-18",
+      "2026-08-19",
+    ]);
+  });
+
+  it("spans a month boundary", () => {
+    expect(jobDayKeys("2026-08-30T09:00:00Z", "2026-09-01T17:00:00Z")).toEqual([
+      "2026-08-30",
+      "2026-08-31",
+      "2026-09-01",
+    ]);
+  });
+
+  it("falls back to just the start date if end is before start (bad data)", () => {
+    expect(jobDayKeys("2026-08-19T09:00:00Z", "2026-08-18T17:00:00Z")).toEqual(["2026-08-19"]);
+  });
+});
+
+describe("formatScheduleRange", () => {
+  it("matches formatTimeRange for a same-day job", () => {
+    expect(formatScheduleRange("2026-08-19T14:00:00Z", "2026-08-19T16:00:00Z")).toBe("14:00 – 16:00");
+  });
+
+  it("includes both dates for a multi-day job", () => {
+    expect(formatScheduleRange("2026-08-17T09:00:00Z", "2026-08-19T17:00:00Z")).toBe("17 Aug 09:00 – 19 Aug 17:00");
   });
 });

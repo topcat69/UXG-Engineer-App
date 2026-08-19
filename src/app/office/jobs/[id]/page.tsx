@@ -104,6 +104,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             assignedTo={job.assigned_to}
             assignedName={job.assigned?.name ?? null}
             scheduledStart={job.scheduled_start}
+            scheduledEnd={job.scheduled_end}
             engineers={engineers ?? []}
           />
           <div className="flex items-center gap-2">

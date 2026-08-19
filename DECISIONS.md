@@ -2484,3 +2484,64 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 266 passed (5 new: `parseMaxSequence` cases in
 `job-number.test.ts`), same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-19 — Multi-day job scheduling on the office job page + scheduler board
+
+A job could already store a `scheduled_end` on a different calendar date
+than `scheduled_start` (both are plain `timestamptz` columns, no schema
+change needed here) — but nothing in the UI ever let an office user set an
+explicit end date, and the scheduler board only ever placed a job card
+under the single day column matching `scheduled_start`'s date. A 3-day
+on-site job (e.g. 6 hours/day, non-contiguous slack days) had no way to be
+entered or seen as spanning more than one day.
+
+Went with a single start + end instant spanning the whole range (option
+the user picked over a per-day list of slots) — simpler, and per-day hour
+allocation for this kind of work isn't reliably known up front anyway.
+
+**Office job page** (`assign-schedule-panel.tsx`/`actions.ts`'s
+`assignAndScheduleJob`): the "Duration (hours)" input is now a "Scheduled
+end" datetime-local field, so the end can be any later date, not just
+later that same day. Left blank, it still defaults to start + 2 hours
+(same fallback as the old duration default) so scheduling a normal
+same-day job needs no extra input. Server-side validates the end is
+strictly after the start.
+
+**Scheduler board** (`scheduler-board.tsx`): added `jobDayKeys()`
+(`lib/scheduler/week.ts`, unit tested) — every calendar day a job's
+[start, end] span touches — and switched `jobsFor()`'s single-day
+equality check to `jobDayKeys(...).includes(day)`, so a multi-day job now
+renders a card under every day column it spans, not just its start day.
+Each card shows a "Day 2/3" indicator on spanned days, and
+`formatScheduleRange()` (also `week.ts`, unit tested) swaps in full
+"17 Aug 09:00 – 19 Aug 17:00" text instead of the old HH:MM-only
+`formatTimeRange` once a job crosses a calendar day, since a bare time
+range can't distinguish "on site all week" from "a quick 2-hour job".
+
+**Scheduler page query** (`office/scheduler/page.tsx`): the week's job
+query previously only matched `scheduled_start` falling inside the
+displayed week — a job that started last week and runs into this one
+would vanish from the board entirely once its start day scrolled off the
+front. Added a second query for jobs that started before the visible week
+but whose `scheduled_end` still falls on/after Monday, unioned with the
+existing one, rather than a single `.or()`/nested-`and()` PostgREST filter
+string — this codebase had no prior `.or()` usage to follow, and two plain
+`.gte`/`.lt` queries are easier to verify without a live Supabase instance
+in this sandbox.
+
+Deliberately not done: drag-and-drop still moves a job by shifting its
+start date and preserving the existing start→end duration (unchanged
+behavior, already worked correctly for a multi-day span, just verified
+during this addendum rather than modified). Engineer conflict-detection
+(`detectConflicts`) still only checks the job's *start* day against that
+engineer's other jobs that day — extending it to check every day in a
+multi-day span would need `maxJobsPerDay` to mean something different for
+a multi-day job (per-day cap vs. span-total), which wasn't asked for and
+is its own design decision. Bulk-schedule (`bulkScheduleJobs`, used to
+schedule many different jobs onto the same slot at once) is untouched —
+it's a distinct workflow from a single job spanning multiple days.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 273 passed (7 new: `jobDayKeys`/`formatScheduleRange` cases in
+`week.test.ts`), same 2 pre-existing Supabase-dependent failures as every
+addendum in this sandbox, no regressions.

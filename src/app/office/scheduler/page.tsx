@@ -15,21 +15,35 @@ export default async function SchedulerPage({
   const weekEnd = addDays(monday, 7);
   const days = Array.from({ length: 7 }, (_, i) => isoDate(addDays(monday, i)));
 
+  const jobColumns = "id, job_number, status, assigned_to, scheduled_start, scheduled_end, site:sites(name)";
   const supabase = await createClient();
-  const [{ data: engineers }, { data: jobs }] = await Promise.all([
-    supabase
-      .from("users")
-      .select("id, name, max_jobs_per_day")
-      .in("role", ["engineer", "manager"])
-      .eq("active", true)
-      .order("name"),
-    supabase
-      .from("jobs")
-      .select("id, job_number, status, assigned_to, scheduled_start, scheduled_end, site:sites(name)")
-      .gte("scheduled_start", monday.toISOString())
-      .lt("scheduled_start", weekEnd.toISOString())
-      .order("scheduled_start"),
-  ]);
+  const [{ data: engineers }, { data: jobsStartingThisWeek }, { data: jobsSpanningIntoThisWeek }] = await Promise.all(
+    [
+      supabase
+        .from("users")
+        .select("id, name, max_jobs_per_day")
+        .in("role", ["engineer", "manager"])
+        .eq("active", true)
+        .order("name"),
+      // Jobs that start within the displayed week.
+      supabase
+        .from("jobs")
+        .select(jobColumns)
+        .gte("scheduled_start", monday.toISOString())
+        .lt("scheduled_start", weekEnd.toISOString())
+        .order("scheduled_start"),
+      // Multi-day jobs that started in a previous week but still run into
+      // this one — without this, dragging the week forward would make a
+      // 3-day job vanish from days 2 and 3 the moment its start day
+      // scrolls off the front of the visible week.
+      supabase
+        .from("jobs")
+        .select(jobColumns)
+        .lt("scheduled_start", monday.toISOString())
+        .gte("scheduled_end", monday.toISOString()),
+    ],
+  );
+  const jobs = [...(jobsStartingThisWeek ?? []), ...(jobsSpanningIntoThisWeek ?? [])];
 
   const prevWeek = isoDate(addDays(monday, -7));
   const nextWeek = isoDate(addDays(monday, 7));
@@ -54,7 +68,7 @@ export default async function SchedulerPage({
         </div>
       </div>
 
-      <SchedulerBoard days={days} engineers={engineersWithFeed} jobs={(jobs ?? []) as never} />
+      <SchedulerBoard days={days} engineers={engineersWithFeed} jobs={jobs as never} />
     </div>
   );
 }

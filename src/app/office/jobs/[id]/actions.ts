@@ -343,16 +343,19 @@ export type AssignScheduleResult = { ok: true; message: string; warning?: string
  * Single-job assign + schedule from the job detail page itself — the same
  * two operations the Scheduler tab's drag-and-drop does (see
  * rescheduleJob/bulkAssignJobs/bulkScheduleJobs in ../actions.ts), just
- * reachable without leaving the job. `scheduledStartLocal` is a
- * datetime-local input value ("" clears/leaves the schedule alone,
- * engineerId null unassigns) so the office user isn't forced to touch both
- * fields at once.
+ * reachable without leaving the job. `scheduledStartLocal`/`scheduledEndLocal`
+ * are datetime-local input values ("" for start clears/leaves the schedule
+ * alone, engineerId null unassigns) so the office user isn't forced to
+ * touch both fields at once. `scheduledEndLocal` can be on a later
+ * calendar date than the start — some jobs run across several on-site
+ * days — so this deliberately takes an explicit end instant rather than a
+ * same-day duration.
  */
 export async function assignAndScheduleJob(
   jobId: string,
   engineerId: string | null,
   scheduledStartLocal: string,
-  durationHours: number,
+  scheduledEndLocal: string,
 ): Promise<AssignScheduleResult> {
   const supabase = await createClient();
   const { data: job } = await supabase
@@ -368,9 +371,17 @@ export async function assignAndScheduleJob(
   let newStart: Date | null = null;
   if (scheduledStartLocal) {
     newStart = new Date(scheduledStartLocal);
-    if (Number.isNaN(newStart.getTime())) return { ok: false, message: "Invalid date/time." };
+    if (Number.isNaN(newStart.getTime())) return { ok: false, message: "Invalid start date/time." };
+
+    // Falls back to a 2-hour slot when the end is left blank, matching the
+    // old fixed-duration default — the end field only needs filling in for
+    // a job that runs longer or across multiple days.
+    const newEnd = scheduledEndLocal ? new Date(scheduledEndLocal) : new Date(newStart.getTime() + 2 * 60 * 60 * 1000);
+    if (Number.isNaN(newEnd.getTime())) return { ok: false, message: "Invalid end date/time." };
+    if (newEnd <= newStart) return { ok: false, message: "Scheduled end must be after the start." };
+
     patch.scheduled_start = newStart.toISOString();
-    patch.scheduled_end = new Date(newStart.getTime() + durationHours * 60 * 60 * 1000).toISOString();
+    patch.scheduled_end = newEnd.toISOString();
   }
 
   let warning: string | undefined;
