@@ -2359,3 +2359,36 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 257 passed (8 new: `status-colors.test.ts`), same 2 pre-existing
 Supabase-dependent failures as every addendum in this sandbox, no
 regressions.
+
+## 2026-08-19 — Edit Job (SupAdmin/Manager only)
+
+Job detail page had no way to change a job's project, site, job type,
+priority, or description after creation — only status transitions and
+assignment/scheduling were editable. Added `updateJob()` (`office/jobs/[id]/actions.ts`),
+mirroring the existing `updateSlaRequirement`/`updateJobInformation` pattern,
+and a new toggle-to-edit `EditJobPanel` client component
+(`office/jobs/[id]/edit-job-panel.tsx`) that replaces the static
+job-type/priority/project/client line on the job detail page. View mode is
+unchanged visually (same line, plus an "Edit" link); edit mode swaps in
+selects for project/client/site (site list cascades off the chosen client,
+same as the New Job form) and job type/priority, plus a description
+textarea, with Save/Cancel.
+
+No extra role check was added inside `updateJob()` or `EditJobPanel` beyond
+what already exists: `/office/*` pages are gated end-to-end by
+`requireOfficeUser()` (superadmin/manager only) at the page level
+(`office/jobs/[id]/page.tsx`), which is the *only* role gate the existing
+Delete, Cancel, and Duplicate job actions rely on too — none of them
+re-check role inside their server action. Edit Job follows that same
+established pattern rather than inventing a new one.
+
+Deliberately not done: no status-based restriction on when a job can be
+edited (e.g. blocking edits once a job is `closed`) — not requested, and
+Delete/Cancel/Duplicate don't do this either, so it would be inconsistent
+with the rest of the page. No migration was needed — `job_type`, `priority`,
+`site_id`, `project_id`, and `description` all already exist as columns.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 257 passed, same 2 pre-existing Supabase-dependent failures
+(`rls.test.ts` generateLink, `migration.test.ts` x2 timeouts) as every
+addendum in this sandbox, no regressions.

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import SiteMap from "@/components/site-map-loader";
@@ -13,7 +12,8 @@ import { TaskPanel } from "./task-panel";
 import { ShareLinkPanel } from "./share-link-panel";
 import { JobDetailsPanel } from "./job-details-panel";
 import { AssignSchedulePanel } from "./assign-schedule-panel";
-import { usesJobDetails, photoSlotsFor, JOB_TYPE_LABELS, type JobDetailsType } from "@/lib/forms/job-form";
+import { EditJobPanel } from "./edit-job-panel";
+import { usesJobDetails, photoSlotsFor, type JobDetailsType } from "@/lib/forms/job-form";
 import { humanize } from "@/lib/format/text";
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,6 +33,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: jobTasks },
     { data: templates },
     { data: engineers },
+    { data: projects },
+    { data: clients },
+    { data: allSites },
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -56,6 +59,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("job_tasks").select("id, label, is_done").eq("job_id", id).order("position"),
     supabase.from("job_templates").select("id, name").order("name"),
     supabase.from("users").select("id, name").in("role", ["engineer", "manager"]).eq("active", true).order("name"),
+    supabase.from("projects").select("id, name").order("name"),
+    supabase.from("clients").select("id, name").order("name"),
+    supabase.from("sites").select("id, name, client_id").order("name"),
   ]);
 
   if (error || !job) notFound();
@@ -76,22 +82,21 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <Badge variant="secondary">{humanize(job.status)}</Badge>
             {job.qa_status !== "pending" && <Badge variant="outline">QA: {humanize(job.qa_status ?? "")}</Badge>}
           </div>
-          <p className="text-muted-foreground text-sm">
-            {JOB_TYPE_LABELS[job.job_type as keyof typeof JOB_TYPE_LABELS] ?? humanize(job.job_type)} · Priority{" "}
-            {job.priority} ·{" "}
-            <Link href={`/office/jobs?project_id=${job.project_id ?? ""}`} className="underline">
-              {job.project?.name ?? "No project"}
-            </Link>
-            {job.site?.client && (
-              <>
-                {" "}
-                ·{" "}
-                <Link href={`/office/clients/${job.site.client.id}`} className="underline">
-                  {job.site.client.name}
-                </Link>
-              </>
-            )}
-          </p>
+          <EditJobPanel
+            jobId={job.id}
+            projectId={job.project_id}
+            projectName={job.project?.name ?? null}
+            clientId={job.site?.client?.id ?? null}
+            clientName={job.site?.client?.name ?? null}
+            siteId={job.site_id}
+            siteName={job.site?.name ?? ""}
+            jobType={job.job_type}
+            priority={job.priority}
+            description={job.description}
+            projects={projects ?? []}
+            clients={clients ?? []}
+            sites={allSites ?? []}
+          />
         </div>
         <div className="flex flex-col items-end gap-2">
           <AssignSchedulePanel

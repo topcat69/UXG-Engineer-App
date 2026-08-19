@@ -15,6 +15,48 @@ import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
 import { sendJobAssignedEmail } from "@/lib/email/send-job-emails";
 import type { ActionResult } from "../actions";
 
+/**
+ * Edits the core static fields a job was created with — project, site,
+ * job type, priority, description. Same validation as createJob (project/
+ * site/job type all required); priority/description are free-form and
+ * optional. No status gating — deliberately not blocked once a job is
+ * past draft, since restricting that is a design call beyond what was
+ * asked for and would just get in an office user's way if they need to
+ * correct a genuine mistake after the fact.
+ */
+export async function updateJob(
+  jobId: string,
+  input: { project_id: string; site_id: string; job_type: string; priority: string; description: string },
+): Promise<ActionResult> {
+  if (!input.project_id) return { ok: false, message: "Select a project." };
+  if (!input.site_id) return { ok: false, message: "Select a site." };
+  if (!input.job_type) return { ok: false, message: "Select a job type." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("jobs")
+    .update({
+      project_id: input.project_id,
+      site_id: input.site_id,
+      job_type: input.job_type,
+      priority: input.priority.trim() || "P3",
+      description: input.description.trim() || null,
+    })
+    .eq("id", jobId);
+  if (error) return { ok: false, message: error.message };
+
+  // Best-effort, same non-blocking contract as every other Calendar sync
+  // call in this file — a site change moves the job's location, so the
+  // calendar event (if one exists) should reflect it too.
+  after(() => syncCalendarForJob(supabase, jobId));
+
+  revalidatePath(`/office/jobs/${jobId}`);
+  revalidatePath("/office/jobs");
+  revalidatePath("/office/scheduler");
+  revalidatePath("/office/dashboard");
+  return { ok: true, message: "Saved." };
+}
+
 export async function raiseIssue(jobId: string, siteId: string, formData: FormData): Promise<ActionResult> {
   const severity = String(formData.get("severity") ?? "");
   const description = String(formData.get("description") ?? "").trim();
