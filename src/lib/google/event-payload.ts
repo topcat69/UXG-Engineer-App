@@ -5,7 +5,7 @@ type SiteRow = Database["public"]["Tables"]["sites"]["Row"];
 
 export type CalendarJob = Pick<
   JobRow,
-  "id" | "job_number" | "scheduled_start" | "scheduled_end" | "calendar_event_id"
+  "id" | "job_number" | "scheduled_start" | "scheduled_end" | "calendar_event_id" | "description"
 >;
 export type CalendarSite = Pick<
   SiteRow,
@@ -40,9 +40,23 @@ export type EventPayload = {
   summary: string;
   location: string;
   description: string;
-  start: { dateTime: string };
-  end: { dateTime: string };
+  start: { date: string };
+  end: { date: string };
 };
+
+/**
+ * The calendar's day *after* the last day the job runs — Google Calendar's
+ * all-day events use an exclusive end date (a single-day event on the 20th
+ * has start "2026-08-20"/end "2026-08-21"), so a job scheduled through the
+ * 22nd needs end "2026-08-23", not "2026-08-22". Manipulated as a UTC date
+ * string rather than a local Date, matching how the rest of this app slices
+ * day boundaries off ISO timestamps directly (see scheduler/week.ts).
+ */
+function exclusiveEndDate(scheduledEndIso: string): string {
+  const d = new Date(`${scheduledEndIso.slice(0, 10)}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 /**
  * Pure event-body builder — no network, fully unit-testable. Title and
@@ -50,6 +64,13 @@ export type EventPayload = {
  * full postal address (not just the site name) so the event is
  * tap-to-navigate. `deepLinkBaseUrl` lets callers point the description's
  * job link at whatever origin the app is actually deployed on.
+ *
+ * All-day rather than timed: office staff scanning a calendar care about
+ * which day(s) an engineer is on site, not the exact hour — a timed event
+ * with the job's often-approximate scheduled_start/end was reading as more
+ * precise than it actually is. Multi-day jobs (scheduled_end on a later
+ * calendar date than scheduled_start) become a single all-day event
+ * spanning that whole range, via `exclusiveEndDate`.
  */
 export function buildEventPayload(job: CalendarJob, site: CalendarSite, deepLinkBaseUrl: string): EventPayload {
   if (!job.scheduled_start || !job.scheduled_end) {
@@ -57,6 +78,8 @@ export function buildEventPayload(job: CalendarJob, site: CalendarSite, deepLink
   }
 
   const descriptionLines = [
+    `Site: ${site.name}`,
+    job.description ? `Job description: ${job.description}` : null,
     site.access_notes ? `Access notes: ${site.access_notes}` : null,
     site.contact_name ? `Site contact: ${site.contact_name}${site.contact_phone ? ` (${site.contact_phone})` : ""}` : null,
     coordinatesMapLink(site),
@@ -67,7 +90,7 @@ export function buildEventPayload(job: CalendarJob, site: CalendarSite, deepLink
     summary: `${job.job_number} — ${site.name}`,
     location: fullSiteAddress(site),
     description: descriptionLines.join("\n"),
-    start: { dateTime: job.scheduled_start },
-    end: { dateTime: job.scheduled_end },
+    start: { date: job.scheduled_start.slice(0, 10) },
+    end: { date: exclusiveEndDate(job.scheduled_end) },
   };
 }

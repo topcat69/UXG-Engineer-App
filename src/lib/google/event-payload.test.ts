@@ -20,6 +20,7 @@ const job = {
   scheduled_start: "2026-08-10T09:00:00.000Z",
   scheduled_end: "2026-08-10T11:00:00.000Z",
   calendar_event_id: null,
+  description: "Replace faulty player and re-test content playback.",
 };
 
 describe("fullSiteAddress", () => {
@@ -43,17 +44,31 @@ describe("buildEventPayload", () => {
     expect(payload.location).toBe("12 River Road, Leeds, LS1 4AB");
   });
 
-  it("includes access notes, site contact, and a deep link to the job in the description", () => {
+  it("includes the site name, job description, access notes, site contact, and a deep link to the job in the description", () => {
     const payload = buildEventPayload(job, site, "https://uxgengineering.example.com");
+    expect(payload.description).toContain("Site: Riverside Retail Park");
+    expect(payload.description).toContain("Job description: Replace faulty player and re-test content playback.");
     expect(payload.description).toContain("Access notes: Use the loading bay, ask for Dave");
     expect(payload.description).toContain("Dave Holt (07700 900123)");
     expect(payload.description).toContain("https://uxgengineering.example.com/office/jobs/job-1");
   });
 
-  it("carries the job's scheduled start/end through unchanged", () => {
+  it("omits the job description line when the job has none", () => {
+    const payload = buildEventPayload({ ...job, description: null }, site, "https://x");
+    expect(payload.description).not.toContain("Job description:");
+  });
+
+  it("is an all-day event: same-day job becomes start=that day, end=the next day (exclusive)", () => {
     const payload = buildEventPayload(job, site, "https://uxgengineering.example.com");
-    expect(payload.start).toEqual({ dateTime: "2026-08-10T09:00:00.000Z" });
-    expect(payload.end).toEqual({ dateTime: "2026-08-10T11:00:00.000Z" });
+    expect(payload.start).toEqual({ date: "2026-08-10" });
+    expect(payload.end).toEqual({ date: "2026-08-11" });
+  });
+
+  it("spans a multi-day job's full range, end date still exclusive", () => {
+    const multiDayJob = { ...job, scheduled_start: "2026-08-10T09:00:00.000Z", scheduled_end: "2026-08-12T17:00:00.000Z" };
+    const payload = buildEventPayload(multiDayJob, site, "https://x");
+    expect(payload.start).toEqual({ date: "2026-08-10" });
+    expect(payload.end).toEqual({ date: "2026-08-13" });
   });
 
   it("throws if the job has no schedule yet, rather than building a bogus event", () => {
@@ -62,11 +77,11 @@ describe("buildEventPayload", () => {
 
   it("omits missing optional description lines instead of leaving blank lines", () => {
     const payload = buildEventPayload(
-      job,
+      { ...job, description: null },
       { ...site, access_notes: null, contact_name: null, latitude: null, longitude: null },
       "https://x",
     );
-    expect(payload.description).toBe("https://x/office/jobs/job-1");
+    expect(payload.description).toBe("Site: Riverside Retail Park\nhttps://x/office/jobs/job-1");
   });
 
   it("includes a link to the site's exact stored coordinates when known", () => {

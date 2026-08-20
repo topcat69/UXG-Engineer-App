@@ -2751,3 +2751,34 @@ pass clean (they do, unaffected). The actual fix was verified live by the
 user directly against production: `app_settings` now returns the 4
 expected rows, and the pg_net extension creation is queued as a migration
 for the next `supabase db push`.
+
+## 2026-08-20 — Calendar events: all-day, with site name and job description
+
+Following up on getting Google Calendar sync actually working end-to-end
+(the "You need to have writer access to this calendar" fix — the service
+account had only been shared with the target calendar as a viewer, not an
+editor; no code involved, just re-sharing it with "Make changes to
+events"), two changes to what the event itself contains:
+
+**All-day instead of timed.** `buildEventPayload()` (`lib/google/event-payload.ts`)
+now emits `{ date: ... }` instead of `{ dateTime: ... }` for both start and
+end — office staff scanning a calendar care about which day(s) an engineer
+is on site, not the exact scheduled hour. Added `exclusiveEndDate()`
+(unit tested): Google Calendar's all-day events use an *exclusive* end
+date (a single-day event on the 20th has `start: "2026-08-20"`, `end:
+"2026-08-21"`), so this takes `scheduled_end`'s calendar date and adds one
+day — which, combined with this session's earlier multi-day scheduling
+feature, means a job spanning several days becomes one all-day event
+covering that whole range rather than a single-day sliver.
+
+**Site name and job description in the event body.** `CalendarJob` picked
+up `description` (job's free-text field, added earlier this session);
+`sync-job-calendar.ts`'s query updated to select it. The description now
+leads with `Site: {name}` and `Job description: {text}` (when set) ahead
+of the existing access notes / site contact / coordinates link / deep-link
+lines — the site name was previously only in the event title, and the job
+description wasn't in the event at all.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 282 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.

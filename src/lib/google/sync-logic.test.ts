@@ -20,6 +20,7 @@ const scheduledJob = {
   scheduled_start: "2026-08-10T09:00:00.000Z",
   scheduled_end: "2026-08-10T11:00:00.000Z",
   calendar_event_id: null as string | null,
+  description: null as string | null,
 };
 
 function fakeCalendar(): CalendarClientLike {
