@@ -2697,3 +2697,53 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 280 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions. `/office/issues` route
 confirmed present in the production build output.
+
+## 2026-08-19 — Fix "schema net does not exist" blocking Raise Issue in production
+
+Investigating why issues raised in production never appeared on Monday.com
+surfaced two separate, compounding production-setup gaps — neither one a
+code bug, both invisible until actually exercised on the real deployment:
+
+1. **`app_settings` was completely empty in production.** All three DB
+   webhook triggers (status-submitted email, issue-blocks-completion
+   revisit, issue-Monday sync) read their target URL/secret from this
+   table at call time rather than a migration-seeded value, by design (see
+   `20260109000000_status_submitted_webhook.sql`'s own comment) — it has
+   to be set once by hand per environment. `supabase/seed.sql` only seeds
+   local-dev values and, critically, `supabase db push` never runs
+   `seed.sql` against a remote database — so production had never had
+   these rows inserted at all. Fixed by hand via the SQL Editor, inserting
+   the four rows (`webhook_url`, `issue_webhook_url`,
+   `monday_issue_webhook_url`, `webhook_secret`) pointing at the VM's real
+   address and the real `WEBHOOK_SHARED_SECRET`.
+2. **`pg_net` itself was never enabled on the production database.**
+   Every trigger function's body calls `net.http_post(...)`, assuming the
+   extension is already installed — true of the Supabase CLI's local dev
+   stack by default, never true of a fresh Supabase Cloud project unless a
+   migration (or someone by hand) explicitly runs `create extension
+   pg_net`. No migration ever did. Unlike gap #1 (a missing config row,
+   which those trigger functions guard against and silently no-op on),
+   this is a hard Postgres error — `schema "net" does not exist` — raised
+   from inside an `AFTER INSERT ON issues` trigger, which rolls back the
+   *entire insert*. So "Raise issue" wasn't quietly failing to sync to
+   Monday.com, it was failing outright, for every issue, the whole time.
+   Fixed with a proper migration this time (not just a by-hand fix, unlike
+   #1's table row) since it's a schema-level dependency every environment
+   genuinely needs: `20260121000000_pg_net_extension.sql` runs `create
+   extension if not exists pg_net with schema net;`.
+
+Both gaps existed because these three webhooks were never actually
+exercised end-to-end against the real production Supabase project after
+initial deploy — only ever tested locally (where pg_net ships enabled and
+`seed.sql` runs automatically) or by calling the Monday.com API layer
+directly. Nothing here needed an app code change; #2 got a migration since
+it's a genuine schema dependency, #1 stays a by-hand production step per
+its original design (now actually completed, and reflected in this
+addendum so there's a record of it).
+
+Verified: no application code changed, so no re-run of the local
+typecheck/lint/build/test suite was needed beyond confirming they still
+pass clean (they do, unaffected). The actual fix was verified live by the
+user directly against production: `app_settings` now returns the 4
+expected rows, and the pg_net extension creation is queued as a migration
+for the next `supabase db push`.

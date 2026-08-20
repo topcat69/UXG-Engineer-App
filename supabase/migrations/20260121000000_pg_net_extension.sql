@@ -1,0 +1,11 @@
+-- The three DB webhook triggers (status-submitted email, issue-blocks-
+-- completion revisit, issue-Monday sync — 20260109000000, 20260112000000,
+-- 20260113000000) all call net.http_post(), on the assumption that pg_net
+-- is already enabled. That's true of the Supabase CLI's local dev stack
+-- by default, but NOT of a real hosted Supabase Cloud project — nothing
+-- ever actually enabled it there. Unlike a missing app_settings row
+-- (which those triggers no-op on gracefully), a missing schema is a hard
+-- error that rolls back the entire statement that fired the trigger — so
+-- production was left with "raising an issue" failing outright, not just
+-- silently not syncing.
+create extension if not exists pg_net with schema net;
