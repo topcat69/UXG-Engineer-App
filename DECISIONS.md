@@ -2663,3 +2663,37 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 280 passed (3 new: `categorizeJob`/revisit cases in
 `map-markers.test.ts`), same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-19 — Add a standalone Issues page
+
+Previously the only place to see issues in the office UI was the
+dashboard's "Open issues by age" chart — aggregate counts with a
+drill-through to the jobs list, no actual way to read an issue's
+description or who raised it without opening each flagged job one by one.
+
+Added `/office/issues` (`office/issues/page.tsx`, linked from the nav
+between QA Queue and Reports): lists every issue, sorted by severity
+(critical first), each showing severity/blocks-completion/category badges,
+description, who raised it and when, and links to both its job and (if
+one exists) the revisit job it produced.
+
+"Visible until the job is closed" is keyed off the *job's* `status`, not
+the issue's own `status` column: nothing in this app currently ever moves
+an issue's status away from its `'open'` default — there's no resolve
+action anywhere — so filtering on `issues.status` would show literally
+every issue ever raised forever, which isn't what was asked for. A job
+reaching `status = "closed"` (via QA approve, the only path that sets it)
+is the actual "this is done" signal this app has today, so that's what
+drops an issue off the page — same job-status field the dashboard's own
+issue metrics already key off indirectly via the jobs list.
+
+Deliberately not done: no new "resolve issue" action — out of scope for
+"list issues until the job is closed", and would be a separate design
+decision (should resolving an issue require a note? should it be gated to
+managers?) better done as its own request. No migration needed — every
+column used already existed.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 280 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions. `/office/issues` route
+confirmed present in the production build output.
