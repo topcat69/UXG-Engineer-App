@@ -8,4 +8,9 @@
 -- error that rolls back the entire statement that fired the trigger — so
 -- production was left with "raising an issue" failing outright, not just
 -- silently not syncing.
-create extension if not exists pg_net with schema net;
+--
+-- No `with schema net` clause: that requires the target schema to already
+-- exist *before* CREATE EXTENSION runs, which defeats the point on a
+-- fresh database — pg_net's own control file already fixes its schema to
+-- `net` and creates that schema itself as part of installation.
+create extension if not exists pg_net;

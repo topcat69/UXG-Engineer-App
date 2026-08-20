@@ -2730,7 +2730,11 @@ code bug, both invisible until actually exercised on the real deployment:
    Fixed with a proper migration this time (not just a by-hand fix, unlike
    #1's table row) since it's a schema-level dependency every environment
    genuinely needs: `20260121000000_pg_net_extension.sql` runs `create
-   extension if not exists pg_net with schema net;`.
+   extension if not exists pg_net;` — deliberately without a `with schema
+   net` clause, which turned out to be its own dead end: that clause
+   requires the target schema to already exist *before* `CREATE EXTENSION`
+   runs, which a fresh database never has (pg_net's own control file
+   already fixes and creates its schema as `net` regardless).
 
 Both gaps existed because these three webhooks were never actually
 exercised end-to-end against the real production Supabase project after
