@@ -13,7 +13,7 @@ describe("themeClassName", () => {
   it("prefixes every other theme with theme-", () => {
     expect(themeClassName("blue")).toBe("theme-blue");
     expect(themeClassName("forest")).toBe("theme-forest");
-    expect(themeClassName("slate")).toBe("theme-slate");
+    expect(themeClassName("navy")).toBe("theme-navy");
   });
 
   it("degrades an unrecognized value to the default look rather than throwing", () => {
@@ -29,6 +29,6 @@ describe("THEMES / THEME_LABELS", () => {
 
 describe("ALL_THEME_CLASSNAMES", () => {
   it("lists every non-empty class name once, excluding light's empty string", () => {
-    expect(ALL_THEME_CLASSNAMES).toEqual(["dark", "theme-blue", "theme-forest", "theme-slate"]);
+    expect(ALL_THEME_CLASSNAMES).toEqual(["dark", "theme-blue", "theme-forest", "theme-navy"]);
   });
 });

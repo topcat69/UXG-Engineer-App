@@ -3089,3 +3089,41 @@ unrecognized-value fallback, `THEME_LABELS` completeness,
 `ALL_THEME_CLASSNAMES`'s exact list), same 2 pre-existing
 Supabase-dependent failures as every addendum in this sandbox, no
 regressions.
+
+## 2026-08-21 — 5th theme redesigned: Slate → Navy (dark blue background)
+
+Follow-up to the theming addendum above: the 5th theme ("Slate") was a
+light-graphite palette; asked to make it a genuinely dark-background
+theme instead — blue background, white text, everything else matched to
+that — so it's been redesigned and renamed to "Navy" rather than kept as
+a light theme under a new name.
+
+Same primary/ring/chart-1..4 as Light/Dark (the brand orange) rather than
+a blue-on-blue accent — a blue background needs a contrasting accent to
+stay legible and clickable, and reusing the brand color keeps Light/Dark/
+Navy feeling like one consistent brand rather than three unrelated looks
+(Blue and Forest, both light-background, get their own on-brand accent
+hue instead, since accent-vs-background contrast isn't a concern there).
+
+Being dark-background, Navy needed the same treatment `.dark` already
+gets that Blue/Forest didn't need: `destructive` and `chart-5` are
+explicitly redefined (lighter values, for contrast against a dark
+background) rather than left to inherit `:root`'s light-tuned values —
+see the updated comment above the theme blocks in `globals.css`.
+
+`THEMES`'s "slate" key became "navy" in `lib/theme/themes.ts` — a small
+migration (`20260124000000_theme_slate_to_navy.sql`) renames any
+already-stored `'slate'` preference to `'navy'` so an early adopter of
+the theming feature (shipped in this same session, so unlikely anyone
+had actually picked it yet, but not something to leave to chance) isn't
+silently reverted to Light next load.
+
+Verified visually again the same way as the first theming addendum —
+screenshotted `/login` under `.theme-navy` via Playwright/Chromium and
+confirmed the card/button/input all read cleanly against the navy
+background before calling this done.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 302 passed (same count — Navy's tests are renamed Slate tests,
+not new ones), same 2 pre-existing Supabase-dependent failures as every
+addendum in this sandbox, no regressions.

@@ -119,15 +119,17 @@
 
 /*
  * Three more themes alongside the default light/.dark above — same token
- * set, just a different accent hue apiece; deliberately light-background
- * (like :root) rather than a light/dark variant of each, since the app only
- * offers "5 themes," not a light/dark axis crossed with an accent axis.
- * destructive and chart-1..5 are left undefined here on purpose: they're
- * not overridden by these classes, so they fall through to :root's values
- * (same element, lower-specificity rule loses only where a property is
- * actually redefined) — keeping "danger" red and dashboard chart colors
- * consistent across every light-background theme rather than reinventing
- * five destructive reds and five chart palettes for no visual benefit.
+ * set, just a different accent hue apiece. Blue and Forest are light-
+ * background (like :root), so destructive and chart-1..5 are left
+ * undefined for them on purpose: unoverridden custom properties fall
+ * through to :root's values (same element, lower-specificity rule loses
+ * only where a property is actually redefined) — keeping "danger" red and
+ * dashboard chart colors consistent across every light-background theme
+ * rather than reinventing them for no visual benefit. Navy is the
+ * exception: a dark-background theme needs the same treatment .dark
+ * already gets (a lighter destructive, a lighter chart-5) for the same
+ * contrast reason, so it redefines those explicitly instead of inheriting
+ * :root's light-tuned values.
  */
 .theme-blue {
   --background: oklch(0.985 0.004 250);
@@ -185,32 +187,38 @@
   --sidebar-ring: oklch(0.5 0.135 152);
 }
 
-.theme-slate {
-  --background: oklch(0.98 0.002 255);
-  --foreground: oklch(0.2 0.006 255);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.006 255);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.006 255);
-  --primary: oklch(0.36 0.015 255);
-  --primary-foreground: oklch(0.98 0.002 255);
-  --secondary: oklch(0.94 0.004 255);
-  --secondary-foreground: oklch(0.24 0.008 255);
-  --muted: oklch(0.94 0.004 255);
-  --muted-foreground: oklch(0.5 0.006 255);
-  --accent: oklch(0.9 0.008 255);
-  --accent-foreground: oklch(0.28 0.012 255);
-  --border: oklch(0.88 0.005 255);
-  --input: oklch(0.88 0.005 255);
-  --ring: oklch(0.36 0.015 255);
-  --sidebar: oklch(0.955 0.003 255);
-  --sidebar-foreground: oklch(0.2 0.006 255);
-  --sidebar-primary: oklch(0.36 0.015 255);
-  --sidebar-primary-foreground: oklch(0.98 0.002 255);
-  --sidebar-accent: oklch(0.9 0.008 255);
-  --sidebar-accent-foreground: oklch(0.28 0.012 255);
-  --sidebar-border: oklch(0.88 0.005 255);
-  --sidebar-ring: oklch(0.36 0.015 255);
+.theme-navy {
+  --background: oklch(0.22 0.06 255);
+  --foreground: oklch(0.97 0.01 255);
+  --card: oklch(0.27 0.065 255);
+  --card-foreground: oklch(0.97 0.01 255);
+  --popover: oklch(0.27 0.065 255);
+  --popover-foreground: oklch(0.97 0.01 255);
+  --primary: oklch(0.749 0.162 64.135);
+  --primary-foreground: oklch(0.145 0 0);
+  --secondary: oklch(0.32 0.05 255);
+  --secondary-foreground: oklch(0.95 0.01 255);
+  --muted: oklch(0.32 0.05 255);
+  --muted-foreground: oklch(0.74 0.03 255);
+  --accent: oklch(0.36 0.06 255);
+  --accent-foreground: oklch(0.95 0.01 255);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.749 0.162 64.135);
+  --chart-1: oklch(0.749 0.162 64.135);
+  --chart-2: oklch(0.615 0.217 11.669);
+  --chart-3: oklch(0.705 0.132 224.855);
+  --chart-4: oklch(0.765 0.166 146.531);
+  --chart-5: oklch(0.55 0.06 271.858);
+  --sidebar: oklch(0.27 0.065 255);
+  --sidebar-foreground: oklch(0.97 0.01 255);
+  --sidebar-primary: oklch(0.749 0.162 64.135);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
+  --sidebar-accent: oklch(0.36 0.06 255);
+  --sidebar-accent-foreground: oklch(0.95 0.01 255);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.749 0.162 64.135);
 }
 
 @layer base {

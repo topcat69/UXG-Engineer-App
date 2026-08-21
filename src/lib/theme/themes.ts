@@ -2,7 +2,7 @@
 // picking the initial class) and the client (the switcher's optimistic
 // swap), same split as lib/forms/job-form.ts's predicates.
 
-export const THEMES = ["light", "dark", "blue", "forest", "slate"] as const;
+export const THEMES = ["light", "dark", "blue", "forest", "navy"] as const;
 export type Theme = (typeof THEMES)[number];
 
 export const THEME_LABELS: Record<Theme, string> = {
@@ -10,7 +10,7 @@ export const THEME_LABELS: Record<Theme, string> = {
   dark: "Dark",
   blue: "Blue",
   forest: "Forest",
-  slate: "Slate",
+  navy: "Navy",
 };
 
 function isTheme(value: string): value is Theme {
