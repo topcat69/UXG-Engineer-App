@@ -3235,3 +3235,32 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 302 passed (no new tests — no new pure logic, `canManage` is
 reused unchanged), same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Log scheduled/assigned email failures instead of losing them
+
+Root-causing a "no emails when scheduling a job" report surfaced a gap:
+`sendJobEmail` throws on a real Resend failure (bad API key, unverified
+sender, rate limit, whatever), and none of the four call sites —
+`assignAndScheduleJob`, `rescheduleJob`, `bulkScheduleJobs`,
+`bulkAssignJobs` — ever caught that. Every one of them fires the send
+inside `after()`, so a thrown error there becomes an unhandled rejection
+with no record of which job or why. `syncCalendarForJob` already
+self-catches and logs for exactly this reason; the email sends never got
+the same treatment when they were added.
+
+Fixed by catching and logging at each call site — `console.error` naming
+the job id and which email type failed — rather than changing
+`sendJobEmail`'s own throw-on-failure contract, which every other email
+caller in this codebase (day-before, submitted, approved) also relies on
+as-is. The two bulk call sites (`bulkAssignJobs`, `bulkScheduleJobs`)
+share a small `sendEmailSafely` wrapper so one job's failure can't also
+swallow the rest of the batch's `Promise.all`.
+
+This is diagnostic, not a fix for any specific misconfiguration — if
+Resend genuinely isn't configured correctly on the VM, emails still won't
+send; the difference is `docker compose logs app` now says why instead of
+nothing.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 302 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.

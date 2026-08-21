@@ -11,6 +11,23 @@ import { maxJobSequenceForYear } from "@/lib/jobs/next-job-number";
 
 export type ActionResult = { ok: true; message: string } | { ok: false; message: string };
 
+/**
+ * sendJobAssignedEmail/sendJobScheduledEmail throw on a real Resend
+ * failure (see resend.ts) — inside a bulk after() callback that becomes
+ * an unhandled rejection for the whole Promise.all with no record of
+ * which job it was, which is exactly what made a genuine "no emails
+ * sending" report indistinguishable from "nothing happened." This logs
+ * per-job instead, and keeps one failure from short-circuiting the rest
+ * of the batch.
+ */
+async function sendEmailSafely(promise: Promise<unknown>, jobId: string, label: string): Promise<void> {
+  try {
+    await promise;
+  } catch (error) {
+    console.error(`${label} failed for job ${jobId}`, error);
+  }
+}
+
 export type CreateJobResult = { ok: true; jobId: string } | { ok: false; message: string };
 
 /**
@@ -61,7 +78,7 @@ export async function bulkAssignJobs(jobIds: string[], engineerId: string): Prom
   // office user sees scale with Resend's latency times N jobs, not just the
   // (already-succeeded) database write above — the same "best-effort, never
   // blocking" contract this comment already claimed, but actually kept.
-  after(() => Promise.all(jobIds.map((id) => sendJobAssignedEmail(supabase, id))));
+  after(() => Promise.all(jobIds.map((id) => sendEmailSafely(sendJobAssignedEmail(supabase, id), id, "Assigned email"))));
 
   revalidatePath("/office/jobs");
   return { ok: true, message: `Assigned ${jobIds.length} job(s).` };
@@ -126,7 +143,7 @@ export async function bulkScheduleJobs(
   after(() =>
     Promise.all([
       ...jobIds.map((id) => syncCalendarForJob(supabase, id)),
-      ...jobIds.map((id) => sendJobScheduledEmail(supabase, id)),
+      ...jobIds.map((id) => sendEmailSafely(sendJobScheduledEmail(supabase, id), id, "Scheduled email")),
     ]),
   );
 

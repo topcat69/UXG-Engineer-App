@@ -456,10 +456,19 @@ export async function assignAndScheduleJob(
   const effectiveEngineerId = engineerId ?? job.assigned_to;
   after(async () => {
     await syncCalendarForJob(supabase, jobId);
-    if (newStart && effectiveEngineerId) {
-      await sendJobScheduledEmail(supabase, jobId);
-    } else if (engineerId && engineerId !== job.assigned_to) {
-      await sendJobAssignedEmail(supabase, jobId);
+    try {
+      if (newStart && effectiveEngineerId) {
+        await sendJobScheduledEmail(supabase, jobId);
+      } else if (engineerId && engineerId !== job.assigned_to) {
+        await sendJobAssignedEmail(supabase, jobId);
+      }
+    } catch (error) {
+      // Unlike syncCalendarForJob (which self-catches), sendJobEmail throws
+      // on a real Resend failure — inside after() that becomes an
+      // unhandled rejection with no clear record of which job/email it
+      // was, which is exactly what made a real "no emails sending" report
+      // indistinguishable from "nothing happened." Log it here instead.
+      console.error(`Scheduled/assigned email failed for job ${jobId}`, error);
     }
   });
 

@@ -104,7 +104,14 @@ export async function rescheduleJob(
     // changed even when it's the same engineer as before.
     const effectiveEngineerId = targetEngineerId ?? job.assigned_to;
     if (effectiveEngineerId) {
-      await sendJobScheduledEmail(supabase, jobId);
+      try {
+        await sendJobScheduledEmail(supabase, jobId);
+      } catch (error) {
+        // sendJobEmail throws on a real Resend failure; inside after() that's
+        // an unhandled rejection with no record of which job/reason — log it
+        // so "no emails sending" is diagnosable instead of silent.
+        console.error(`Scheduled email failed for job ${jobId}`, error);
+      }
     }
   });
 
