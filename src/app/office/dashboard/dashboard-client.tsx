@@ -29,16 +29,19 @@ export function DashboardClient({
   initialIssues,
   engineers,
   initialMapJobs,
+  projects,
 }: {
   initialJobs: DashboardJob[];
   initialIssues: DashboardIssue[];
   engineers: Engineer[];
   initialMapJobs: RawMapJob[];
+  projects: { id: string; name: string }[];
 }) {
   const [jobs, setJobs] = useState(initialJobs);
   const [issues, setIssues] = useState(initialIssues);
   const [mapJobs, setMapJobs] = useState(initialMapJobs);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [mapProjectId, setMapProjectId] = useState("");
   const router = useRouter();
 
   const refetch = useCallback(async () => {
@@ -52,7 +55,7 @@ export function DashboardClient({
       supabase
         .from("jobs")
         .select(
-          "id, job_number, status, parent_job_id, site:sites(name, latitude, longitude), assigned:users!jobs_assigned_to_fkey(name)",
+          "id, job_number, status, parent_job_id, project_id, site:sites(name, latitude, longitude), assigned:users!jobs_assigned_to_fkey(name)",
         )
         .neq("status", "draft"),
     ]);
@@ -79,7 +82,8 @@ export function DashboardClient({
     };
   }, [refetch]);
 
-  const mapMarkers = buildJobMapMarkers(mapJobs);
+  const mapJobsForProject = mapProjectId ? mapJobs.filter((j) => j.project_id === mapProjectId) : mapJobs;
+  const mapMarkers = buildJobMapMarkers(mapJobsForProject);
   const firstTimeFix = computeFirstTimeFixRate(jobs);
   const completedVsScheduled = computeCompletedVsScheduled(jobs);
   const avgTimeOnSiteMinutes = computeAverageTimeOnSiteMinutes(jobs);
@@ -133,8 +137,28 @@ export function DashboardClient({
       </div>
 
       <ChartCard title="Job locations" subtitle="Scheduled and in-progress jobs on the map — click a marker to open it">
+        <div className="mb-2 flex items-center gap-2">
+          <label htmlFor="map-project-filter" className="text-muted-foreground text-xs">
+            Project
+          </label>
+          <select
+            id="map-project-filter"
+            value={mapProjectId}
+            onChange={(e) => setMapProjectId(e.target.value)}
+            className="border-input h-8 rounded-md border bg-transparent px-2 text-sm"
+          >
+            <option value="">All projects</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
         {mapMarkers.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No scheduled or in-progress jobs with a located site yet.</p>
+          <p className="text-muted-foreground text-sm">
+            No scheduled or in-progress jobs with a located site{mapProjectId ? " for this project" : ""} yet.
+          </p>
         ) : (
           <>
             <JobsMap markers={mapMarkers} />

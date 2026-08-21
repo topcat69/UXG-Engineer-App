@@ -33,6 +33,7 @@ export type RawMapJob = {
   job_number: string;
   status: string;
   parent_job_id: string | null;
+  project_id: string | null;
   site: { name: string; latitude: number | null; longitude: number | null } | null;
   assigned: { name: string } | null;
 };

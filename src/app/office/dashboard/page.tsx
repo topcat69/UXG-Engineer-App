@@ -11,20 +11,22 @@ import { DashboardClient } from "./dashboard-client";
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  const [{ data: jobs }, { data: issues }, { data: engineers }, { data: mapJobs }] = await Promise.all([
-    supabase
-      .from("jobs")
-      .select("id, status, parent_job_id, scheduled_start, actual_start, actual_end, assigned_to")
-      .neq("status", "draft"),
-    supabase.from("issues").select("job_id, category, status, revisit_job_id, created_at"),
-    supabase.from("users").select("id, name").eq("role", "engineer").eq("active", true).order("name"),
-    supabase
-      .from("jobs")
-      .select(
-        "id, job_number, status, parent_job_id, site:sites(name, latitude, longitude), assigned:users!jobs_assigned_to_fkey(name)",
-      )
-      .neq("status", "draft"),
-  ]);
+  const [{ data: jobs }, { data: issues }, { data: engineers }, { data: mapJobs }, { data: projects }] =
+    await Promise.all([
+      supabase
+        .from("jobs")
+        .select("id, status, parent_job_id, scheduled_start, actual_start, actual_end, assigned_to")
+        .neq("status", "draft"),
+      supabase.from("issues").select("job_id, category, status, revisit_job_id, created_at"),
+      supabase.from("users").select("id, name").eq("role", "engineer").eq("active", true).order("name"),
+      supabase
+        .from("jobs")
+        .select(
+          "id, job_number, status, parent_job_id, project_id, site:sites(name, latitude, longitude), assigned:users!jobs_assigned_to_fkey(name)",
+        )
+        .neq("status", "draft"),
+      supabase.from("projects").select("id, name").order("name"),
+    ]);
 
   return (
     <DashboardClient
@@ -32,6 +34,7 @@ export default async function DashboardPage() {
       initialIssues={issues ?? []}
       engineers={engineers ?? []}
       initialMapJobs={mapJobs ?? []}
+      projects={projects ?? []}
     />
   );
 }

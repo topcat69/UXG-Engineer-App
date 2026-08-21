@@ -3321,3 +3321,31 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 309 passed (6 new: `groupIssuesByJob`'s collapsing/sorting/edge
 cases), same 2 pre-existing Supabase-dependent failures as every addendum
 in this sandbox, no regressions.
+
+## 2026-08-21 — Dashboard map: filter by project
+
+A "Project" dropdown above the Job locations map — picking one narrows
+the map to just that project's scheduled/in-progress jobs (e.g. keeping
+a rollout's sites visually separate from the rest of the board); "All
+projects" (the default) is unchanged from today's behavior. Deliberately
+scoped to the map only, not the other dashboard charts/stats — that's
+what was asked for, and workload/revisit-rate/etc. answer different
+questions than "where is this project's work happening right now."
+
+`RawMapJob` (`lib/dashboard/map-markers.ts`) gained `project_id`; both the
+initial dashboard query and its Realtime refetch now select it alongside
+the job's site/assignee. The filter itself is a one-line array filter in
+`dashboard-client.tsx` applied before `buildJobMapMarkers` runs — kept
+inline rather than extracted into the lib, matching this file's own
+existing convention for its other drill-through filters
+(`jobIdsForCause`/`jobIdsForAgeBucket` aren't extracted either). The
+empty-map message now says "for this project" when a filter is active,
+so an empty map reads as "nothing for this project" rather than looking
+like the whole dashboard broke.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 309 passed (no new tests — no new pure logic; the added filter
+line has the same test-coverage shape as this file's other existing
+inline drill-through filters, none of which are separately unit tested
+either), same 2 pre-existing Supabase-dependent failures as every
+addendum in this sandbox, no regressions.
