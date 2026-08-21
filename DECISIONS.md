@@ -2842,3 +2842,30 @@ before — this only adds a way to switch, not a new default.
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 283 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Draft jobs no longer show in the field app queue
+
+"My Jobs" excluded submitted/under_review/approved/closed/cancelled from
+the engineer queue (see the earlier "checked-out jobs drop off the queue"
+addendum), but `draft` was still explicitly kept — meaning a job assigned
+to someone before it had an actual schedule showed up in their queue
+immediately, even though nothing about it was scheduled yet. Being
+assigned to a job isn't the same as it being scheduled to you.
+
+Fixed by adding `"draft"` to `isInEngineerQueue()`'s exclusion set
+(`lib/jobs/engineer-queue.ts`, unit tested) — the same single filter
+`job-list.tsx` already runs every job through. Once a draft job actually
+gets scheduled it disappears from `draft` automatically anyway (every
+schedule path — `assignAndScheduleJob`/`rescheduleJob`/`bulkScheduleJobs`
+— flips status to `scheduled` the moment a start time is set), so this
+doesn't need any new transition logic, just the queue filter catching up
+to what "scheduled to them" actually means.
+
+Deliberately not touched: `sync-down.ts` still pulls every job assigned to
+the user regardless of status, same as the earlier addendum's reasoning —
+this only changes what's *displayed*, not what's cached locally.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 284 passed (1 new: draft-exclusion case in
+`engineer-queue.test.ts`), same 2 pre-existing Supabase-dependent failures
+as every addendum in this sandbox, no regressions.

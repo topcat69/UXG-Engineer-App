@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isInEngineerQueue } from "./engineer-queue";
 
 describe("isInEngineerQueue", () => {
-  it("keeps pre-submission and in-progress statuses in the queue", () => {
-    expect(isInEngineerQueue("draft")).toBe(true);
+  it("keeps scheduled and in-progress statuses in the queue", () => {
     expect(isInEngineerQueue("scheduled")).toBe(true);
     expect(isInEngineerQueue("dispatched")).toBe(true);
     expect(isInEngineerQueue("accepted")).toBe(true);
@@ -11,6 +10,10 @@ describe("isInEngineerQueue", () => {
     expect(isInEngineerQueue("on_site")).toBe(true);
     expect(isInEngineerQueue("in_progress")).toBe(true);
     expect(isInEngineerQueue("on_hold")).toBe(true);
+  });
+
+  it("drops draft jobs — assigned isn't the same as scheduled yet", () => {
+    expect(isInEngineerQueue("draft")).toBe(false);
   });
 
   it("drops a job once it's been checked out (submitted onward)", () => {
