@@ -3286,3 +3286,38 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 303 passed (1 new: `buildScheduledEmail` omits the Client line
 when there isn't one), same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Issues page: one entry per job, not per issue
+
+A single field submission can auto-raise several issues at once — a
+failed boot test, content not displaying, and "revisit required" all fire
+independently (see `detectAutoIssues` in `lib/forms/job-form.ts`) — so a
+job with three such issues was showing as three separate full-width cards
+on `/office/issues`, reading as three open problems rather than one job
+needing attention. That's what the screenshot in this request showed:
+UXG-2026-0007 and UXG-2026-0008 each with 2-3 near-identical-looking
+cards, not (as it first looked) any actual per-day duplication — this app
+has never raised an issue per calendar day a job spans; every auto-issue
+is a one-time thing from a single submission.
+
+New pure `groupIssuesByJob()` (`lib/issues/group-by-job.ts`, unit tested)
+collapses the flat issue list into one group per job, sorted by that
+job's most severe issue — same ordering the page used before, just at
+the job level now instead of the individual-issue level. Each issue keeps
+its own severity/category/date/raiser badges nested inside its job's
+card, so no detail was dropped, just consolidated. The open-count header
+now reads "N jobs with open issues" instead of "N open", since N now
+means something different than it did as a flat per-issue count.
+
+Not visually verified in a live browser (same reason as the edit-users
+addendum — this sandbox has no running Supabase to authenticate
+against); the grouping logic itself — the part with any real risk of a
+subtle bug — has 6 passing unit tests covering collapsing, cross-job
+separation, severity-based sort order, a job's group taking its worst
+severity regardless of arrival order, dropping issues with no job, and
+picking the first revisit job seen. Worth a look once deployed.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 309 passed (6 new: `groupIssuesByJob`'s collapsing/sorting/edge
+cases), same 2 pre-existing Supabase-dependent failures as every addendum
+in this sandbox, no regressions.
