@@ -5,7 +5,10 @@ import { UsersManager } from "./users-manager";
 export default async function UsersPage() {
   const currentUser = await requireOfficeUser();
   const supabase = await createClient();
-  const { data: users } = await supabase.from("users").select("id, name, email, role, active").order("name");
+  const { data: users } = await supabase
+    .from("users")
+    .select("id, name, email, role, active, phone, company, max_jobs_per_day")
+    .order("name");
 
   return (
     <div className="flex flex-col gap-4">

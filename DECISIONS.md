@@ -3188,3 +3188,50 @@ especially when a later one ("no migration needed this time") reads as
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 302 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Users can now be edited, not just role/active-toggled
+
+`/office/users` could create a user, change their role, and activate/
+deactivate them, but nothing let you fix a typo'd name or update someone's
+phone/company/max-jobs-per-day once created — the page's own description
+text already said "create or edit," but edit was never actually built.
+
+New `updateUser` server action (`office/users/actions.ts`) covers
+name/email/phone/company/max_jobs_per_day — role and active keep their
+existing dedicated controls rather than being folded in here. Permission
+boundary is the same `canManage` (superadmin unrestricted, manager
+engineer-only) every other action here already uses, checked against the
+target's role fetched fresh from the DB rather than trusted from the
+client — that matters more here than in the other actions, because the
+email-sync step below goes through the service-role admin client and
+bypasses RLS entirely, so the database can't backstop a bug in the app-
+level check the way it does for the plain `.update()` calls.
+
+**Email is handled specially**: `public.users.email` is a mirror, not the
+source of truth — magic-link sign-in looks someone up by `auth.users`'
+own email. Editing only the roster copy would leave the office showing an
+address the person can no longer actually sign in with, and every job
+email (`send-job-emails.ts` reads `users.email`) would go to a stale
+inbox. `updateUser` calls `admin.auth.admin.updateUserById(userId, {
+email, email_confirm: true })` first, same admin client and same
+`email_confirm: true` pattern `createUser` already uses, before touching
+the `public.users` row — so the two can't drift.
+
+UI: an "Edit" button per manageable row opens a form (same visual
+language as the existing "Add a user" section) pre-filled with that
+user's current values; Save/Cancel, with an explicit note that changing
+the email changes their sign-in address too.
+
+**Not verified in a live browser** — this sandbox's local Supabase isn't
+running (same reason `rls.test.ts` fails here), and standing it up just
+to click through one form was disproportionate to the change; the code
+reuses the exact same server-action/local-state/Button patterns the
+create/role-change/deactivate controls on this same page already use in
+production, and `pnpm build`'s type-checked production compile caught
+anything a live click-through would have caught structurally. Worth an
+actual click-through once deployed.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 302 passed (no new tests — no new pure logic, `canManage` is
+reused unchanged), same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.

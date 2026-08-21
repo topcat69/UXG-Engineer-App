@@ -8,7 +8,16 @@ import type { Database } from "@/lib/supabase/database.types";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
 
-export type UserRow = { id: string; name: string; email: string; role: UserRole; active: boolean };
+export type UserRow = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  active: boolean;
+  phone: string | null;
+  company: string | null;
+  max_jobs_per_day: number | null;
+};
 export type CreateUserResult = { ok: true; user: UserRow } | { ok: false; message: string };
 export type UpdateUserResult = { ok: true; user: UserRow } | { ok: false; message: string };
 
@@ -54,7 +63,7 @@ export async function createUser(name: string, email: string, role: UserRole): P
     .from("users")
     .update({ name: trimmedName, role })
     .eq("id", created.user.id)
-    .select("id, name, email, role, active")
+    .select("id, name, email, role, active, phone, company, max_jobs_per_day")
     .single();
   if (updateError) return { ok: false, message: updateError.message };
 
@@ -73,7 +82,7 @@ export async function setUserActive(userId: string, active: boolean): Promise<Up
     .from("users")
     .update({ active })
     .eq("id", userId)
-    .select("id, name, email, role, active")
+    .select("id, name, email, role, active, phone, company, max_jobs_per_day")
     .single();
   if (error) return { ok: false, message: error.message };
 
@@ -92,9 +101,74 @@ export async function changeUserRole(userId: string, role: UserRole): Promise<Up
     .from("users")
     .update({ role })
     .eq("id", userId)
-    .select("id, name, email, role, active")
+    .select("id, name, email, role, active, phone, company, max_jobs_per_day")
     .single();
   if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/office/users");
+  return { ok: true, user: updated };
+}
+
+export type EditableUserFields = {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  max_jobs_per_day: number | null;
+};
+
+/**
+ * Edits a user's profile fields — everything except role/active, which
+ * already have their own controls. Permission-gated the same way as
+ * createUser/setUserActive (`canManage`, mirroring the users_write RLS
+ * policy), checked here against the target's *current* role fetched fresh
+ * rather than trusted from the client, since the email sync below goes
+ * through the admin client and bypasses RLS entirely — the database can't
+ * backstop that call the way it backstops the plain `.update()`.
+ *
+ * Keeps Supabase Auth's own email in sync with the roster: magic-link
+ * sign-in looks someone up by *that* email, not this row's, so changing
+ * one without the other would leave the office showing an address the
+ * person can no longer actually sign in with.
+ */
+export async function updateUser(userId: string, fields: EditableUserFields): Promise<UpdateUserResult> {
+  const actor = await getCurrentUser();
+  if (!actor) return { ok: false, message: "Not signed in." };
+
+  const supabase = await createClient();
+  const { data: target } = await supabase.from("users").select("role, email").eq("id", userId).single();
+  if (!target) return { ok: false, message: "User not found." };
+  if (!canManage(actor.role, target.role)) {
+    return { ok: false, message: "You don't have permission to edit this user." };
+  }
+
+  const trimmedName = fields.name.trim();
+  const trimmedEmail = fields.email.trim().toLowerCase();
+  if (!trimmedName) return { ok: false, message: "Name is required." };
+  if (!trimmedEmail) return { ok: false, message: "Email is required." };
+
+  if (trimmedEmail !== target.email) {
+    const admin = createAdminClient();
+    const { error: authError } = await admin.auth.admin.updateUserById(userId, {
+      email: trimmedEmail,
+      email_confirm: true,
+    });
+    if (authError) return { ok: false, message: authError.message };
+  }
+
+  const { data: updated, error: updateError } = await supabase
+    .from("users")
+    .update({
+      name: trimmedName,
+      email: trimmedEmail,
+      phone: fields.phone.trim() || null,
+      company: fields.company.trim() || null,
+      max_jobs_per_day: fields.max_jobs_per_day,
+    })
+    .eq("id", userId)
+    .select("id, name, email, role, active, phone, company, max_jobs_per_day")
+    .single();
+  if (updateError) return { ok: false, message: updateError.message };
 
   revalidatePath("/office/users");
   return { ok: true, user: updated };

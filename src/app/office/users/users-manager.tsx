@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import type { Database } from "@/lib/supabase/database.types";
 import { humanize } from "@/lib/format/text";
-import { changeUserRole, createUser, setUserActive, type UserRow } from "./actions";
+import { changeUserRole, createUser, setUserActive, updateUser, type UserRow } from "./actions";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
 
@@ -35,6 +35,13 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
   const [role, setRole] = useState<UserRole>("engineer");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editCompany, setEditCompany] = useState("");
+  const [editMaxJobsPerDay, setEditMaxJobsPerDay] = useState("");
 
   const creatableRoles = currentUser.role === "superadmin" ? ALL_ROLES : (["engineer"] as UserRole[]);
 
@@ -69,6 +76,40 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
       const result = await changeUserRole(userId, newRole);
       if (result.ok) {
         setUsers((prev) => prev.map((u) => (u.id === userId ? result.user : u)));
+      } else {
+        setMessage(result.message);
+      }
+    });
+  }
+
+  function handleStartEdit(u: UserRow) {
+    setEditingUserId(u.id);
+    setEditName(u.name);
+    setEditEmail(u.email);
+    setEditPhone(u.phone ?? "");
+    setEditCompany(u.company ?? "");
+    setEditMaxJobsPerDay(u.max_jobs_per_day == null ? "" : String(u.max_jobs_per_day));
+    setMessage(null);
+  }
+
+  function handleCancelEdit() {
+    setEditingUserId(null);
+  }
+
+  function handleSaveEdit() {
+    if (!editingUserId) return;
+    const userId = editingUserId;
+    startTransition(async () => {
+      const result = await updateUser(userId, {
+        name: editName,
+        email: editEmail,
+        phone: editPhone,
+        company: editCompany,
+        max_jobs_per_day: editMaxJobsPerDay.trim() === "" ? null : Number(editMaxJobsPerDay),
+      });
+      if (result.ok) {
+        setUsers((prev) => prev.map((u) => (u.id === userId ? result.user : u)).sort((a, b) => a.name.localeCompare(b.name)));
+        setEditingUserId(null);
       } else {
         setMessage(result.message);
       }
@@ -118,16 +159,21 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
                 </td>
                 <td className="py-2">
                   {manageable && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={isPending || (isSelf && u.active)}
-                      title={isSelf && u.active ? "You can't deactivate your own account" : undefined}
-                      onClick={() => handleSetActive(u.id, !u.active)}
-                    >
-                      {u.active ? "Deactivate" : "Reactivate"}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleStartEdit(u)}>
+                        Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={isPending || (isSelf && u.active)}
+                        title={isSelf && u.active ? "You can't deactivate your own account" : undefined}
+                        onClick={() => handleSetActive(u.id, !u.active)}
+                      >
+                        {u.active ? "Deactivate" : "Reactivate"}
+                      </Button>
+                    </div>
                   )}
                 </td>
               </tr>
@@ -135,6 +181,66 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
           })}
         </tbody>
       </table>
+
+      {editingUserId && (
+        <section className="flex flex-col gap-3 rounded-md border p-3">
+          <h2 className="font-medium">Edit {users.find((u) => u.id === editingUserId)?.name}</h2>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-muted-foreground text-xs">Name</label>
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-muted-foreground text-xs">Email</label>
+              <input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                className="border-input h-9 w-64 rounded-md border bg-transparent px-2 text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-muted-foreground text-xs">Phone</label>
+              <input
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+                className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-muted-foreground text-xs">Company</label>
+              <input
+                value={editCompany}
+                onChange={(e) => setEditCompany(e.target.value)}
+                className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-muted-foreground text-xs">Max jobs/day</label>
+              <input
+                type="number"
+                min={0}
+                value={editMaxJobsPerDay}
+                onChange={(e) => setEditMaxJobsPerDay(e.target.value)}
+                className="border-input h-9 w-24 rounded-md border bg-transparent px-2 text-sm"
+              />
+            </div>
+            <Button type="button" disabled={isPending || !editName.trim() || !editEmail.trim()} onClick={handleSaveEdit}>
+              Save
+            </Button>
+            <Button type="button" variant="outline" disabled={isPending} onClick={handleCancelEdit}>
+              Cancel
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Changing the email also updates their sign-in address — they&apos;ll need to use the new one next time.
+          </p>
+        </section>
+      )}
 
       <section className="flex flex-col gap-3 border-t pt-4">
         <h2 className="font-medium">Add a user</h2>
