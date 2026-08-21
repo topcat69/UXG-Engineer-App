@@ -72,6 +72,7 @@ export async function sendStandaloneEmail(to: string, content: EmailContent): Pr
     subject: content.subject,
     html: content.html,
     text: content.text,
+    replyTo: replyToAddress(),
   });
   if (error) throw new Error(`Resend send failed: ${error.message}`);
   return { status: "sent", messageId: data?.id ?? null };
@@ -96,10 +97,20 @@ async function sendWithHeaders(
     text: content.text,
     headers: emailHeaders,
     attachments: attachments?.map((a) => ({ filename: a.filename, content: a.content })),
+    replyTo: replyToAddress(),
   });
   if (error) throw new Error(`Resend send failed: ${error.message}`);
 }
 
 function fromAddress(): string {
   return process.env.RESEND_FROM_EMAIL || "UXG Engineer Job Scheduler <notifications@uxgengineering.example.com>";
+}
+
+/**
+ * Optional — replies go to `RESEND_FROM_EMAIL` itself when this isn't set.
+ * Lets the "from" address be a no-reply-style system identity while replies
+ * still land in an inbox someone actually monitors.
+ */
+function replyToAddress(): string | undefined {
+  return process.env.RESEND_REPLY_TO_EMAIL || undefined;
 }

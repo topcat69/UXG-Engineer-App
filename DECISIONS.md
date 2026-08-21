@@ -2947,3 +2947,20 @@ clean — 289 passed (5 new: `buildScheduledEmail`'s subject format, full
 detail body, attachment naming, and same-day-vs-multi-day range cases),
 same 2 pre-existing Supabase-dependent failures as every addendum in this
 sandbox, no regressions.
+
+## 2026-08-21 — Optional reply-to address for job emails
+
+`RESEND_FROM_EMAIL` doubled as the reply target for every job email, with
+no way to separate "who it's sent from" from "where a reply should land."
+Fine for a real, monitored group address, but not every deployment wants
+its system "from" address to also be the reply inbox.
+
+Added optional `RESEND_REPLY_TO_EMAIL` (`.env.example`, `lib/email/resend.ts`)
+— when set, it's passed as Resend's `replyTo` on every send (`sendJobEmail`'s
+threaded sends and the standalone weekly-summary send alike); when unset,
+behavior is unchanged and replies go to `RESEND_FROM_EMAIL` as before, so
+this is purely additive.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 289 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.
