@@ -10,6 +10,7 @@ export type CurrentUser = {
   email: string;
   name: string;
   role: UserRole;
+  theme: string;
 };
 
 /**
@@ -25,7 +26,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data } = await supabase.from("users").select("id, email, name, role, active").eq("id", user.id).single();
+  const { data } = await supabase.from("users").select("id, email, name, role, active, theme").eq("id", user.id).single();
   if (!data || !data.active) return null;
 
   return data;

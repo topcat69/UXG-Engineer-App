@@ -6,6 +6,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { InstallPrompt } from "@/components/install-prompt";
 import { UxgLogo } from "@/components/branding/uxg-logo";
 import { StorageOnboarding } from "@/components/storage-onboarding";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/offline/db";
 import { summarizeOutbox } from "@/lib/offline/outbox";
@@ -46,6 +47,7 @@ export function FieldApp({ user }: { user: CurrentUser }) {
             {hasPending ? `${summary.pendingOps + summary.pendingMedia} unsent` : "All synced"}
           </button>
           <span className="text-muted-foreground">{user.name}</span>
+          <ThemeSwitcher currentTheme={user.theme} />
           {/* Managers/superadmins can be assigned jobs too, so they can reach this
               app — but unlike an engineer, they also have somewhere to switch back to. */}
           {(user.role === "manager" || user.role === "superadmin") && (

@@ -117,6 +117,102 @@
   --sidebar-ring: oklch(0.749 0.162 64.135);
 }
 
+/*
+ * Three more themes alongside the default light/.dark above — same token
+ * set, just a different accent hue apiece; deliberately light-background
+ * (like :root) rather than a light/dark variant of each, since the app only
+ * offers "5 themes," not a light/dark axis crossed with an accent axis.
+ * destructive and chart-1..5 are left undefined here on purpose: they're
+ * not overridden by these classes, so they fall through to :root's values
+ * (same element, lower-specificity rule loses only where a property is
+ * actually redefined) — keeping "danger" red and dashboard chart colors
+ * consistent across every light-background theme rather than reinventing
+ * five destructive reds and five chart palettes for no visual benefit.
+ */
+.theme-blue {
+  --background: oklch(0.985 0.004 250);
+  --foreground: oklch(0.18 0.02 250);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 250);
+  --primary: oklch(0.52 0.17 254);
+  --primary-foreground: oklch(0.98 0.005 250);
+  --secondary: oklch(0.955 0.01 250);
+  --secondary-foreground: oklch(0.22 0.02 250);
+  --muted: oklch(0.955 0.01 250);
+  --muted-foreground: oklch(0.5 0.02 250);
+  --accent: oklch(0.92 0.045 254);
+  --accent-foreground: oklch(0.26 0.06 254);
+  --border: oklch(0.9 0.012 250);
+  --input: oklch(0.9 0.012 250);
+  --ring: oklch(0.52 0.17 254);
+  --sidebar: oklch(0.965 0.008 250);
+  --sidebar-foreground: oklch(0.18 0.02 250);
+  --sidebar-primary: oklch(0.52 0.17 254);
+  --sidebar-primary-foreground: oklch(0.98 0.005 250);
+  --sidebar-accent: oklch(0.92 0.045 254);
+  --sidebar-accent-foreground: oklch(0.26 0.06 254);
+  --sidebar-border: oklch(0.9 0.012 250);
+  --sidebar-ring: oklch(0.52 0.17 254);
+}
+
+.theme-forest {
+  --background: oklch(0.985 0.004 150);
+  --foreground: oklch(0.18 0.02 150);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 150);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 150);
+  --primary: oklch(0.5 0.135 152);
+  --primary-foreground: oklch(0.98 0.006 150);
+  --secondary: oklch(0.955 0.01 150);
+  --secondary-foreground: oklch(0.22 0.02 150);
+  --muted: oklch(0.955 0.01 150);
+  --muted-foreground: oklch(0.5 0.02 150);
+  --accent: oklch(0.92 0.05 152);
+  --accent-foreground: oklch(0.26 0.07 152);
+  --border: oklch(0.9 0.012 150);
+  --input: oklch(0.9 0.012 150);
+  --ring: oklch(0.5 0.135 152);
+  --sidebar: oklch(0.965 0.008 150);
+  --sidebar-foreground: oklch(0.18 0.02 150);
+  --sidebar-primary: oklch(0.5 0.135 152);
+  --sidebar-primary-foreground: oklch(0.98 0.006 150);
+  --sidebar-accent: oklch(0.92 0.05 152);
+  --sidebar-accent-foreground: oklch(0.26 0.07 152);
+  --sidebar-border: oklch(0.9 0.012 150);
+  --sidebar-ring: oklch(0.5 0.135 152);
+}
+
+.theme-slate {
+  --background: oklch(0.98 0.002 255);
+  --foreground: oklch(0.2 0.006 255);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.006 255);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.006 255);
+  --primary: oklch(0.36 0.015 255);
+  --primary-foreground: oklch(0.98 0.002 255);
+  --secondary: oklch(0.94 0.004 255);
+  --secondary-foreground: oklch(0.24 0.008 255);
+  --muted: oklch(0.94 0.004 255);
+  --muted-foreground: oklch(0.5 0.006 255);
+  --accent: oklch(0.9 0.008 255);
+  --accent-foreground: oklch(0.28 0.012 255);
+  --border: oklch(0.88 0.005 255);
+  --input: oklch(0.88 0.005 255);
+  --ring: oklch(0.36 0.015 255);
+  --sidebar: oklch(0.955 0.003 255);
+  --sidebar-foreground: oklch(0.2 0.006 255);
+  --sidebar-primary: oklch(0.36 0.015 255);
+  --sidebar-primary-foreground: oklch(0.98 0.002 255);
+  --sidebar-accent: oklch(0.9 0.008 255);
+  --sidebar-accent-foreground: oklch(0.28 0.012 255);
+  --sidebar-border: oklch(0.88 0.005 255);
+  --sidebar-ring: oklch(0.36 0.015 255);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

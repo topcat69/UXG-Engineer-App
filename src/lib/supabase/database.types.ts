@@ -1003,6 +1003,7 @@ export type Database = {
           name: string
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
+          theme: string
         }
         Insert: {
           active?: boolean
@@ -1014,6 +1015,7 @@ export type Database = {
           name: string
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          theme?: string
         }
         Update: {
           active?: boolean
@@ -1025,6 +1027,7 @@ export type Database = {
           name?: string
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          theme?: string
         }
         Relationships: []
       }
@@ -1040,6 +1043,10 @@ export type Database = {
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      set_own_theme: {
+        Args: { new_theme: string }
+        Returns: undefined
       }
     }
     Enums: {

@@ -3,6 +3,7 @@ import { requireOfficeUser } from "@/lib/auth/current-user";
 import { signOut } from "@/lib/auth/actions";
 import { humanize } from "@/lib/format/text";
 import { UxgLogo } from "@/components/branding/uxg-logo";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 
 const NAV = [
   { href: "/office/dashboard", label: "Dashboard" },
@@ -41,6 +42,7 @@ export default async function OfficeLayout({ children }: { children: React.React
           <Link href="/my-jobs" className="text-muted-foreground hover:text-foreground underline">
             My Jobs (field app)
           </Link>
+          <ThemeSwitcher currentTheme={user.theme} />
           <form action={signOut}>
             <button type="submit" className="text-muted-foreground hover:text-foreground underline">
               Sign out

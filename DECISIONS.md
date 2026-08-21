@@ -3023,3 +3023,69 @@ clean — 296 passed (7 new: `requirableFieldsFor`'s per-type set, and
 `validateJobDetails`'s optional-field skipping/defaulting/photo-and-
 signature-always-required cases), same 2 pre-existing Supabase-dependent
 failures as every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Per-user themes (Light/Dark/Blue/Forest/Slate)
+
+Five selectable themes, available in both the office app and the field
+app — a personal preference each user sets for themselves (not an
+org-wide/admin-set look), per explicit product decision. Beyond the
+existing Light/Dark, three new themes were proposed and built: Blue
+(steel blue accent), Forest (green accent), Slate (cool graphite accent) —
+each a light-background palette with a distinct accent hue, rather than a
+light/dark variant of each, since the ask was "5 themes" as one flat list,
+not a light/dark axis crossed with an accent axis.
+
+**Storage**: `users.theme` (plain text, default `'light'`) — the same
+"app code owns the valid set, not a DB enum/check constraint" choice
+already made for `jobs.job_type`, since the theme list is expected to grow.
+`lib/theme/themes.ts` is the single source of truth (`THEMES`,
+`THEME_LABELS`, `themeClassName()`), used both server-side (root layout,
+picking the initial class) and client-side (the switcher's optimistic
+swap).
+
+**Self-service without widening `users` RLS**: `users_write` restricts
+every write on `users` to superadmin, on purpose — the roster isn't
+self-service. RLS can't be scoped to one column, so a "users can update
+their own row" policy would let anyone attempt to write their own
+role/active too, not just theme. Went with a `SECURITY DEFINER` function
+instead (`set_own_theme(new_theme text)`, scoped to `auth.uid()` inside
+the function body) — same pattern this schema already uses for
+`current_user_role()`. `updateTheme()` (`lib/theme/actions.ts`) calls it
+via `supabase.rpc(...)` and validates against `THEMES` before that.
+
+**Applying the theme**: `app/layout.tsx`'s `RootLayout` is now async,
+reads `getCurrentUser()` (already had role/name/email; now `theme` too),
+and puts the matching class on `<html>` — since it's the one layout both
+`/office/*` and `/my-jobs` render under, this single change genuinely
+covers "both apps" without a separate mechanism per app. Signed-out
+visitors (login, a public share link) get no user and so the default
+light look. `ThemeSwitcher` (`components/theme-switcher.tsx`) is wired
+into both `office/layout.tsx`'s header and `field-app.tsx`'s header —
+same component, same `updateTheme` action, since the preference is
+per-user, not per-app; picking a theme in one app carries over to the
+other next time either loads. The switcher applies the class to
+`document.documentElement` immediately on change (not waiting on the
+server round trip) so switching feels instant, then persists it for every
+future full page load.
+
+**Known trade-off**: making the root layout depend on a per-request auth
+lookup means `/login` and `/_not-found` — previously statically
+prerendered — are now server-rendered per request (confirmed via
+`pnpm build`'s route list: both flipped from `○` to `ƒ`). Every other
+route in this app was already dynamic, so this isn't a new category of
+cost, just two more routes joining it; not worth a separate mechanism to
+avoid given the app is already fundamentally per-request/auth-gated
+throughout.
+
+**Verified visually, not just by the type/lint/test suite**: ran the dev
+server and screenshotted `/login` under all 5 theme classes via
+Playwright/Chromium — every theme keeps the Card/Button/Input contrast
+legible, confirmed by eye before calling this done (see this session's
+screenshots, not committed — a one-off manual check, not a repo asset).
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 302 passed (6 new: `themeClassName`'s per-theme class name and
+unrecognized-value fallback, `THEME_LABELS` completeness,
+`ALL_THEME_CLASSNAMES`'s exact list), same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions.
