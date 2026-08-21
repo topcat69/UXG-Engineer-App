@@ -55,6 +55,7 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
     { data: jobTasks, error: jobTasksError },
     { data: jobDetails, error: jobDetailsError },
     { data: jobEquipment, error: jobEquipmentError },
+    { data: jobOptionalFields, error: jobOptionalFieldsError },
   ] =
     jobIds.length > 0
       ? await Promise.all([
@@ -65,8 +66,12 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
           // Office-prepared, engineer never writes it, so there's no
           // pending-outbox guard needed the way install_forms/job_details have.
           supabase.from("job_equipment").select("*").in("job_id", jobIds),
+          // Same as job_equipment above — a manager's mandatory/optional
+          // toggle, never written by the engineer.
+          supabase.from("job_optional_fields").select("*").in("job_id", jobIds),
         ])
       : [
+          { data: [], error: null } as const,
           { data: [], error: null } as const,
           { data: [], error: null } as const,
           { data: [], error: null } as const,
@@ -78,6 +83,7 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
   if (jobTasksError) throw jobTasksError;
   if (jobDetailsError) throw jobDetailsError;
   if (jobEquipmentError) throw jobEquipmentError;
+  if (jobOptionalFieldsError) throw jobOptionalFieldsError;
 
   // A task the engineer just ticked/unticked offline has a pending
   // task_toggle op keyed by its own id — pulling the server's stale copy
@@ -88,7 +94,17 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
 
   await db.transaction(
     "rw",
-    [db.jobs, db.sites, db.installForms, db.surveyForms, db.jobTasks, db.jobDetails, db.jobEquipment, db.syncMeta],
+    [
+      db.jobs,
+      db.sites,
+      db.installForms,
+      db.surveyForms,
+      db.jobTasks,
+      db.jobDetails,
+      db.jobEquipment,
+      db.jobOptionalFields,
+      db.syncMeta,
+    ],
     async () => {
       await db.jobs.bulkPut(jobs ?? []);
       await db.sites.bulkPut(sites ?? []);
@@ -106,6 +122,14 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
         if (row.job_id && overwritableJobIds.has(row.job_id)) await db.jobDetails.put(row);
       }
       await db.jobEquipment.bulkPut(jobEquipment ?? []);
+
+      // A full replace, not just bulkPut — job_optional_fields is sparse
+      // (a row's *absence* means "required"), so a manager re-marking a
+      // field mandatory deletes its row server-side; bulkPut alone would
+      // never notice that and the stale "optional" row would linger
+      // locally, silently letting the engineer skip a field they shouldn't.
+      await db.jobOptionalFields.where("job_id").anyOf(jobIds).delete();
+      await db.jobOptionalFields.bulkPut(jobOptionalFields ?? []);
 
       // Drop local jobs that have fallen out of the assigned/windowed set —
       // unless they still have unsynced work, which must survive until drained.

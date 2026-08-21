@@ -13,6 +13,7 @@ import { cloneTasksForJob } from "@/lib/jobs/clone-tasks";
 import { detectConflicts } from "@/lib/scheduler/conflicts";
 import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
 import { sendJobAssignedEmail, sendJobScheduledEmail } from "@/lib/email/send-job-emails";
+import type { RequirableFieldKey } from "@/lib/forms/job-form";
 import type { ActionResult } from "../actions";
 
 /**
@@ -335,6 +336,25 @@ export async function deleteJobEquipment(itemId: string, jobId: string): Promise
 
   revalidatePath(`/office/jobs/${jobId}`);
   return { ok: true, message: "Removed." };
+}
+
+/**
+ * Toggles whether one job_details field is required for this specific job
+ * (see job_optional_fields — 20260122000000_job_optional_fields.sql).
+ * `required: true` deletes any override row (back to the default); `false`
+ * inserts one. RLS already restricts writes on that table to
+ * manager/superadmin, so there's no role check duplicated here — same as
+ * every other action in this file.
+ */
+export async function setJobFieldRequired(jobId: string, fieldKey: RequirableFieldKey, required: boolean): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = required
+    ? await supabase.from("job_optional_fields").delete().eq("job_id", jobId).eq("field_key", fieldKey)
+    : await supabase.from("job_optional_fields").insert({ job_id: jobId, field_key: fieldKey });
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/office/jobs/${jobId}`);
+  return { ok: true, message: required ? "Marked required." : "Marked optional." };
 }
 
 export type AssignScheduleResult = { ok: true; message: string; warning?: string } | { ok: false; message: string };

@@ -81,6 +81,7 @@ export function JobWorkflow({
   const formRow = useLiveQuery(() => db.installForms.where("job_id").equals(jobId).first(), [jobId]);
   const detailsRow = useLiveQuery(() => db.jobDetails.where("job_id").equals(jobId).first(), [jobId]);
   const equipment = useLiveQuery(() => db.jobEquipment.where("job_id").equals(jobId).sortBy("position"), [jobId], []);
+  const optionalFieldRows = useLiveQuery(() => db.jobOptionalFields.where("job_id").equals(jobId).toArray(), [jobId], []);
   const media = useLiveQuery(() => db.mediaQueue.where("jobId").equals(jobId).toArray(), [jobId], []);
   const tasks = useLiveQuery(() => db.jobTasks.where("job_id").equals(jobId).sortBy("position"), [jobId], []);
 
@@ -265,7 +266,8 @@ export function JobWorkflow({
     const capturedSlots = new Set(mediaBySlot.keys());
     let validationErrors: string[];
     if (detailsMode) {
-      validationErrors = validateJobDetails(jobType as JobDetailsType, detailsValues, capturedSlots, !!signature);
+      const optionalKeys = new Set((optionalFieldRows ?? []).map((row) => row.field_key));
+      validationErrors = validateJobDetails(jobType as JobDetailsType, detailsValues, capturedSlots, !!signature, optionalKeys);
     } else {
       validationErrors = validateInstallForm(installValues, capturedSlots, !!signature);
     }

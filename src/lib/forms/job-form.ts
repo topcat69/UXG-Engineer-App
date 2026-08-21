@@ -88,6 +88,50 @@ export function photoSlotsFor(jobType: JobDetailsType): readonly string[] {
   return [before, "photo_completed", "photo_equipment_in_situ"] as const;
 }
 
+/**
+ * Keys a manager can mark optional for one specific job (see
+ * job_optional_fields, 20260122000000_job_optional_fields.sql) — exactly
+ * the set validateJobDetails below checks, kept as one list so the office
+ * toggle UI and the validator can't drift apart. Deliberately excludes
+ * photos and the signature: those are evidence capture, not form data, and
+ * stay mandatory regardless of this override.
+ */
+export type RequirableFieldKey =
+  | "player_serial"
+  | "screen_serial"
+  | "mount_type"
+  | "power_source"
+  | "network_type"
+  | "wifi_signal"
+  | "player_boot_test"
+  | "content_displaying"
+  | "reported_to_site_manager"
+  | "issue_detail"
+  | "revisit_required";
+
+export type RequirableField = { key: RequirableFieldKey; label: string };
+
+/** Every field a manager can toggle for this job type, in the order the form/office panel render them. */
+export function requirableFieldsFor(jobType: JobDetailsType): RequirableField[] {
+  const fields: RequirableField[] = [];
+  if (showsAvFields(jobType)) {
+    fields.push(
+      { key: "player_serial", label: "Player serial" },
+      { key: "screen_serial", label: "Screen serial" },
+      { key: "mount_type", label: "Mount type" },
+      { key: "power_source", label: "Power source" },
+      { key: "network_type", label: "Network type" },
+      { key: "wifi_signal", label: "WiFi signal" },
+      { key: "player_boot_test", label: "Player boot test" },
+      { key: "content_displaying", label: "Content displaying" },
+    );
+  }
+  fields.push({ key: "reported_to_site_manager", label: "Reported to site manager" });
+  if (showsIssuesSection(jobType)) fields.push({ key: "issue_detail", label: "Issue detail" });
+  if (showsRevisitRequired(jobType)) fields.push({ key: "revisit_required", label: "Revisit required" });
+  return fields;
+}
+
 export function showWifiSignal(values: JobDetailsValues): boolean {
   return values.network_type === "WiFi";
 }
@@ -147,29 +191,43 @@ export function detectAutoIssues(jobType: JobDetailsType, values: JobDetailsValu
   return issues;
 }
 
-/** All reasons the form isn't ready to submit yet — empty array means ready. */
+/**
+ * All reasons the form isn't ready to submit yet — empty array means ready.
+ * `optionalFields` is whatever a manager has opted this specific job out of
+ * (see job_optional_fields / requirableFieldsFor above) — defaults to
+ * empty, i.e. every field mandatory, matching "by default everything is
+ * required" for jobs with no override on file.
+ */
 export function validateJobDetails(
   jobType: JobDetailsType,
   values: JobDetailsValues,
   capturedSlots: ReadonlySet<string>,
   hasSignature: boolean,
+  optionalFields: ReadonlySet<string> = new Set(),
 ): string[] {
   const errors: string[] = [];
+  const requires = (key: RequirableFieldKey) => !optionalFields.has(key);
 
   if (showsAvFields(jobType)) {
-    if (!values.player_serial.trim()) errors.push("Player serial is required.");
-    if (!values.screen_serial.trim()) errors.push("Screen serial is required.");
-    if (!values.mount_type) errors.push("Mount type is required.");
-    if (!values.power_source) errors.push("Power source is required.");
-    if (!values.network_type) errors.push("Network type is required.");
-    if (showWifiSignal(values) && !values.wifi_signal) errors.push("WiFi signal is required.");
-    if (!values.player_boot_test) errors.push("Player boot test result is required.");
-    if (!values.content_displaying) errors.push("Content displaying result is required.");
+    if (requires("player_serial") && !values.player_serial.trim()) errors.push("Player serial is required.");
+    if (requires("screen_serial") && !values.screen_serial.trim()) errors.push("Screen serial is required.");
+    if (requires("mount_type") && !values.mount_type) errors.push("Mount type is required.");
+    if (requires("power_source") && !values.power_source) errors.push("Power source is required.");
+    if (requires("network_type") && !values.network_type) errors.push("Network type is required.");
+    if (requires("wifi_signal") && showWifiSignal(values) && !values.wifi_signal) errors.push("WiFi signal is required.");
+    if (requires("player_boot_test") && !values.player_boot_test) errors.push("Player boot test result is required.");
+    if (requires("content_displaying") && !values.content_displaying) errors.push("Content displaying result is required.");
   }
 
-  if (!values.reported_to_site_manager) errors.push("Reporting to the site manager is required.");
-  if (showIssueDetail(values) && !values.issue_detail.trim()) errors.push("Issue detail is required.");
-  if (showsRevisitRequired(jobType) && !values.revisit_required) errors.push("Revisit required must be answered.");
+  if (requires("reported_to_site_manager") && !values.reported_to_site_manager) {
+    errors.push("Reporting to the site manager is required.");
+  }
+  if (requires("issue_detail") && showIssueDetail(values) && !values.issue_detail.trim()) {
+    errors.push("Issue detail is required.");
+  }
+  if (requires("revisit_required") && showsRevisitRequired(jobType) && !values.revisit_required) {
+    errors.push("Revisit required must be answered.");
+  }
 
   for (const slot of photoSlotsFor(jobType)) {
     if (!capturedSlots.has(slot)) {

@@ -377,6 +377,35 @@ export type Database = {
           },
         ]
       }
+      job_optional_fields: {
+        Row: {
+          created_at: string | null
+          field_key: string
+          id: string
+          job_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          field_key: string
+          id?: string
+          job_id: string
+        }
+        Update: {
+          created_at?: string | null
+          field_key?: string
+          id?: string
+          job_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_optional_fields_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_tasks: {
         Row: {
           created_at: string | null

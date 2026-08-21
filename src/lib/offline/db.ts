@@ -10,6 +10,7 @@ export type JobEquipmentRow = Database["public"]["Tables"]["job_equipment"]["Row
 export type SignatureRow = Database["public"]["Tables"]["signatures"]["Row"];
 export type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
 export type JobTaskRow = Database["public"]["Tables"]["job_tasks"]["Row"];
+export type JobOptionalFieldRow = Database["public"]["Tables"]["job_optional_fields"]["Row"];
 export type JobStatus = Database["public"]["Enums"]["job_status"];
 
 type OutboxBase = {
@@ -99,6 +100,7 @@ class OfflineDB extends Dexie {
   jobTasks!: EntityTable<JobTaskRow, "id">;
   jobDetails!: EntityTable<JobDetailsRow, "id">;
   jobEquipment!: EntityTable<JobEquipmentRow, "id">;
+  jobOptionalFields!: EntityTable<JobOptionalFieldRow, "id">;
 
   constructor() {
     super("uxg-engineer-job-scheduler");
@@ -132,6 +134,21 @@ class OfflineDB extends Dexie {
       jobTasks: "id, job_id, is_done",
       jobDetails: "id, job_id",
       jobEquipment: "id, job_id",
+    });
+    // job_optional_fields: office-managed, read-only to the engineer, same
+    // as job_equipment — see sync-down.ts's own comment on that table.
+    this.version(4).stores({
+      jobs: "id, status, assigned_to, scheduled_start, site_id",
+      sites: "id",
+      installForms: "id, job_id",
+      surveyForms: "id, job_id",
+      outbox: "id, createdAt",
+      mediaQueue: "id, jobId, status",
+      syncMeta: "key",
+      jobTasks: "id, job_id, is_done",
+      jobDetails: "id, job_id",
+      jobEquipment: "id, job_id",
+      jobOptionalFields: "id, job_id",
     });
   }
 }

@@ -12,9 +12,10 @@ import { DuplicateJobButton } from "./duplicate-job-button";
 import { TaskPanel } from "./task-panel";
 import { ShareLinkPanel } from "./share-link-panel";
 import { JobDetailsPanel } from "./job-details-panel";
+import { RequiredFieldsPanel } from "./required-fields-panel";
 import { AssignSchedulePanel } from "./assign-schedule-panel";
 import { EditJobPanel } from "./edit-job-panel";
-import { usesJobDetails, photoSlotsFor, type JobDetailsType } from "@/lib/forms/job-form";
+import { showsAvFields, usesJobDetails, photoSlotsFor, type JobDetailsType, type RequirableFieldKey } from "@/lib/forms/job-form";
 import { humanize } from "@/lib/format/text";
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -28,6 +29,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: surveyForm },
     { data: jobDetails },
     { data: jobEquipment },
+    { data: jobOptionalFields },
     { data: media },
     { data: issues },
     { data: shareLinks },
@@ -54,6 +56,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("survey_forms").select("*").eq("job_id", id).maybeSingle(),
     supabase.from("job_details").select("*").eq("job_id", id).maybeSingle(),
     supabase.from("job_equipment").select("id, model, serial").eq("job_id", id).order("position"),
+    supabase.from("job_optional_fields").select("field_key").eq("job_id", id),
     supabase.from("media_assets").select("*").eq("job_id", id).order("slot"),
     supabase.from("issues").select("*, raised_by_user:users(name)").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("share_links").select("token, expires_at, revoked").eq("job_id", id).order("created_at", { ascending: false }),
@@ -231,7 +234,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           )}
           {jobDetails && (
             <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
-              {usesJobDetails(job.job_type) && job.job_type !== "delivery" && (
+              {usesJobDetails(job.job_type) && showsAvFields(job.job_type) && (
                 <>
                   <FormField label="Player serial" value={jobDetails.player_serial} />
                   <FormField label="Screen serial" value={jobDetails.screen_serial} />
@@ -249,6 +252,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                 <FormField label="Revisit required" value={jobDetails.revisit_required ? "Yes" : "No"} />
               )}
               <FormField label="Issues found" value={jobDetails.issues_found ? "Yes" : "No"} />
+              {jobDetails.issues_found && <FormField label="Issue detail" value={jobDetails.issue_detail} />}
+              <FormField label="Engineer notes" value={jobDetails.engineer_notes} />
             </dl>
           )}
         </section>
@@ -259,6 +264,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         jobType={job.job_type as JobDetailsType}
         jobDetails={jobDetails ?? null}
         equipment={jobEquipment ?? []}
+      />
+
+      <RequiredFieldsPanel
+        jobId={job.id}
+        jobType={job.job_type}
+        optionalKeys={(jobOptionalFields ?? []).map((row) => row.field_key as RequirableFieldKey)}
       />
 
       <TaskPanel jobId={job.id} tasks={jobTasks ?? []} templates={templates ?? []} />

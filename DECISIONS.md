@@ -2964,3 +2964,62 @@ this is purely additive.
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 289 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Per-job optional form fields + full form-data visibility for managers
+
+Two related requests: a manager needs to see everything an engineer sees on
+the job (the office job detail page was showing an incomplete subset), and
+needs the ability to mark individual form fields optional for one specific
+job — some jobs genuinely don't need every field the job type normally
+requires (e.g. no WiFi signal reading on a site with no WiFi at all).
+Everything defaults to mandatory, matching the existing behavior for every
+job that doesn't opt out of anything.
+
+**Visibility fix** (`office/jobs/[id]/page.tsx`'s "Form data" section):
+the AV-field block was gated on a hardcoded `job.job_type !== "delivery"`
+that happened to match `showsAvFields()`'s current install/sla/maintenance
+set by coincidence, not by calling it — now calls `showsAvFields()`
+directly so the two can't silently drift apart if a job type's fields ever
+change. `issue_detail` (the engineer's free-text issue description) and
+`engineer_notes` were both captured in `job_details` and used in
+validation/completion-report but never rendered anywhere on the office
+side — both now show in the Form data section.
+
+**Scope decision**: "form data" means the job_details fields
+`validateJobDetails` actually checks — the AV fields, reported-to-site-
+manager, issue detail, and revisit-required. Deliberately excludes photos,
+the signature, and the task checklist: those are evidence capture and
+already have their own separate mechanisms (the task checklist already
+supports per-job ad-hoc items via `job_tasks`/`job_templates`), not "form
+data" in the sense meant here.
+
+**New table `job_optional_fields`** (`20260122000000_job_optional_fields.sql`)
+is deliberately sparse — a row means "optional for this job", absence
+means "required" (the default). That means every job that already exists
+starts fully mandatory with zero rows and no backfill migration needed.
+Same office-managed/engineer-reads-only shape as `job_equipment`: select
+wherever the parent job is visible, insert/delete restricted to
+manager/superadmin, no update policy since a row's only state is whether
+it exists.
+
+**`requirableFieldsFor(jobType)`** (`lib/forms/job-form.ts`) is the single
+list both the new office `RequiredFieldsPanel` and `validateJobDetails`
+draw from, so the toggle UI and the validator's own per-field applicability
+(which fields apply to which job type) can't drift apart the way the office
+page's AV-field gate just had. `validateJobDetails` gained a 5th, optional
+`optionalFields: ReadonlySet<string>` parameter defaulting to an empty
+set — every existing call site (and every existing test) is unaffected;
+only the field app's submit handler passes a real set now, read from a new
+`jobOptionalFields` Dexie store synced down the same way `job_equipment`
+already is. Sync-down does a full delete-then-replace for this table
+specifically (not just `bulkPut`, unlike `job_equipment`) — since a row's
+absence is meaningful here, a manager re-marking a field mandatory deletes
+it server-side, and `bulkPut` alone would never notice, leaving a stale
+"optional" row (and a silently-skippable required field) on the engineer's
+device until it happened to get overwritten some other way.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 296 passed (7 new: `requirableFieldsFor`'s per-type set, and
+`validateJobDetails`'s optional-field skipping/defaulting/photo-and-
+signature-always-required cases), same 2 pre-existing Supabase-dependent
+failures as every addendum in this sandbox, no regressions.

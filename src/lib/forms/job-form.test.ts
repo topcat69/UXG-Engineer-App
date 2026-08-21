@@ -3,6 +3,7 @@ import {
   EMPTY_JOB_DETAILS,
   detectAutoIssues,
   photoSlotsFor,
+  requirableFieldsFor,
   showIssueDetail,
   showWifiSignal,
   showsAvFields,
@@ -126,6 +127,71 @@ describe("validateJobDetails", () => {
     expect(errors).toContain("Photo required: before packing.");
     expect(errors).toContain("Photo required: completed.");
     expect(errors).toContain("Photo required: equipment in situ.");
+  });
+});
+
+describe("requirableFieldsFor", () => {
+  it("includes AV fields plus reported-to-site-manager and revisit for install", () => {
+    const keys = requirableFieldsFor("install").map((f) => f.key);
+    expect(keys).toContain("player_serial");
+    expect(keys).toContain("reported_to_site_manager");
+    expect(keys).toContain("issue_detail");
+    expect(keys).toContain("revisit_required");
+  });
+
+  it("drops AV fields, issue detail, and revisit for delivery — only reported-to-site-manager remains", () => {
+    expect(requirableFieldsFor("delivery").map((f) => f.key)).toEqual(["reported_to_site_manager"]);
+  });
+
+  it("keeps issue detail but drops revisit for maintenance", () => {
+    const keys = requirableFieldsFor("maintenance").map((f) => f.key);
+    expect(keys).toContain("issue_detail");
+    expect(keys).not.toContain("revisit_required");
+  });
+});
+
+describe("validateJobDetails with optionalFields", () => {
+  const avSlots = new Set(["photo_before", "photo_completed", "photo_equipment_in_situ"]);
+  const deliverySlots = new Set(["photo_before_packing", "photo_completed", "photo_equipment_in_situ"]);
+
+  it("skips a field's required-check once it's in optionalFields, leaving every other check intact", () => {
+    const values = { ...completeAvValues, revisit_required: "no", player_serial: "" };
+    expect(validateJobDetails("install", values, avSlots, true)).toContain("Player serial is required.");
+    expect(validateJobDetails("install", values, avSlots, true, new Set(["player_serial"]))).not.toContain(
+      "Player serial is required.",
+    );
+  });
+
+  it("defaults to every field mandatory when optionalFields is omitted — no behavior change for existing jobs", () => {
+    const values = { ...EMPTY_JOB_DETAILS };
+    expect(validateJobDetails("delivery", values, deliverySlots, true)).toContain(
+      "Reporting to the site manager is required.",
+    );
+  });
+
+  it("marking reported_to_site_manager optional lets a delivery job pass without it", () => {
+    const values = { ...EMPTY_JOB_DETAILS };
+    const errors = validateJobDetails(
+      "delivery",
+      values,
+      deliverySlots,
+      true,
+      new Set(["reported_to_site_manager"]),
+    );
+    expect(errors).not.toContain("Reporting to the site manager is required.");
+  });
+
+  it("never makes photos or the signature optional — optionalFields only covers form fields", () => {
+    const values = { ...completeAvValues, revisit_required: "no" };
+    const errors = validateJobDetails(
+      "install",
+      values,
+      new Set(),
+      false,
+      new Set(["player_serial", "screen_serial", "mount_type", "power_source", "network_type", "player_boot_test", "content_displaying", "reported_to_site_manager", "revisit_required"]),
+    );
+    expect(errors).toContain("Customer signature is required.");
+    expect(errors.some((e) => e.startsWith("Photo required"))).toBe(true);
   });
 });
 
