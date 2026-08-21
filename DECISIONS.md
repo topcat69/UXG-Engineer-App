@@ -2869,3 +2869,18 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 284 passed (1 new: draft-exclusion case in
 `engineer-queue.test.ts`), same 2 pre-existing Supabase-dependent failures
 as every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Remove "Sign in with Google"
+
+Magic link is the only supported login method — the "Sign in with Google"
+button on `/login` was leftover from an earlier build-out and was never
+actually usable anyway (it needs Google turned on as an Auth provider in
+the Supabase dashboard with real OAuth credentials, which was never done).
+Removed the button, its divider, and `handleGoogleSignIn` entirely from
+`app/login/page.tsx`. `auth/callback/route.ts` is untouched — it's a
+generic `exchangeCodeForSession` handler magic link's own email-link flow
+already depends on, nothing Google-specific in it to remove.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 284 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.

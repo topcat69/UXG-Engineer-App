@@ -70,28 +70,6 @@ export default function LoginPage() {
     window.location.href = "/";
   }
 
-  /**
-   * Same callback route and same post-auth gate as magic-link (see
-   * getCurrentUser in src/lib/auth/current-user.ts) — anyone with a Google
-   * account can complete this OAuth flow, but they're then immediately
-   * redirected to /login unless a matching, active row already exists in
-   * the users table. This only starts working once Google is turned on as
-   * a provider in the Supabase dashboard (Authentication > Providers >
-   * Google) with a Google Cloud OAuth client id/secret — that's
-   * console/dashboard configuration this code can't do on its own.
-   */
-  async function handleGoogleSignIn() {
-    setError(null);
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (signInError) setError(signInError.message);
-  }
-
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-sm">
@@ -141,14 +119,6 @@ export default function LoginPage() {
               {error ? <p className="text-sm text-destructive">{error}</p> : null}
               <Button type="submit" disabled={status === "sending"}>
                 {status === "sending" ? "Sending…" : "Send magic link"}
-              </Button>
-              <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                <span className="bg-border h-px flex-1" />
-                or
-                <span className="bg-border h-px flex-1" />
-              </div>
-              <Button type="button" variant="outline" onClick={handleGoogleSignIn}>
-                Sign in with Google
               </Button>
             </form>
           )}
