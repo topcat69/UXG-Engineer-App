@@ -2,8 +2,18 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { appBaseUrl } from "@/lib/app-url";
-import { sendJobEmail, sendStandaloneEmail, type SendResult } from "./resend";
-import { buildApprovedEmail, buildAssignedEmail, buildDayBeforeEmail, buildSubmittedEmail, buildWeeklySummaryEmail } from "./templates";
+import { humanize } from "@/lib/format/text";
+import { JOB_TYPE_LABELS } from "@/lib/forms/job-form";
+import { downloadBytes } from "@/lib/pdf/completion-report";
+import { sendJobEmail, sendStandaloneEmail, type EmailAttachment, type SendResult } from "./resend";
+import {
+  buildApprovedEmail,
+  buildAssignedEmail,
+  buildDayBeforeEmail,
+  buildScheduledEmail,
+  buildSubmittedEmail,
+  buildWeeklySummaryEmail,
+} from "./templates";
 
 // See resend.ts's AnySupabaseClient comment — callers pass either the SSR
 // server client or the service-role admin client.
@@ -28,6 +38,72 @@ export async function sendJobAssignedEmail(supabase: AnySupabaseClient, jobId: s
     deepLink: `${appBaseUrl()}/office/jobs/${jobId}`,
   });
   return sendJobEmail(supabase, jobId, job.assigned.email, content);
+}
+
+function attachmentFilename(kind: "RAMS" | "Site-plan", storagePath: string): string {
+  const ext = storagePath.split(".").pop();
+  return ext ? `${kind}.${ext}` : kind;
+}
+
+/**
+ * "New Job Scheduled" — sent every time a job's schedule is set or changed
+ * for its assigned engineer, including reschedules (a job dragged to a new
+ * day is a real change to what the engineer needs to know, not noise) —
+ * see the call sites in office/jobs/[id]/actions.ts, office/scheduler/actions.ts,
+ * and office/jobs/actions.ts's bulkScheduleJobs. Carries the same full job
+ * detail set as the Calendar event body (lib/google/event-payload.ts) plus
+ * whichever of RAMS/site plan are on file, downloaded from Storage and
+ * attached directly rather than just linked, per spec.
+ */
+export async function sendJobScheduledEmail(supabase: AnySupabaseClient, jobId: string): Promise<SendResult> {
+  const { data: job } = await supabase
+    .from("jobs")
+    .select(
+      "job_number, scheduled_start, scheduled_end, description, job_type, priority, assigned:users!jobs_assigned_to_fkey(name, email), job_details(job_information, sla_requirement_detail, rams_storage_path, site_plan_storage_path), job_equipment(model, serial), site:sites(name, address_line1, address_line2, town, postcode, access_notes, contact_name, contact_phone)",
+    )
+    .eq("id", jobId)
+    .single();
+  if (!job?.site || !job.assigned?.email || !job.scheduled_start) return SKIPPED;
+
+  const attachments: EmailAttachment[] = [];
+  const ramsPath = job.job_details?.rams_storage_path;
+  const sitePlanPath = job.job_details?.site_plan_storage_path;
+  if (ramsPath) {
+    const bytes = await downloadBytes(supabase, ramsPath);
+    if (bytes) attachments.push({ filename: attachmentFilename("RAMS", ramsPath), content: bytes });
+  }
+  if (sitePlanPath) {
+    const bytes = await downloadBytes(supabase, sitePlanPath);
+    if (bytes) attachments.push({ filename: attachmentFilename("Site-plan", sitePlanPath), content: bytes });
+  }
+
+  const siteAddress = [job.site.address_line1, job.site.address_line2, job.site.town, job.site.postcode]
+    .filter(Boolean)
+    .join(", ");
+
+  const content = buildScheduledEmail(
+    {
+      jobNumber: job.job_number,
+      siteName: job.site.name,
+      siteAddress,
+      scheduledStart: job.scheduled_start,
+      scheduledEnd: job.scheduled_end,
+      engineerName: job.assigned.name,
+      jobType: JOB_TYPE_LABELS[job.job_type as keyof typeof JOB_TYPE_LABELS] ?? humanize(job.job_type),
+      priority: job.priority,
+      description: job.description,
+      jobInformation: job.job_details?.job_information ?? null,
+      slaRequirementDetail: job.job_details?.sla_requirement_detail ?? null,
+      equipment: job.job_equipment ?? [],
+      accessNotes: job.site.access_notes,
+      siteContactName: job.site.contact_name,
+      siteContactPhone: job.site.contact_phone,
+      deepLink: `${appBaseUrl()}/office/jobs/${jobId}`,
+    },
+    attachments.map((a) => a.filename),
+  );
+
+  return sendJobEmail(supabase, jobId, job.assigned.email, content, attachments);
 }
 
 /** "Day-before schedule" reminder — see selection logic in src/lib/email/day-before.ts. */

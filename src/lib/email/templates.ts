@@ -30,6 +30,79 @@ export function buildAssignedEmail(input: AssignedEmailInput): EmailContent {
   return { subject: `${input.jobNumber} — ${input.siteName} — assigned to you`, html, text };
 }
 
+export type ScheduledEmailEquipmentItem = { model: string; serial: string | null };
+
+/**
+ * Everything about the job that's known at scheduling time — deliberately
+ * the same field set as the Calendar event body (see
+ * lib/google/event-payload.ts's buildEventPayload) since both exist to
+ * answer "what is this job and where/when is it", just for different
+ * surfaces (inbox vs calendar).
+ */
+export type ScheduledEmailInput = {
+  jobNumber: string;
+  siteName: string;
+  siteAddress: string;
+  scheduledStart: string;
+  scheduledEnd: string | null;
+  engineerName: string;
+  jobType: string;
+  priority: string | null;
+  description: string | null;
+  jobInformation: string | null;
+  slaRequirementDetail: string | null;
+  equipment: ScheduledEmailEquipmentItem[];
+  accessNotes: string | null;
+  siteContactName: string | null;
+  siteContactPhone: string | null;
+  deepLink: string;
+};
+
+function formatFullDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" });
+}
+
+/**
+ * "New Job Scheduled" — sent whenever a job gets a schedule (first time or
+ * a change to one), so this fires on reschedules too, not just the initial
+ * assignment. Attachments (RAMS/site plan) are handled by the caller via
+ * sendJobEmail's attachments param — this builder only produces the text
+ * that names them, since the actual files aren't known until the caller
+ * has downloaded them from Storage.
+ */
+export function buildScheduledEmail(input: ScheduledEmailInput, attachedFilenames: string[]): EmailContent {
+  const when =
+    input.scheduledEnd && input.scheduledEnd.slice(0, 10) !== input.scheduledStart.slice(0, 10)
+      ? `${formatFullDateTime(input.scheduledStart)} to ${formatFullDateTime(input.scheduledEnd)}`
+      : formatFullDateTime(input.scheduledStart);
+
+  const equipmentLine =
+    input.equipment.length > 0
+      ? `Equipment: ${input.equipment.map((e) => (e.serial ? `${e.model} (${e.serial})` : e.model)).join(", ")}`
+      : null;
+
+  const paragraphs = [
+    `Hi ${input.engineerName},`,
+    `You've been scheduled for job ${input.jobNumber} at ${input.siteName}, ${when}.`,
+    `Site: ${input.siteName} — ${input.siteAddress}`,
+    `Job type: ${input.jobType}`,
+    input.priority ? `Priority: ${input.priority}` : null,
+    input.description ? `Job description: ${input.description}` : null,
+    input.jobInformation ? `Job information: ${input.jobInformation}` : null,
+    input.slaRequirementDetail ? `SLA requirement: ${input.slaRequirementDetail}` : null,
+    equipmentLine,
+    input.accessNotes ? `Access notes: ${input.accessNotes}` : null,
+    input.siteContactName
+      ? `Site contact: ${input.siteContactName}${input.siteContactPhone ? ` (${input.siteContactPhone})` : ""}`
+      : null,
+    attachedFilenames.length > 0 ? `Attached: ${attachedFilenames.join(", ")}` : null,
+    `Job details: ${input.deepLink}`,
+  ].filter((line): line is string => !!line);
+
+  const { html, text } = wrap(paragraphs);
+  return { subject: `New Job Scheduled — ${input.jobNumber}`, html, text };
+}
+
 export type DayBeforeEmailInput = {
   jobNumber: string;
   siteName: string;

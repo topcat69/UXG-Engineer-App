@@ -2884,3 +2884,66 @@ already depends on, nothing Google-specific in it to remove.
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 284 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — "New Job Scheduled" email, with attachments
+
+Every schedule-setting entry point now sends the assigned engineer an
+email the moment their schedule is actually set or changed, per spec:
+subject starting `New Job Scheduled — {job_number}`, body carrying the
+full job detail set, and any RAMS/site-plan documents on file attached
+directly (not just linked).
+
+New template `buildScheduledEmail` (`lib/email/templates.ts`, unit
+tested) mirrors the exact field set already built for the Calendar event
+body (`lib/google/event-payload.ts`'s `buildEventPayload`, from an
+earlier addendum this session) — site, assignee, schedule window, job
+type, priority, description, job information notes, SLA requirement,
+equipment list, access notes, site contact — since both exist to answer
+the same "what is this job and where/when is it" question, just for
+different surfaces. Same-day jobs get a single date+time; jobs spanning
+multiple calendar days get a "{start} to {end}" range.
+
+Attachments needed threading a new `EmailAttachment` type and optional
+`attachments` param through `sendJobEmail`/`sendWithHeaders`
+(`lib/email/resend.ts`) down to Resend's own `attachments` field, which
+was never wired up before now. New orchestration function
+`sendJobScheduledEmail` (`lib/email/send-job-emails.ts`) queries
+`job_details.rams_storage_path`/`site_plan_storage_path`, downloads
+whichever exist via `downloadBytes` (`lib/pdf/completion-report.ts`,
+already used by the job-archive zip for the same purpose), and attaches
+them as `RAMS.{ext}`/`Site-plan.{ext}`. Same best-effort contract as
+every other email/Calendar integration in this app: a Resend or Storage
+failure never blocks the scheduling action itself.
+
+This deliberately overrides a prior design decision. `rescheduleJob`
+(`office/scheduler/actions.ts`) used to only email on a genuine
+reassignment, with the reasoning "dragging a job to a new day within the
+same engineer's lane shouldn't spam them" — but the user's explicit ask
+was "when a user is scheduled a job", and every drag *is* a schedule
+change the engineer needs to know about, reassignment or not. That
+function, `assignAndScheduleJob` (`office/jobs/[id]/actions.ts`), and
+`bulkScheduleJobs` (`office/jobs/actions.ts`) all now fire
+`sendJobScheduledEmail` whenever a call actually sets/changes
+`scheduled_start` for a job with an assigned engineer:
+
+- `assignAndScheduleJob`: fires when `newStart` is set and there's an
+  effective engineer (the one being assigned this call, or the job's
+  existing one); falls back to the old lighter `sendJobAssignedEmail`
+  only when the call reassigns without touching the schedule.
+- `rescheduleJob`: fires unconditionally on every drag now (it can only
+  be called with a schedule change in the first place), addressed to
+  whichever engineer ends up assigned.
+- `bulkScheduleJobs`: previously sent no email at all — bulk-scheduling
+  a batch of already-assigned jobs was a silent gap relative to every
+  other schedule path. Now fires per job alongside the existing Calendar
+  sync, both in the same best-effort `after()`.
+
+`bulkAssignJobs` (assign-only, no schedule touched) is untouched — it
+still sends the older, lighter `sendJobAssignedEmail`, which already
+handles the "assigned but not yet scheduled" case correctly.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 289 passed (5 new: `buildScheduledEmail`'s subject format, full
+detail body, attachment naming, and same-day-vs-multi-day range cases),
+same 2 pre-existing Supabase-dependent failures as every addendum in this
+sandbox, no regressions.

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { detectConflicts } from "@/lib/scheduler/conflicts";
 import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
-import { sendJobAssignedEmail } from "@/lib/email/send-job-emails";
+import { sendJobScheduledEmail } from "@/lib/email/send-job-emails";
 
 export type RescheduleResult = { ok: true; message: string; warning?: string } | { ok: false; message: string };
 
@@ -99,10 +99,12 @@ export async function rescheduleJob(
   after(async () => {
     await syncCalendarForJob(supabase, jobId);
 
-    // Only a genuine reassignment gets an email — dragging a job to a new day
-    // within the same engineer's lane shouldn't spam them.
-    if (targetEngineerId && targetEngineerId !== job.assigned_to) {
-      await sendJobAssignedEmail(supabase, jobId);
+    // Every drag moves scheduled_start, so every drag is "being scheduled"
+    // to whoever ends up assigned — the engineer needs to know their day
+    // changed even when it's the same engineer as before.
+    const effectiveEngineerId = targetEngineerId ?? job.assigned_to;
+    if (effectiveEngineerId) {
+      await sendJobScheduledEmail(supabase, jobId);
     }
   });
 

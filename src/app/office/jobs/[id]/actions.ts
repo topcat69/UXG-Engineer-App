@@ -12,7 +12,7 @@ import { duplicateJob } from "@/lib/jobs/duplicate-job";
 import { cloneTasksForJob } from "@/lib/jobs/clone-tasks";
 import { detectConflicts } from "@/lib/scheduler/conflicts";
 import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
-import { sendJobAssignedEmail } from "@/lib/email/send-job-emails";
+import { sendJobAssignedEmail, sendJobScheduledEmail } from "@/lib/email/send-job-emails";
 import type { ActionResult } from "../actions";
 
 /**
@@ -429,10 +429,16 @@ export async function assignAndScheduleJob(
 
   // Same best-effort, non-blocking contract as rescheduleJob/bulkAssignJobs
   // in ../actions.ts — a Calendar/Resend round trip shouldn't sit between
-  // the office user clicking Save and seeing it take effect.
+  // the office user clicking Save and seeing it take effect. A schedule
+  // being set here (newStart) always sends "New Job Scheduled" to whoever
+  // ends up assigned — reassignment alone (no schedule touched) still gets
+  // the lighter "assigned" email instead.
+  const effectiveEngineerId = engineerId ?? job.assigned_to;
   after(async () => {
     await syncCalendarForJob(supabase, jobId);
-    if (engineerId && engineerId !== job.assigned_to) {
+    if (newStart && effectiveEngineerId) {
+      await sendJobScheduledEmail(supabase, jobId);
+    } else if (engineerId && engineerId !== job.assigned_to) {
       await sendJobAssignedEmail(supabase, jobId);
     }
   });

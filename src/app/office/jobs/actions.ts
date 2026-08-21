@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
-import { sendJobAssignedEmail } from "@/lib/email/send-job-emails";
+import { sendJobAssignedEmail, sendJobScheduledEmail } from "@/lib/email/send-job-emails";
 import { nextJobNumber } from "@/lib/jobs/job-number";
 import { maxJobSequenceForYear } from "@/lib/jobs/next-job-number";
 
@@ -119,7 +119,16 @@ export async function bulkScheduleJobs(
   // Calendar API round trips before seeing "Scheduled." — confirmed for
   // real once live credentials were wired in (see DECISIONS.md), not a
   // theoretical concern.
-  after(() => Promise.all(jobIds.map((id) => syncCalendarForJob(supabase, id))));
+  // "New Job Scheduled" per job, same best-effort/skip-if-unassigned contract
+  // as sendJobScheduledEmail's own internal guard — bulk-scheduling already-
+  // assigned jobs sent no email at all before this, which was a gap relative
+  // to every other schedule-setting entry point.
+  after(() =>
+    Promise.all([
+      ...jobIds.map((id) => syncCalendarForJob(supabase, id)),
+      ...jobIds.map((id) => sendJobScheduledEmail(supabase, id)),
+    ]),
+  );
 
   revalidatePath("/office/jobs");
   return { ok: true, message: `Scheduled ${jobIds.length} job(s).` };

@@ -27,6 +27,9 @@ function getResendClient(): Resend | null {
 
 export type SendResult = { status: "sent" | "skipped"; messageId: string | null };
 
+/** A file to attach, already downloaded into memory — e.g. a RAMS/site-plan document pulled from Storage. */
+export type EmailAttachment = { filename: string; content: Buffer };
+
 /**
  * Sends one email about a job, threading it via `buildEmailHeaders`: the
  * first email for a job becomes the thread root and that root id is
@@ -40,6 +43,7 @@ export async function sendJobEmail(
   jobId: string,
   to: string,
   content: EmailContent,
+  attachments?: EmailAttachment[],
 ): Promise<SendResult> {
   const resend = getResendClient();
   if (!resend) return { status: "skipped", messageId: null };
@@ -48,7 +52,7 @@ export async function sendJobEmail(
   const isFirst = !job?.email_thread_id;
   const headers = buildEmailHeaders(jobId, isFirst, crypto.randomUUID());
 
-  await sendWithHeaders(resend, to, content, headers);
+  await sendWithHeaders(resend, to, content, headers, attachments);
 
   if (isFirst) {
     await supabase.from("jobs").update({ email_thread_id: headers.messageId }).eq("id", jobId);
@@ -73,7 +77,13 @@ export async function sendStandaloneEmail(to: string, content: EmailContent): Pr
   return { status: "sent", messageId: data?.id ?? null };
 }
 
-async function sendWithHeaders(resend: Resend, to: string, content: EmailContent, headers: EmailHeaders) {
+async function sendWithHeaders(
+  resend: Resend,
+  to: string,
+  content: EmailContent,
+  headers: EmailHeaders,
+  attachments?: EmailAttachment[],
+) {
   const emailHeaders: Record<string, string> = { "Message-ID": headers.messageId };
   if (headers.references) emailHeaders["References"] = headers.references;
   if (headers.inReplyTo) emailHeaders["In-Reply-To"] = headers.inReplyTo;
@@ -85,6 +95,7 @@ async function sendWithHeaders(resend: Resend, to: string, content: EmailContent
     html: content.html,
     text: content.text,
     headers: emailHeaders,
+    attachments: attachments?.map((a) => ({ filename: a.filename, content: a.content })),
   });
   if (error) throw new Error(`Resend send failed: ${error.message}`);
 }
