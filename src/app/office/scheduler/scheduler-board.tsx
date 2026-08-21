@@ -16,10 +16,16 @@ type JobRow = {
   scheduled_start: string | null;
   scheduled_end: string | null;
   parent_job_id: string | null;
-  site: { name: string } | null;
+  site: { name: string; client: { name: string } | null } | null;
 };
 
 type Engineer = { id: string; name: string; max_jobs_per_day: number | null; icsUrl: string };
+
+/** "Site (Client)" — same parenthetical convention as the job detail page's own site/client line. */
+function siteLabel(site: JobRow["site"]): string {
+  if (!site) return "";
+  return site.client ? `${site.name} (${site.client.name})` : site.name;
+}
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -168,7 +174,7 @@ function FragmentRow({
                   data-job-id={job.id}
                   onDragStart={(e) => e.dataTransfer.setData("text/plain", job.id)}
                   className={`cursor-grab rounded border border-l-4 p-1 text-xs shadow-sm active:cursor-grabbing ${STATUS_COLOR_CLASSES[statusColorBucket(job.status)]}`}
-                  title={`${job.job_number} · ${job.site?.name ?? ""} · ${lane.label} · ${humanize(job.status)}`}
+                  title={`${job.job_number} · ${siteLabel(job.site)} · ${lane.label} · ${humanize(job.status)}`}
                 >
                   <div className="flex items-center justify-between gap-1">
                     <span className="font-medium">{job.job_number}</span>
@@ -178,7 +184,7 @@ function FragmentRow({
                       </span>
                     )}
                   </div>
-                  <div className="text-muted-foreground truncate">{job.site?.name}</div>
+                  <div className="text-muted-foreground truncate">{siteLabel(job.site)}</div>
                   {job.scheduled_start && (
                     <div className="text-muted-foreground">{formatScheduleRange(job.scheduled_start, job.scheduled_end)}</div>
                   )}

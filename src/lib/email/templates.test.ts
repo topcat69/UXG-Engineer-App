@@ -38,6 +38,7 @@ describe("buildAssignedEmail", () => {
 describe("buildScheduledEmail", () => {
   const base = {
     jobNumber: "UXG-2026-0042",
+    clientName: "Acme Corp",
     siteName: "Riverside Retail Park",
     siteAddress: "12 Riverside Way, Leeds, LS1 4AB",
     scheduledStart: "2026-08-21T09:00:00.000Z",
@@ -62,6 +63,7 @@ describe("buildScheduledEmail", () => {
 
   it("includes the full job detail set in the body", () => {
     const email = buildScheduledEmail(base, []);
+    expect(email.text).toContain("Acme Corp");
     expect(email.text).toContain("Riverside Retail Park");
     expect(email.text).toContain("12 Riverside Way, Leeds, LS1 4AB");
     expect(email.text).toContain("Install");
@@ -73,6 +75,11 @@ describe("buildScheduledEmail", () => {
     expect(email.text).toContain("Ring bell twice");
     expect(email.text).toContain("Sam Okafor (01234 567890)");
     expect(email.text).toContain(base.deepLink);
+  });
+
+  it("says nothing about a client when the site has none", () => {
+    const email = buildScheduledEmail({ ...base, clientName: null }, []);
+    expect(email.text).not.toContain("Client:");
   });
 
   it("names attached files when there are any", () => {

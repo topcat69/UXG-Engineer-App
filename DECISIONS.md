@@ -3264,3 +3264,25 @@ nothing.
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 302 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Client name on the scheduler board and the scheduled email
+
+Both surfaces showed the site but not which client it belongs to.
+
+**Scheduler** (`office/scheduler/scheduler-board.tsx`): job cards and their
+hover tooltip now show `Site (Client)` — same parenthetical convention the
+job detail page already uses for site/client. `siteLabel()` is one small
+pure helper shared by both the card line and the tooltip so they can't
+drift apart. `page.tsx`'s job query joins `client:clients(name)` through
+`site:sites(...)`, same join shape used everywhere else in this app.
+
+**Scheduled email** (`buildScheduledEmail`/`sendJobScheduledEmail`): added
+a `Client:` line right after the opening sentence, only shown when the
+site actually has one on file (some sites predate the client feature or
+were never assigned one). `sendJobScheduledEmail`'s query now joins
+`client:clients(name)` the same way.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 303 passed (1 new: `buildScheduledEmail` omits the Client line
+when there isn't one), same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.

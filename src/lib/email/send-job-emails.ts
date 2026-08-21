@@ -59,7 +59,7 @@ export async function sendJobScheduledEmail(supabase: AnySupabaseClient, jobId: 
   const { data: job } = await supabase
     .from("jobs")
     .select(
-      "job_number, scheduled_start, scheduled_end, description, job_type, priority, assigned:users!jobs_assigned_to_fkey(name, email), job_details(job_information, sla_requirement_detail, rams_storage_path, site_plan_storage_path), job_equipment(model, serial), site:sites(name, address_line1, address_line2, town, postcode, access_notes, contact_name, contact_phone)",
+      "job_number, scheduled_start, scheduled_end, description, job_type, priority, assigned:users!jobs_assigned_to_fkey(name, email), job_details(job_information, sla_requirement_detail, rams_storage_path, site_plan_storage_path), job_equipment(model, serial), site:sites(name, address_line1, address_line2, town, postcode, access_notes, contact_name, contact_phone, client:clients(name))",
     )
     .eq("id", jobId)
     .single();
@@ -84,6 +84,7 @@ export async function sendJobScheduledEmail(supabase: AnySupabaseClient, jobId: 
   const content = buildScheduledEmail(
     {
       jobNumber: job.job_number,
+      clientName: job.site.client?.name ?? null,
       siteName: job.site.name,
       siteAddress,
       scheduledStart: job.scheduled_start,

@@ -15,7 +15,8 @@ export default async function SchedulerPage({
   const weekEnd = addDays(monday, 7);
   const days = Array.from({ length: 7 }, (_, i) => isoDate(addDays(monday, i)));
 
-  const jobColumns = "id, job_number, status, assigned_to, scheduled_start, scheduled_end, parent_job_id, site:sites(name)";
+  const jobColumns =
+    "id, job_number, status, assigned_to, scheduled_start, scheduled_end, parent_job_id, site:sites(name, client:clients(name))";
   const supabase = await createClient();
   const [{ data: engineers }, { data: jobsStartingThisWeek }, { data: jobsSpanningIntoThisWeek }] = await Promise.all(
     [

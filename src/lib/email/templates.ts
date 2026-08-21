@@ -41,6 +41,7 @@ export type ScheduledEmailEquipmentItem = { model: string; serial: string | null
  */
 export type ScheduledEmailInput = {
   jobNumber: string;
+  clientName: string | null;
   siteName: string;
   siteAddress: string;
   scheduledStart: string;
@@ -84,6 +85,7 @@ export function buildScheduledEmail(input: ScheduledEmailInput, attachedFilename
   const paragraphs = [
     `Hi ${input.engineerName},`,
     `You've been scheduled for job ${input.jobNumber} at ${input.siteName}, ${when}.`,
+    input.clientName ? `Client: ${input.clientName}` : null,
     `Site: ${input.siteName} — ${input.siteAddress}`,
     `Job type: ${input.jobType}`,
     input.priority ? `Priority: ${input.priority}` : null,
