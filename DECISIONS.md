@@ -3154,3 +3154,37 @@ test, plus the already-parameterised `THEME_LABELS`/`ALL_THEME_CLASSNAMES`
 checks picking it up automatically), same 2 pre-existing
 Supabase-dependent failures as every addendum in this sandbox, no
 regressions.
+
+## 2026-08-21 — Log the actual DB error in getCurrentUser instead of swallowing it
+
+Root-caused a "can't log in" report: the theming feature's `users.theme`
+column had shipped in code (root layout now reads it on every request)
+before `supabase db push` had been run against production, so the
+`users` select in `getCurrentUser()` was failing on the missing column —
+and that failure was silently discarded (`const { data } = await
+...select(...)`, `error` never even read). A real query failure looked
+byte-for-byte identical to "not signed in" to every single caller, which
+all redirect to `/login` on a null return — so a magic-link code that
+verified correctly at the Supabase Auth level still bounced the user
+straight back to the login page with zero indication why, on both apps
+at once (they share this one function).
+
+Fixed by actually reading and logging the error (`console.error`) when
+the select fails. Deliberately still returns `null` in that case, same as
+before — a broken query must never render a broken authenticated page to
+a real user, so the redirect-to-login behavior is correct and stays. The
+fix is purely diagnostic: `docker compose logs app` now shows exactly
+which query failed and why, instead of this class of bug looking
+indistinguishable from a user mistyping their code.
+
+Root cause here was environmental, not this fix: a deploy that adds a
+column to a `select()` needs `supabase db push` run before (or in the
+same breath as) rolling out the app image — this is already the stated
+deploy order in every addendum, but it's easy to run three feature
+deploys back to back and drop the migration step on one of them,
+especially when a later one ("no migration needed this time") reads as
+"skip the db push."
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 302 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.
