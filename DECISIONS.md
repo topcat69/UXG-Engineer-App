@@ -2782,3 +2782,38 @@ description wasn't in the event at all.
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 282 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Calendar events: assignee + full job information
+
+Following up on yesterday's all-day-event change: Calendar event
+descriptions now also include who the job is assigned to and the rest of
+the job's detail fields, not just the free-text description.
+
+`CalendarJob` (`lib/google/event-payload.ts`) grew four fields that aren't
+plain `jobs` columns — `assignedName`, `jobInformation`,
+`slaRequirementDetail`, `equipment` — since they come from a join
+(assignee) and two other tables (`job_details`, `job_equipment`) rather
+than the `jobs` row itself; callers assemble them from whatever they
+already query rather than this (still pure, network-free) module reaching
+into Supabase on its own. `buildEventPayload()`'s description now reads:
+site, assigned engineer (or "Unassigned"), job type (via the same
+`JOB_TYPE_LABELS` map used across the office UI) and priority, the job's
+free-text description, the "Job Information" notes prepared for the
+engineer, the SLA requirement note, and the equipment list — each still
+individually optional/omitted when not set, same convention as the
+existing access-notes/contact/coordinates lines.
+
+`sync-job-calendar.ts`'s query grew to match — `assigned:users!jobs_assigned_to_fkey(name)`,
+`job_details(job_information, sla_requirement_detail)`, `job_equipment(model, serial)`.
+Hit one real gotcha while writing it: the query string was originally
+built via `+` concatenation across multiple lines for readability, which
+silently breaks Supabase-js's typed `.select()` — it parses the query
+shape from the string's *literal* TypeScript type to compute the result
+type, and a runtime-concatenated string loses that, so every field came
+back typed as `GenericStringError` instead of erroring at the call site
+that actually used it. Fixed by writing it as one single string literal
+instead.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 283 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.

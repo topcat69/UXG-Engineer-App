@@ -21,6 +21,15 @@ const job = {
   scheduled_end: "2026-08-10T11:00:00.000Z",
   calendar_event_id: null,
   description: "Replace faulty player and re-test content playback.",
+  job_type: "install",
+  priority: "P2",
+  assignedName: "Sam Carter",
+  jobInformation: "Site manager expects us before 9am, park round the back.",
+  slaRequirementDetail: "4-hour response",
+  equipment: [
+    { model: "BrightSign XT1144", serial: "SN-1001" },
+    { model: "Samsung QM75B", serial: null },
+  ],
 };
 
 describe("fullSiteAddress", () => {
@@ -44,13 +53,24 @@ describe("buildEventPayload", () => {
     expect(payload.location).toBe("12 River Road, Leeds, LS1 4AB");
   });
 
-  it("includes the site name, job description, access notes, site contact, and a deep link to the job in the description", () => {
+  it("includes site, assignee, job type/priority, description, job information, SLA, equipment, access notes, site contact, and a deep link", () => {
     const payload = buildEventPayload(job, site, "https://uxgengineering.example.com");
     expect(payload.description).toContain("Site: Riverside Retail Park");
+    expect(payload.description).toContain("Assigned to: Sam Carter");
+    expect(payload.description).toContain("Job type: Installation");
+    expect(payload.description).toContain("Priority: P2");
     expect(payload.description).toContain("Job description: Replace faulty player and re-test content playback.");
+    expect(payload.description).toContain("Job information: Site manager expects us before 9am, park round the back.");
+    expect(payload.description).toContain("SLA requirement: 4-hour response");
+    expect(payload.description).toContain("Equipment: BrightSign XT1144 (SN-1001), Samsung QM75B");
     expect(payload.description).toContain("Access notes: Use the loading bay, ask for Dave");
     expect(payload.description).toContain("Dave Holt (07700 900123)");
     expect(payload.description).toContain("https://uxgengineering.example.com/office/jobs/job-1");
+  });
+
+  it("shows 'Unassigned' when the job has no assignee", () => {
+    const payload = buildEventPayload({ ...job, assignedName: null }, site, "https://x");
+    expect(payload.description).toContain("Assigned to: Unassigned");
   });
 
   it("omits the job description line when the job has none", () => {
@@ -77,11 +97,13 @@ describe("buildEventPayload", () => {
 
   it("omits missing optional description lines instead of leaving blank lines", () => {
     const payload = buildEventPayload(
-      { ...job, description: null },
+      { ...job, description: null, jobInformation: null, slaRequirementDetail: null, equipment: [], assignedName: null },
       { ...site, access_notes: null, contact_name: null, latitude: null, longitude: null },
       "https://x",
     );
-    expect(payload.description).toBe("Site: Riverside Retail Park\nhttps://x/office/jobs/job-1");
+    expect(payload.description).toBe(
+      "Site: Riverside Retail Park\nAssigned to: Unassigned\nJob type: Installation\nPriority: P2\nhttps://x/office/jobs/job-1",
+    );
   });
 
   it("includes a link to the site's exact stored coordinates when known", () => {

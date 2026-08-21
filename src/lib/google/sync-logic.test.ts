@@ -21,6 +21,12 @@ const scheduledJob = {
   scheduled_end: "2026-08-10T11:00:00.000Z",
   calendar_event_id: null as string | null,
   description: null as string | null,
+  job_type: "install",
+  priority: "P3",
+  assignedName: null as string | null,
+  jobInformation: null as string | null,
+  slaRequirementDetail: null as string | null,
+  equipment: [] as { model: string; serial: string | null }[],
 };
 
 function fakeCalendar(): CalendarClientLike {

@@ -1,12 +1,28 @@
 import type { Database } from "@/lib/supabase/database.types";
+import { humanize } from "@/lib/format/text";
+import { JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 
 type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 type SiteRow = Database["public"]["Tables"]["sites"]["Row"];
 
+export type CalendarEquipmentItem = { model: string; serial: string | null };
+
+/**
+ * `assignedName`/`jobInformation`/`slaRequirementDetail`/`equipment` aren't
+ * columns on `jobs` itself (assignee comes from a join, the rest from
+ * `job_details`/`job_equipment`) — callers assemble this from whatever
+ * queries they already run rather than this module reaching into Supabase
+ * itself, keeping the payload builder pure or network-free.
+ */
 export type CalendarJob = Pick<
   JobRow,
-  "id" | "job_number" | "scheduled_start" | "scheduled_end" | "calendar_event_id" | "description"
->;
+  "id" | "job_number" | "scheduled_start" | "scheduled_end" | "calendar_event_id" | "description" | "job_type" | "priority"
+> & {
+  assignedName: string | null;
+  jobInformation: string | null;
+  slaRequirementDetail: string | null;
+  equipment: CalendarEquipmentItem[];
+};
 export type CalendarSite = Pick<
   SiteRow,
   | "name"
@@ -77,9 +93,20 @@ export function buildEventPayload(job: CalendarJob, site: CalendarSite, deepLink
     throw new Error(`Job ${job.id} has no schedule — cannot build a calendar event`);
   }
 
+  const equipmentLine =
+    job.equipment.length > 0
+      ? `Equipment: ${job.equipment.map((e) => (e.serial ? `${e.model} (${e.serial})` : e.model)).join(", ")}`
+      : null;
+
   const descriptionLines = [
     `Site: ${site.name}`,
+    `Assigned to: ${job.assignedName ?? "Unassigned"}`,
+    `Job type: ${JOB_TYPE_LABELS[job.job_type as keyof typeof JOB_TYPE_LABELS] ?? humanize(job.job_type)}`,
+    job.priority ? `Priority: ${job.priority}` : null,
     job.description ? `Job description: ${job.description}` : null,
+    job.jobInformation ? `Job information: ${job.jobInformation}` : null,
+    job.slaRequirementDetail ? `SLA requirement: ${job.slaRequirementDetail}` : null,
+    equipmentLine,
     site.access_notes ? `Access notes: ${site.access_notes}` : null,
     site.contact_name ? `Site contact: ${site.contact_name}${site.contact_phone ? ` (${site.contact_phone})` : ""}` : null,
     coordinatesMapLink(site),

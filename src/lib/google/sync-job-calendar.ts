@@ -20,13 +20,28 @@ export async function syncCalendarForJob(supabase: AnySupabaseClient, jobId: str
     const { data: job } = await supabase
       .from("jobs")
       .select(
-        "id, job_number, scheduled_start, scheduled_end, calendar_event_id, description, site:sites(name, address_line1, address_line2, town, postcode, access_notes, contact_name, contact_phone, latitude, longitude)",
+        "id, job_number, scheduled_start, scheduled_end, calendar_event_id, description, job_type, priority, assigned:users!jobs_assigned_to_fkey(name), job_details(job_information, sla_requirement_detail), job_equipment(model, serial), site:sites(name, address_line1, address_line2, town, postcode, access_notes, contact_name, contact_phone, latitude, longitude)",
       )
       .eq("id", jobId)
       .single();
     if (!job || !job.site || !job.scheduled_start || !job.scheduled_end) return;
 
-    const result = await syncJobCalendarEvent(job, job.site, appBaseUrl());
+    const calendarJob = {
+      id: job.id,
+      job_number: job.job_number,
+      scheduled_start: job.scheduled_start,
+      scheduled_end: job.scheduled_end,
+      calendar_event_id: job.calendar_event_id,
+      description: job.description,
+      job_type: job.job_type,
+      priority: job.priority,
+      assignedName: job.assigned?.name ?? null,
+      jobInformation: job.job_details?.job_information ?? null,
+      slaRequirementDetail: job.job_details?.sla_requirement_detail ?? null,
+      equipment: job.job_equipment ?? [],
+    };
+
+    const result = await syncJobCalendarEvent(calendarJob, job.site, appBaseUrl());
     if (result.status !== "skipped" && result.eventId !== job.calendar_event_id) {
       await supabase.from("jobs").update({ calendar_event_id: result.eventId }).eq("id", jobId);
     }
