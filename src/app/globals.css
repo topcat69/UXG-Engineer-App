@@ -118,18 +118,18 @@
 }
 
 /*
- * Three more themes alongside the default light/.dark above — same token
- * set, just a different accent hue apiece. Blue and Forest are light-
- * background (like :root), so destructive and chart-1..5 are left
- * undefined for them on purpose: unoverridden custom properties fall
- * through to :root's values (same element, lower-specificity rule loses
- * only where a property is actually redefined) — keeping "danger" red and
- * dashboard chart colors consistent across every light-background theme
- * rather than reinventing them for no visual benefit. Navy is the
- * exception: a dark-background theme needs the same treatment .dark
- * already gets (a lighter destructive, a lighter chart-5) for the same
- * contrast reason, so it redefines those explicitly instead of inheriting
- * :root's light-tuned values.
+ * Four more themes alongside the default light/.dark above — same token
+ * set, just a different accent hue (or, for Navy, a different background)
+ * apiece. Blue, Forest, and Sky are light-background (like :root), so
+ * destructive and chart-1..5 are left undefined for them on purpose:
+ * unoverridden custom properties fall through to :root's values (same
+ * element, lower-specificity rule loses only where a property is actually
+ * redefined) — keeping "danger" red and dashboard chart colors consistent
+ * across every light-background theme rather than reinventing them for no
+ * visual benefit. Navy is the exception: a dark-background theme needs the
+ * same treatment .dark already gets (a lighter destructive, a lighter
+ * chart-5) for the same contrast reason, so it redefines those explicitly
+ * instead of inheriting :root's light-tuned values.
  */
 .theme-blue {
   --background: oklch(0.985 0.004 250);
@@ -219,6 +219,41 @@
   --sidebar-accent-foreground: oklch(0.95 0.01 255);
   --sidebar-border: oklch(1 0 0 / 12%);
   --sidebar-ring: oklch(0.749 0.162 64.135);
+}
+
+/*
+ * Distinct from Blue on purpose: Blue's background is nearly white with
+ * just a hint of blue (a "white page, blue accent" theme); Sky's page
+ * background is itself a visibly, brightly blue surface, with cards
+ * floating on it in a near-white tone — much closer to what "sky blue
+ * theme" actually evokes than another barely-tinted white would be.
+ */
+.theme-sky {
+  --background: oklch(0.93 0.045 220);
+  --foreground: oklch(0.22 0.03 220);
+  --card: oklch(0.98 0.012 220);
+  --card-foreground: oklch(0.22 0.03 220);
+  --popover: oklch(0.98 0.012 220);
+  --popover-foreground: oklch(0.22 0.03 220);
+  --primary: oklch(0.58 0.16 222);
+  --primary-foreground: oklch(0.98 0.01 220);
+  --secondary: oklch(0.88 0.035 220);
+  --secondary-foreground: oklch(0.25 0.03 220);
+  --muted: oklch(0.88 0.035 220);
+  --muted-foreground: oklch(0.48 0.025 220);
+  --accent: oklch(0.85 0.05 218);
+  --accent-foreground: oklch(0.28 0.05 218);
+  --border: oklch(0.82 0.035 220);
+  --input: oklch(0.82 0.035 220);
+  --ring: oklch(0.58 0.16 222);
+  --sidebar: oklch(0.9 0.04 220);
+  --sidebar-foreground: oklch(0.22 0.03 220);
+  --sidebar-primary: oklch(0.58 0.16 222);
+  --sidebar-primary-foreground: oklch(0.98 0.01 220);
+  --sidebar-accent: oklch(0.85 0.05 218);
+  --sidebar-accent-foreground: oklch(0.28 0.05 218);
+  --sidebar-border: oklch(0.82 0.035 220);
+  --sidebar-ring: oklch(0.58 0.16 222);
 }
 
 @layer base {

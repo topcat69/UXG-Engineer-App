@@ -3127,3 +3127,30 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 302 passed (same count — Navy's tests are renamed Slate tests,
 not new ones), same 2 pre-existing Supabase-dependent failures as every
 addendum in this sandbox, no regressions.
+
+## 2026-08-21 — 6th theme: Sky Blue
+
+Added a 6th theme on request. Deliberately distinct from the existing
+"Blue" theme rather than a near-duplicate: Blue is a "white page, blue
+accent" look (background barely tinted, oklch chroma 0.004); Sky Blue's
+page background is itself visibly, brightly blue (oklch chroma 0.045,
+lightness 0.93), with near-white cards floating on top of it — much
+closer to what "sky blue theme" actually evokes than another
+barely-tinted white would have been.
+
+Light-background like Blue/Forest, so it follows their pattern: destructive
+and chart-1..5 are left undefined and inherit `:root`'s light-tuned values
+(only Navy, the one dark-background theme among the four added, needs its
+own).
+
+Verified visually the same way as the other additions — screenshotted
+`/login` under `.theme-sky` via Playwright/Chromium; the card, button, and
+input all read cleanly against the brighter blue background.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 302 passed (no new test count — Sky's coverage is an added
+assertion in `themeClassName`'s existing "prefixes every other theme"
+test, plus the already-parameterised `THEME_LABELS`/`ALL_THEME_CLASSNAMES`
+checks picking it up automatically), same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions.
