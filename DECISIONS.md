@@ -2817,3 +2817,28 @@ instead.
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 283 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Managers can reach the field (mobile) app
+
+Turned out the field app itself never had a role restriction — `/my-jobs`
+only checks that someone's signed in, and nothing in `job-list.tsx`,
+`job-workflow.tsx`, `field-app.tsx`, or `sync-down.ts` ever checks
+`user.role` (it all keys off `assigned_to === currentUserId`, and jobs
+have been assignable to managers since an earlier addendum this session).
+The actual gap was purely navigational: the root page (`app/page.tsx`)
+redirects superadmin/manager straight to `/office/jobs` on every login
+with no path back out to `/my-jobs`, and the office nav had no link to
+it either — so a manager could only ever reach the field app by typing
+the URL by hand.
+
+Fixed with two links, not a role-model change: `office/layout.tsx` gained
+a "My Jobs (field app)" link next to the sign-out button, and
+`field-app.tsx`'s header gained an "Office" link back to `/office/jobs`,
+shown only for manager/superadmin (an engineer has no office access to
+link to — `requireOfficeUser()` would just bounce them straight back).
+Managers still land on `/office/jobs` by default after login, same as
+before — this only adds a way to switch, not a new default.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 283 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.

@@ -38,6 +38,9 @@ export default async function OfficeLayout({ children }: { children: React.React
           <span className="text-muted-foreground">
             {user.name} · {humanize(user.role)}
           </span>
+          <Link href="/my-jobs" className="text-muted-foreground hover:text-foreground underline">
+            My Jobs (field app)
+          </Link>
           <form action={signOut}>
             <button type="submit" className="text-muted-foreground hover:text-foreground underline">
               Sign out

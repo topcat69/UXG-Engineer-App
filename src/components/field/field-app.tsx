@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { InstallPrompt } from "@/components/install-prompt";
 import { UxgLogo } from "@/components/branding/uxg-logo";
@@ -45,6 +46,13 @@ export function FieldApp({ user }: { user: CurrentUser }) {
             {hasPending ? `${summary.pendingOps + summary.pendingMedia} unsent` : "All synced"}
           </button>
           <span className="text-muted-foreground">{user.name}</span>
+          {/* Managers/superadmins can be assigned jobs too, so they can reach this
+              app — but unlike an engineer, they also have somewhere to switch back to. */}
+          {(user.role === "manager" || user.role === "superadmin") && (
+            <Link href="/office/jobs" className="text-muted-foreground underline">
+              Office
+            </Link>
+          )}
         </div>
       </header>
 
