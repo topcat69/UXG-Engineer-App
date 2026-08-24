@@ -3995,3 +3995,43 @@ against the exact reported symptom, and is covered by a real Dexie test
 exists, but the full "walk away and come back" scenario end-to-end
 through a real browser session has not been re-run. Flagged for a real
 check once deployed.
+
+## 2026-08-24 — Completion PDF banner: pale-grey logo variant, not the dark-on-light one
+
+The rebranded PDF banner (see the earlier rebrand addendum) is a
+charcoal-to-grey gradient, and was drawing the office UI's own logo asset
+(`public/branding/uxg-logo.png`) on top of it — that file is the
+charcoal-wordmark version meant for the light backgrounds it actually
+appears on elsewhere in the app, so on the banner's dark left edge it was
+barely visible. The office supplied the correct variant to use instead:
+pale-grey lettering with the colour bar unchanged, matching the Brand
+Manual's own "Colour Alternatives" rule (Section 1: "When on a dark or
+coloured background, the UXG logo changes to pale grey lettering,
+retaining the colour in the colour bar").
+
+Generated `public/branding/uxg-logo-white.png` programmatically from the
+existing `uxg-logo.png` (Pillow, one-off script, not committed) rather
+than saving a hand-supplied export: sampled the wordmark's actual
+charcoal pixel colour, then recoloured every pixel closer to that colour
+than to any of the three bar colours to the Manual's pale grey
+(`#E4E4E7`), leaving the bar and the transparent background untouched.
+Doing it this way — from the one source file already in the repo, by the
+Manual's own documented rule — means there's one logo asset pair, not a
+hand-exported file that could subtly drift (different padding, different
+grey) from the original the next time either needs to change.
+`brand.ts`'s `loadLogoBytes()` now reads this new file for the PDF
+banner; the office UI's own logo component
+(`components/branding/uxg-logo.tsx`) is untouched, since it isn't drawn
+on a dark background and was never part of this request.
+
+Verified visually the same way as the original PDF rebrand: generated a
+real sample PDF against fabricated data (temporarily neutralizing the
+`server-only` guard, restored immediately after) and rendered it to a PNG
+with `pdftoppm` — the logo reads clearly against the banner now, colour
+bar intact.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 332 passed (unchanged; a new binary asset and a one-line change
+to which file `loadLogoBytes()` reads, nothing to unit test), same 2
+pre-existing Supabase-dependent failures as every addendum in this
+sandbox, no regressions.

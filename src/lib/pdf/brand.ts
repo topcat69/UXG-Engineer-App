@@ -7,16 +7,23 @@ import { severityAccent } from "./severity";
 export { BRAND, severityAccent };
 
 /**
- * Reads the same logo PNG the office UI already renders
- * (components/branding/uxg-logo.tsx) — one asset, used both in the app
- * chrome and here, rather than a second copy that could drift out of sync
- * with a rebrand. `process.cwd()` is the app root both under `next dev`
- * and in the standalone Docker runtime (see Dockerfile: `WORKDIR /app`,
- * `COPY --from=builder /app/public ./public`), so this resolves the same
- * way in both.
+ * The pale-grey-on-dark variant of the UXG logo, per the Brand Manual's
+ * own "Colour Alternatives" rule (Section 1): "When on a dark or coloured
+ * background, the UXG logo changes to pale grey lettering, retaining the
+ * colour in the colour bar." The banner it sits on (drawBanner, below) is
+ * a charcoal gradient, so the normal charcoal-on-transparent logo
+ * (`uxg-logo.png`, what the office UI renders on its own light chrome)
+ * would be almost invisible there. Generated once from that same source
+ * file by recolouring only the wordmark's charcoal pixels to the manual's
+ * pale grey (`#E4E4E7`) and leaving the bar's three brand colours
+ * untouched — not a second hand-exported asset that could drift out of
+ * sync with the original. `process.cwd()` is the app root both under
+ * `next dev` and in the standalone Docker runtime (see Dockerfile:
+ * `WORKDIR /app`, `COPY --from=builder /app/public ./public`), so this
+ * resolves the same way in both.
  */
 export function loadLogoBytes(): Buffer {
-  return fs.readFileSync(path.join(process.cwd(), "public/branding/uxg-logo.png"));
+  return fs.readFileSync(path.join(process.cwd(), "public/branding/uxg-logo-white.png"));
 }
 
 type Doc = PDFKit.PDFDocument;
