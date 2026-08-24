@@ -3870,3 +3870,50 @@ clean — 327 passed (unchanged; no new pure logic — three optional text
 fields with no validation to unit test), same 2 pre-existing
 Supabase-dependent failures as every addendum in this sandbox, no
 regressions. Needs `supabase db push` on deploy (new columns).
+
+## 2026-08-24 — Same parking/site-manager fields, also settable by the office up front
+
+Follow-up to the addendum above: the previous turn only made
+`parking_notes`/`site_manager_name`/`site_manager_phone` editable by the
+field engineer, on site. The office needs to set them too — at job
+creation/prep time, before the engineer ever travels, the same way
+`job_information`/`sla_requirement_detail` already work as office-prepared
+notes.
+
+Added two server actions to `office/jobs/[id]/actions.ts` —
+`updateParkingNotes`/`updateSiteManagerContact` — identical
+upsert-into-`job_details` shape to the existing
+`updateJobInformation`/`updateSlaRequirement`, and a matching UI in
+`JobDetailsPanel` (a Textarea for parking notes, two inputs + one Save for
+the site manager's name/number), placed right after the existing "Details
+about the job" notes field — the same panel already shown on the job
+detail page immediately after `CreateJobForm` redirects there, which is
+the office's actual "creating a job" flow (the create form itself stays
+minimal — project/site/type only — RAMS, site plan, equipment, and now
+these were always meant to be filled in on the job page right after, not
+crammed into the creation dialog).
+
+**This makes these three fields genuinely two-way**, unlike
+`job_information`/`sla_requirement_detail` (office-only,
+`currentDetailsRow()` in `job-workflow.tsx` always re-reads those two
+straight from the freshly-synced `detailsRow` at save time specifically
+so an engineer's offline save can never clobber an office edit) or
+`parking_notified`/`reported_to_site_manager` (engineer-only, no office
+UI at all). `parking_notes`/`site_manager_name`/`site_manager_phone` were
+wired into `JobDetailsValues` in the previous addendum, so the engineer's
+saves write them from local form state like every other engineer-editable
+field — meaning an office edit made while an engineer already has the job
+open and mid-visit could be overwritten by the engineer's next autosave,
+last-write-wins. Accepted rather than engineered around: the case this
+was actually asked for — office sets these before the engineer starts —
+already works correctly, since sync-down pulls the office's value in
+before the engineer's form ever hydrates. Concurrent same-field edits from
+both sides during an active visit are a narrow edge case neither request
+described, and "last save wins" is the same tradeoff several other
+fields in this app already accept.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 327 passed (unchanged — two new server actions and UI wiring, no
+new pure logic), same 2 pre-existing Supabase-dependent failures as every
+addendum in this sandbox, no regressions. No new migration — reuses the
+columns the previous addendum already added.

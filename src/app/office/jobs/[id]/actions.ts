@@ -309,6 +309,38 @@ export async function updateJobInformation(jobId: string, detail: string): Promi
   return { ok: true, message: "Saved." };
 }
 
+/**
+ * Parking restrictions/considerations and the known site manager contact —
+ * set here at job creation/prep time so the engineer already has them
+ * before travelling, on top of the same fields the engineer can also fill
+ * in themselves on site (job-workflow.tsx) if the office didn't know them
+ * up front. Same upsert-into-job_details shape as the two actions above.
+ */
+export async function updateParkingNotes(jobId: string, notes: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("job_details")
+    .upsert({ job_id: jobId, parking_notes: notes.trim() || null }, { onConflict: "job_id" });
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/office/jobs/${jobId}`);
+  return { ok: true, message: "Saved." };
+}
+
+export async function updateSiteManagerContact(jobId: string, name: string, phone: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("job_details")
+    .upsert(
+      { job_id: jobId, site_manager_name: name.trim() || null, site_manager_phone: phone.trim() || null },
+      { onConflict: "job_id" },
+    );
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/office/jobs/${jobId}`);
+  return { ok: true, message: "Saved." };
+}
+
 export type JobEquipmentRow = { id: string; model: string; serial: string | null };
 export type AddEquipmentResult = { ok: true; item: JobEquipmentRow } | { ok: false; message: string };
 

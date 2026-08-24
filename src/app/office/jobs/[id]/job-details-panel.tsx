@@ -4,13 +4,25 @@ import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { showsSiteplanAndEquipment, showsSlaRequirement, usesJobDetails, type JobDetailsType } from "@/lib/forms/job-form";
-import { addJobEquipment, deleteJobEquipment, updateJobInformation, updateSlaRequirement, uploadJobDocument, type JobEquipmentRow } from "./actions";
+import {
+  addJobEquipment,
+  deleteJobEquipment,
+  updateJobInformation,
+  updateParkingNotes,
+  updateSiteManagerContact,
+  updateSlaRequirement,
+  uploadJobDocument,
+  type JobEquipmentRow,
+} from "./actions";
 
 type JobDetailsData = {
   rams_storage_path: string | null;
   site_plan_storage_path: string | null;
   sla_requirement_detail: string | null;
   job_information: string | null;
+  parking_notes: string | null;
+  site_manager_name: string | null;
+  site_manager_phone: string | null;
 } | null;
 
 /**
@@ -37,6 +49,9 @@ export function JobDetailsPanel({
   const [serial, setSerial] = useState("");
   const [slaDetail, setSlaDetail] = useState(jobDetails?.sla_requirement_detail ?? "");
   const [jobInfo, setJobInfo] = useState(jobDetails?.job_information ?? "");
+  const [parkingNotes, setParkingNotes] = useState(jobDetails?.parking_notes ?? "");
+  const [siteManagerName, setSiteManagerName] = useState(jobDetails?.site_manager_name ?? "");
+  const [siteManagerPhone, setSiteManagerPhone] = useState(jobDetails?.site_manager_phone ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const ramsInputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +86,20 @@ export function JobDetailsPanel({
     });
   }
 
+  function handleSaveParkingNotes() {
+    startTransition(async () => {
+      const result = await updateParkingNotes(jobId, parkingNotes);
+      setMessage(result.message);
+    });
+  }
+
+  function handleSaveSiteManagerContact() {
+    startTransition(async () => {
+      const result = await updateSiteManagerContact(jobId, siteManagerName, siteManagerPhone);
+      setMessage(result.message);
+    });
+  }
+
   function handleAddEquipment() {
     startTransition(async () => {
       const result = await addJobEquipment(jobId, model, serial);
@@ -100,6 +129,36 @@ export function JobDetailsPanel({
         <span className="text-muted-foreground text-xs">Details about the job (shown to the engineer)</span>
         <Textarea value={jobInfo} onChange={(e) => setJobInfo(e.target.value)} rows={4} />
         <Button type="button" size="sm" disabled={isPending} onClick={handleSaveJobInfo} className="self-start">
+          Save
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="text-muted-foreground text-xs">Parking considerations / restrictions</span>
+        <Textarea value={parkingNotes} onChange={(e) => setParkingNotes(e.target.value)} rows={2} />
+        <Button type="button" size="sm" disabled={isPending} onClick={handleSaveParkingNotes} className="self-start">
+          Save
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-col gap-1">
+          <label className="text-muted-foreground text-xs">Site manager name</label>
+          <input
+            value={siteManagerName}
+            onChange={(e) => setSiteManagerName(e.target.value)}
+            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-muted-foreground text-xs">Site manager contact number</label>
+          <input
+            value={siteManagerPhone}
+            onChange={(e) => setSiteManagerPhone(e.target.value)}
+            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+          />
+        </div>
+        <Button type="button" size="sm" disabled={isPending} onClick={handleSaveSiteManagerContact}>
           Save
         </Button>
       </div>
