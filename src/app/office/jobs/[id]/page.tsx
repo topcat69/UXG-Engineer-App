@@ -17,6 +17,7 @@ import { AssignSchedulePanel } from "./assign-schedule-panel";
 import { EditJobPanel } from "./edit-job-panel";
 import { showsAvFields, usesJobDetails, photoSlotsFor, type JobDetailsType, type RequirableFieldKey } from "@/lib/forms/job-form";
 import { humanize } from "@/lib/format/text";
+import { formatDurationBetween } from "@/lib/format/duration";
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -81,7 +82,21 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("jobs").select("id, job_number").eq("parent_job_id", id),
   ]);
 
-  const mediaBySlot = new Map((media ?? []).map((m) => [m.slot, m]));
+  // Signed URLs so the office can actually see the photos/videos, not just
+  // their slot placeholders — the Media section used to render an emoji box
+  // for every asset and never fetch a viewable URL for any of them at all.
+  // 1 hour matches the share page's TTL (share/[token]/page.tsx); this page
+  // is loaded fresh on every visit, so there's no need for a longer one.
+  const MEDIA_SIGNED_URL_TTL_SECONDS = 60 * 60;
+  const mediaWithUrls = await Promise.all(
+    (media ?? []).map(async (asset) => {
+      const { data } = await supabase.storage.from("media").createSignedUrl(asset.storage_path, MEDIA_SIGNED_URL_TTL_SECONDS);
+      return { ...asset, url: data?.signedUrl ?? null };
+    }),
+  );
+  const mediaBySlot = new Map(mediaWithUrls.map((m) => [m.slot, m]));
+  const travelDuration = formatDurationBetween(job.actual_travel_start, job.actual_start);
+  const onSiteDuration = formatDurationBetween(job.actual_start, job.actual_end);
   const base = appBaseUrl();
   const now = new Date().toISOString();
   const activeShareLinks = (shareLinks ?? [])
@@ -184,6 +199,20 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
         <section className="flex flex-col gap-2">
           <h2 className="font-medium">Status timeline</h2>
+          {(travelDuration || onSiteDuration) && (
+            <div className="flex flex-col gap-0.5 text-sm">
+              {travelDuration && (
+                <p>
+                  <span className="text-muted-foreground">Time travelling:</span> {travelDuration}
+                </p>
+              )}
+              {onSiteDuration && (
+                <p>
+                  <span className="text-muted-foreground">Time on job:</span> {onSiteDuration}
+                </p>
+              )}
+            </div>
+          )}
           <ol className="flex flex-col gap-2">
             {(statusEvents ?? []).length === 0 && (
               <li className="text-muted-foreground text-sm">No status changes recorded yet.</li>
@@ -282,9 +311,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               const asset = mediaBySlot.get(slot);
               return (
                 <div key={slot} className="flex flex-col gap-1 rounded-md border p-2 text-xs">
-                  <div className="bg-muted flex h-20 items-center justify-center rounded text-muted-foreground">
-                    {asset ? (asset.media_type === "video" ? "🎥" : "📷") : "—"}
-                  </div>
+                  <MediaThumbnail asset={asset ?? null} />
                   <span className="font-medium">{humanize(slot.replace("photo_", ""))}</span>
                   {asset ? (
                     <span className="text-muted-foreground">
@@ -297,15 +324,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               );
             })}
           </div>
-        ) : (media ?? []).length === 0 ? (
+        ) : mediaWithUrls.length === 0 ? (
           <p className="text-muted-foreground text-sm">No media captured yet.</p>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {(media ?? []).map((asset) => (
+            {mediaWithUrls.map((asset) => (
               <div key={asset.id} className="flex flex-col gap-1 rounded-md border p-2 text-xs">
-                <div className="bg-muted flex h-20 items-center justify-center rounded text-muted-foreground">
-                  {asset.media_type === "video" ? "🎥" : "📷"}
-                </div>
+                <MediaThumbnail asset={asset} />
                 <span className="font-medium">{humanize(asset.slot.replace("photo_", ""))}</span>
               </div>
             ))}
@@ -347,5 +372,33 @@ function FormField({ label, value }: { label: string; value: string | null | und
       <dt className="text-muted-foreground">{label}</dt>
       <dd>{value || "—"}</dd>
     </div>
+  );
+}
+
+/**
+ * Photos get a real thumbnail (signed URL, so it's time-limited — see the
+ * TTL comment above); a video's byte stream isn't cheap to thumbnail here,
+ * so it gets a play icon instead, both opening the full-size original in a
+ * new tab. An asset whose signed URL failed to generate (or that hasn't
+ * been captured for this slot at all) falls back to a plain placeholder —
+ * never a broken image.
+ */
+function MediaThumbnail({ asset }: { asset: { media_type: string; url: string | null } | null }) {
+  if (!asset || !asset.url) {
+    return (
+      <div className="bg-muted flex h-20 items-center justify-center rounded text-muted-foreground">
+        {asset ? (asset.media_type === "video" ? "🎥" : "📷") : "—"}
+      </div>
+    );
+  }
+  return (
+    <a href={asset.url} target="_blank" rel="noreferrer" className="block h-20 overflow-hidden rounded">
+      {asset.media_type === "video" ? (
+        <div className="bg-muted flex h-full items-center justify-center text-muted-foreground">🎥 View video</div>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- signed, time-limited storage URL; not worth Next/Image's remote-pattern config for this.
+        <img src={asset.url} alt="" className="h-full w-full object-cover" />
+      )}
+    </a>
   );
 }

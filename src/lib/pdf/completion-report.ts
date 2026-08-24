@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 import { humanize } from "@/lib/format/text";
+import { formatDurationBetween } from "@/lib/format/duration";
 import { formatGpsTimestampOverlay } from "./overlay-text";
 
 type AnySupabaseClient = SupabaseClient<Database>;
@@ -91,6 +92,10 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
   if (job.actual_travel_start) doc.text(`Travel started: ${new Date(job.actual_travel_start).toLocaleString("en-GB")}`);
   if (job.actual_start) doc.text(`Started: ${new Date(job.actual_start).toLocaleString("en-GB")}`);
   if (job.actual_end) doc.text(`Completed: ${new Date(job.actual_end).toLocaleString("en-GB")}`);
+  const travelDuration = formatDurationBetween(job.actual_travel_start, job.actual_start);
+  if (travelDuration) doc.text(`Time travelling: ${travelDuration}`);
+  const onSiteDuration = formatDurationBetween(job.actual_start, job.actual_end);
+  if (onSiteDuration) doc.text(`Time on job: ${onSiteDuration}`);
   doc.fillColor("black");
 
   // --- Form answers ---

@@ -3596,3 +3596,62 @@ every addendum in this sandbox, no regressions. (No new unit tests: the
 change is two lookup-map extensions and two render-string edits, no new
 pure logic to test in isolation — `sync-down.ts`'s only exported pure
 function, `jobIdsSafeToOverwrite`, is unaffected.)
+
+## 2026-08-24 — Completed jobs: travel/on-site duration, and photos that never actually rendered
+
+Two requests about the office job detail page for a completed job.
+
+**1. Duration in hours/minutes, alongside the existing timestamps, for
+billing checks.** The status timeline already showed the raw
+`actual_travel_start`/`actual_start`/`actual_end` timestamps (via
+`status_events`) but left the arithmetic — "how long was this engineer
+actually travelling, how long were they actually on site" — to whoever
+was reading the report, which isn't practical for reporting or for
+checking hours billed correctly. Added a pure `formatDurationBetween`
+helper (`lib/format/duration.ts`, unit tested) — `"1h 23m"`/`"2h"`/`"45m"`
+between two ISO timestamps, `null` (not a misleading `"0m"`) when either
+timestamp is missing or the pair is out of order. Wired into both places
+this app already prints those three timestamps: the office job detail
+page's Status timeline section (`Time travelling` / `Time on job`, above
+the event list) and the completion PDF's cover section (right after the
+existing `Travel started`/`Started`/`Completed` lines) — the PDF is what
+actually leaves the app for reporting, so it needed the same numbers, not
+just the on-screen view. Both durations are computed directly from the
+job row's own `actual_travel_start`/`actual_start`/`actual_end` columns,
+not derived from `status_events` (which record when a transition was
+logged, sourced from the same underlying timestamps in practice, but the
+job row is the one place already treated as authoritative for these three
+fields — see the travel-start Phase addendum above).
+
+**2. Photos genuinely never rendered — a real bug, not a request for a
+new feature.** The Media section's grid has existed since Phase 2, and
+every card in it was, and always had been, a static emoji (📷/🎥) in a
+box — the code never fetched a viewable URL for any media asset at all,
+office-side. (The public share page, by contrast, has generated real
+signed URLs and rendered actual `<img>` tags since Phase 4 — this gap was
+specific to the internal office view, which the share page's own approach
+was the template for fixing.) Fixed by generating a 1-hour signed URL
+per asset (`supabase.storage.from("media").createSignedUrl(...)`, same
+TTL and bucket as the share page) right where `media_assets` is already
+fetched, and a new `MediaThumbnail` component: a photo renders as an
+actual thumbnail `<img>`, a video gets a "🎥 View video" tile (a real
+video thumbnail isn't cheap to generate here, unlike a photo which is
+already the full image); either one links out to the full-size original
+in a new tab. An asset with no captured media, or one whose signed URL
+somehow failed to generate, still falls back to the original placeholder
+box rather than a broken image. No RLS/storage policy change was needed
+— `media_objects_select` (`20260106000000_storage.sql`) already allows
+any signed-in user who can see the parent job to read its storage
+objects, which every office user already could.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 321 passed (6 new, all `formatDurationBetween`: hours+minutes
+together, whole hours only, minutes-only under an hour, rounds to the
+nearest minute, null when either timestamp is missing, null rather than a
+negative duration when the end precedes the start), same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions. Not visually verified in a live browser (no running
+Supabase to sign in against in this sandbox, and the fix is specifically
+about live-photo rendering, which needs a real captured asset to be
+meaningful) — flagged so this gets a real look once deployed, not just
+trusted from the code.
