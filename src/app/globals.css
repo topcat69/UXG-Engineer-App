@@ -267,3 +267,25 @@
     @apply font-sans;
   }
 }
+
+/*
+ * Native <select> dropdown popups, not the shadcn/Radix <Select> —
+ * deliberately unlayered (outside @layer) rather than in @layer base,
+ * since every native select across the app is styled with Tailwind's
+ * `bg-transparent` utility (in the utilities layer, which always outranks
+ * base regardless of selector specificity — a plain `select { }` rule in
+ * @layer base would never win against it). On a dark-background theme
+ * (Dark/Navy) that transparency let the near-white --foreground text
+ * inherit into the browser's own *native* option-list popup, which several
+ * browsers render against their own default light backdrop rather than the
+ * page's — white text on the browser's white popup, invisible until an
+ * option's hover/selected state happened to add a contrasting highlight.
+ * --popover/--popover-foreground (not --background/--foreground) since
+ * that's this design system's actual token pair for a floating surface,
+ * and it's guaranteed opaque in every theme, unlike --input's translucency.
+ */
+select,
+select option {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+}

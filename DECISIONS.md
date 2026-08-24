@@ -3349,3 +3349,55 @@ line has the same test-coverage shape as this file's other existing
 inline drill-through filters, none of which are separately unit tested
 either), same 2 pre-existing Supabase-dependent failures as every
 addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Fix invisible text in native <select> dropdowns on dark themes
+
+Every native `<select>` across the app (Status, role pickers, filters —
+14 files, all sharing the same `bg-transparent` Tailwind classes) had the
+same latent bug, only visible once a dark-background theme existed to
+expose it: the closed control's `bg-transparent` blends fine with
+whatever it sits on, but the browser's *native* option-list popup doesn't
+composite against the page — several browsers render that popup against
+their own default light backdrop regardless of the page's actual
+background. On Navy (and Dark), that meant the near-white `--foreground`
+text was inheriting into a popup styled by the browser as light, i.e.
+white text on white — exactly what the screenshot in this request showed
+("Active," the selected option, was visible only because its blue
+highlight happened to add contrast; "On Hold"/"Completed" weren't).
+
+Fixed with one rule in `globals.css`, not by touching all 14 files
+individually: `select, select option { background-color: var(--popover);
+color: var(--popover-foreground); }`, deliberately placed *outside*
+`@layer base` (unlayered). That matters: every affected `<select>` uses
+Tailwind's `bg-transparent` utility, which lives in the `utilities`
+layer — a layered rule always outranks another layered rule of lower
+priority regardless of selector specificity, so a plain `select { }`
+rule inside `@layer base` would never have actually won against it.
+Unlayered rules sit outside that whole precedence system and beat every
+layered rule unconditionally, which is what makes this a real, reliable
+fix rather than a coincidental one. `--popover`/`--popover-foreground`
+(not `--background`/`--foreground`) since that's this design system's
+actual token pair for a floating surface, and — unlike `--input`, which
+is a translucent overlay in some themes — it's guaranteed fully opaque
+in every theme, so the popup's contrast can't get compromised by
+whatever happens to be underneath it.
+
+Side effect, treated as acceptable rather than avoided: every select's
+*closed* control also now renders with an opaque popover-colored
+background instead of blending transparently into its parent panel. That
+actually removes an inconsistency rather than adding one — the closed
+box and its own open popup now share one color instead of visually
+"jumping" between a blended closed state and a solid open one.
+
+Verified visually, not just assumed from the cascade-layers spec:
+Chromium (even headless) renders a native `<select>`'s option list as an
+actual paintable overlay rather than a true OS popup, so a real click +
+screenshot on the Navy theme was possible and done — before this fix
+would have shown the exact bug in the screenshot; after, all three
+options are clearly legible against the popover-toned background, with
+the selected option's blue highlight now redundant contrast rather than
+the only reason it was readable at all.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 309 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.
