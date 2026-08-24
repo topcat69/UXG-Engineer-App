@@ -4035,3 +4035,49 @@ clean — 332 passed (unchanged; a new binary asset and a one-line change
 to which file `loadLogoBytes()` reads, nothing to unit test), same 2
 pre-existing Supabase-dependent failures as every addendum in this
 sandbox, no regressions.
+
+## 2026-08-24 — Job cancellation: notify the assigned engineer by email
+
+The office asked that cancelling a job also emails the assigned engineer,
+alongside removing it from their Google Calendar. The Calendar removal
+already existed — `removeCalendarForJob` (`lib/google/sync-job-calendar.ts`)
+was already called from `cancelJob` via the same best-effort `after()`
+pattern used for scheduling — but there was no email. So the only gap was
+the notification itself.
+
+Added `buildCancelledEmail` to `lib/email/templates.ts` (pure template,
+following the same shape as every other `buildXEmail`), a
+`sendJobCancelledEmail` orchestration function in
+`lib/email/send-job-emails.ts` (fetches the job/site/assigned engineer,
+returns the standard `SKIPPED` result when the engineer has no email —
+same best-effort rule as every other job email in this app), and wired it
+into `cancelJob` (`office/jobs/[id]/actions.ts`) as a second `after()`
+call sitting right next to the existing Calendar removal — cancellation
+still isn't blocked on either a Calendar round trip or an email send.
+
+The email carries the office's optional free-text cancellation reason
+(already collected by `cancel-job-button.tsx`'s confirm UI and already
+threaded through to `cancelJob`, just never used beyond the
+`status_events` row) when one was given, and omits the "Reason:" line
+entirely when it wasn't — most cancellations won't have one, and a blank
+reason line reads worse than no line. It also reads correctly for a job
+that was cancelled before ever being scheduled (no "scheduled for"
+clause), since cancellation isn't conditional on a job having reached the
+scheduled state.
+
+No schema or migration changes — reuses the existing `jobs`, `sites`, and
+`users` columns already read by every other job email.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 336 passed (4 new, all in `templates.test.ts`'s new
+`buildCancelledEmail` block: mentions cancellation and the calendar
+removal and links the job, includes the reason when given, omits the
+"Reason:" line when not given, reads correctly for a never-scheduled
+job), same 2 pre-existing Supabase-dependent failures as every addendum
+in this sandbox, no regressions. `sendJobCancelledEmail` itself is
+untested directly (it's the `server-only` fetch+send layer, consistent
+with every other function in `send-job-emails.ts` — none of them are
+unit-tested beyond the pure template layer, per the established
+three-layer split). Not verified against a live Resend send or a real
+cancelled job in a running instance — flagged for a real check once
+deployed.

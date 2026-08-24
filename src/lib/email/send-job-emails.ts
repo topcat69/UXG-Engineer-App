@@ -9,6 +9,7 @@ import { sendJobEmail, sendStandaloneEmail, type EmailAttachment, type SendResul
 import {
   buildApprovedEmail,
   buildAssignedEmail,
+  buildCancelledEmail,
   buildDayBeforeEmail,
   buildScheduledEmail,
   buildSubmittedEmail,
@@ -35,6 +36,26 @@ export async function sendJobAssignedEmail(supabase: AnySupabaseClient, jobId: s
     siteName: job.site.name,
     scheduledStart: job.scheduled_start,
     engineerName: job.assigned.name,
+    deepLink: `${appBaseUrl()}/office/jobs/${jobId}`,
+  });
+  return sendJobEmail(supabase, jobId, job.assigned.email, content);
+}
+
+/** "Job cancelled" — sent to the assigned engineer; the Calendar event removal is a separate best-effort call at the same call site (see cancelJob in office/jobs/[id]/actions.ts). */
+export async function sendJobCancelledEmail(supabase: AnySupabaseClient, jobId: string, reason: string | null): Promise<SendResult> {
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("job_number, scheduled_start, site:sites(name), assigned:users!jobs_assigned_to_fkey(name, email)")
+    .eq("id", jobId)
+    .single();
+  if (!job?.site || !job.assigned?.email) return SKIPPED;
+
+  const content = buildCancelledEmail({
+    jobNumber: job.job_number,
+    siteName: job.site.name,
+    scheduledStart: job.scheduled_start,
+    engineerName: job.assigned.name,
+    reason,
     deepLink: `${appBaseUrl()}/office/jobs/${jobId}`,
   });
   return sendJobEmail(supabase, jobId, job.assigned.email, content);

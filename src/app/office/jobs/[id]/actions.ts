@@ -12,7 +12,7 @@ import { duplicateJob } from "@/lib/jobs/duplicate-job";
 import { cloneTasksForJob } from "@/lib/jobs/clone-tasks";
 import { detectConflicts } from "@/lib/scheduler/conflicts";
 import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
-import { sendJobAssignedEmail, sendJobScheduledEmail } from "@/lib/email/send-job-emails";
+import { sendJobAssignedEmail, sendJobCancelledEmail, sendJobScheduledEmail } from "@/lib/email/send-job-emails";
 import type { RequirableFieldKey } from "@/lib/forms/job-form";
 import type { ActionResult } from "../actions";
 
@@ -104,9 +104,11 @@ export async function cancelJob(jobId: string, reason: string): Promise<ActionRe
   });
 
   // Best-effort and scheduled via after(), not awaited — see bulkScheduleJobs
-  // in ../actions.ts for why a real Calendar API round trip shouldn't sit
-  // between a manager clicking "Cancel" and seeing it take effect.
+  // in ../actions.ts for why a real Calendar API round trip (or an email
+  // send) shouldn't sit between a manager clicking "Cancel" and seeing it
+  // take effect.
   after(() => removeCalendarForJob(supabase, jobId));
+  after(() => sendJobCancelledEmail(supabase, jobId, reason.trim() || null));
 
   revalidatePath(`/office/jobs/${jobId}`);
   revalidatePath("/office/jobs");

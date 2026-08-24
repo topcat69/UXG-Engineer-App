@@ -123,6 +123,33 @@ export function buildDayBeforeEmail(input: DayBeforeEmailInput): EmailContent {
   return { subject: `${input.jobNumber} — ${input.siteName} — scheduled for tomorrow`, html, text };
 }
 
+export type CancelledEmailInput = {
+  jobNumber: string;
+  siteName: string;
+  /** Cancellation isn't conditional on a job ever having been scheduled — an assigned-but-not-yet-scheduled job can be cancelled too. */
+  scheduledStart: string | null;
+  engineerName: string;
+  /** The office's optional free-text reason from the cancel confirmation — see cancel-job-button.tsx. */
+  reason: string | null;
+  deepLink: string;
+};
+
+export function buildCancelledEmail(input: CancelledEmailInput): EmailContent {
+  const when = input.scheduledStart
+    ? new Date(input.scheduledStart).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })
+    : null;
+  const { html, text } = wrap([
+    `Hi ${input.engineerName},`,
+    when
+      ? `Job ${input.jobNumber} at ${input.siteName}, scheduled for ${when}, has been cancelled.`
+      : `Job ${input.jobNumber} at ${input.siteName} has been cancelled.`,
+    ...(input.reason ? [`Reason: ${input.reason}`] : []),
+    `It's also been removed from your calendar.`,
+    `Job details: ${input.deepLink}`,
+  ]);
+  return { subject: `${input.jobNumber} — ${input.siteName} — cancelled`, html, text };
+}
+
 export type SubmittedEmailInput = {
   jobNumber: string;
   siteName: string;

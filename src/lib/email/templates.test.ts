@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildApprovedEmail,
   buildAssignedEmail,
+  buildCancelledEmail,
   buildDayBeforeEmail,
   buildScheduledEmail,
   buildSubmittedEmail,
@@ -111,6 +112,61 @@ describe("buildDayBeforeEmail", () => {
       deepLink: "https://uxgengineering.example.com/office/jobs/job-1",
     });
     expect(email.text.toLowerCase()).toContain("tomorrow");
+  });
+});
+
+describe("buildCancelledEmail", () => {
+  it("says the job is cancelled, mentions the calendar removal, and links the job", () => {
+    const email = buildCancelledEmail({
+      jobNumber: "UXG-2026-0042",
+      siteName: "Riverside Retail Park",
+      scheduledStart: "2026-08-10T09:00:00.000Z",
+      engineerName: "Jamie Vance",
+      reason: null,
+      deepLink: "https://uxgengineering.example.com/office/jobs/job-1",
+    });
+    expect(email.subject).toContain("cancelled");
+    expect(email.text).toContain("Jamie Vance");
+    expect(email.text.toLowerCase()).toContain("cancelled");
+    expect(email.text.toLowerCase()).toContain("removed from your calendar");
+    expect(email.text).toContain("https://uxgengineering.example.com/office/jobs/job-1");
+  });
+
+  it("includes the office's reason when one was given", () => {
+    const email = buildCancelledEmail({
+      jobNumber: "UXG-2026-0042",
+      siteName: "Riverside Retail Park",
+      scheduledStart: "2026-08-10T09:00:00.000Z",
+      engineerName: "Jamie Vance",
+      reason: "Client rescheduled to next month",
+      deepLink: "https://uxgengineering.example.com/office/jobs/job-1",
+    });
+    expect(email.text).toContain("Client rescheduled to next month");
+  });
+
+  it("omits a reason line entirely when none was given", () => {
+    const email = buildCancelledEmail({
+      jobNumber: "UXG-2026-0042",
+      siteName: "Riverside Retail Park",
+      scheduledStart: "2026-08-10T09:00:00.000Z",
+      engineerName: "Jamie Vance",
+      reason: null,
+      deepLink: "https://uxgengineering.example.com/office/jobs/job-1",
+    });
+    expect(email.text).not.toContain("Reason:");
+  });
+
+  it("still reads correctly when the job was never scheduled", () => {
+    const email = buildCancelledEmail({
+      jobNumber: "UXG-2026-0042",
+      siteName: "Riverside Retail Park",
+      scheduledStart: null,
+      engineerName: "Jamie Vance",
+      reason: null,
+      deepLink: "https://uxgengineering.example.com/office/jobs/job-1",
+    });
+    expect(email.text).not.toContain("scheduled for");
+    expect(email.text.toLowerCase()).toContain("cancelled");
   });
 });
 
