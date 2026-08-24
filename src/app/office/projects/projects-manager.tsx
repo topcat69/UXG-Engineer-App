@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { humanize } from "@/lib/format/text";
-import { createProject, type ProjectRow } from "./actions";
+import { createProject, updateProject, type ProjectRow } from "./actions";
 
 const STATUSES = ["active", "on_hold", "completed"];
 
@@ -23,6 +23,44 @@ export function ProjectsManager({
   const [status, setStatus] = useState("active");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editEndDate, setEditEndDate] = useState("");
+  const [editStatus, setEditStatus] = useState("active");
+
+  function handleStartEdit(p: ProjectRow) {
+    setEditingId(p.id);
+    setEditName(p.name);
+    setEditStartDate(p.start_date ?? "");
+    setEditEndDate(p.end_date ?? "");
+    setEditStatus(p.status ?? "active");
+    setMessage(null);
+  }
+
+  function handleCancelEdit() {
+    setEditingId(null);
+  }
+
+  function handleSaveEdit() {
+    if (!editingId) return;
+    const id = editingId;
+    startTransition(async () => {
+      const result = await updateProject(id, {
+        name: editName,
+        start_date: editStartDate,
+        end_date: editEndDate,
+        status: editStatus,
+      });
+      if (result.ok) {
+        setProjects((prev) => prev.map((p) => (p.id === id ? result.project : p)));
+        setEditingId(null);
+      } else {
+        setMessage(result.message);
+      }
+    });
+  }
 
   function handleCreate() {
     startTransition(async () => {
@@ -49,6 +87,7 @@ export function ProjectsManager({
             <th className="py-2 font-medium">Status</th>
             <th className="py-2 font-medium">Dates</th>
             <th className="py-2 font-medium">Jobs</th>
+            <th className="py-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -70,17 +109,76 @@ export function ProjectsManager({
                   {jobCounts[p.id] ?? 0}
                 </Link>
               </td>
+              <td className="py-2">
+                <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleStartEdit(p)}>
+                  Edit
+                </Button>
+              </td>
             </tr>
           ))}
           {projects.length === 0 && (
             <tr>
-              <td colSpan={4} className="text-muted-foreground py-4 text-center">
+              <td colSpan={5} className="text-muted-foreground py-4 text-center">
                 No projects yet.
               </td>
             </tr>
           )}
         </tbody>
       </table>
+
+      {editingId && (
+        <section className="flex flex-col gap-3 rounded-md border p-3">
+          <h2 className="font-medium">Edit {projects.find((p) => p.id === editingId)?.name}</h2>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-muted-foreground text-xs">Name</label>
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-muted-foreground text-xs">Start date</label>
+              <input
+                type="date"
+                value={editStartDate}
+                onChange={(e) => setEditStartDate(e.target.value)}
+                className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-muted-foreground text-xs">End date</label>
+              <input
+                type="date"
+                value={editEndDate}
+                onChange={(e) => setEditEndDate(e.target.value)}
+                className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-muted-foreground text-xs">Status</label>
+              <select
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value)}
+                className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+              >
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {humanize(s)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button type="button" disabled={isPending || !editName.trim()} onClick={handleSaveEdit}>
+              Save
+            </Button>
+            <Button type="button" variant="outline" disabled={isPending} onClick={handleCancelEdit}>
+              Cancel
+            </Button>
+          </div>
+        </section>
+      )}
 
       <section className="flex flex-col gap-3 border-t pt-4">
         <h2 className="font-medium">Add a project</h2>

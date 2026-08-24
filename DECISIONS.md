@@ -3401,3 +3401,24 @@ the only reason it was readable at all.
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 309 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Projects can now be edited after creation
+
+`/office/projects` could create a project but never change it — no way
+to mark one on_hold/completed once it wrapped up, or add an end date
+that wasn't known yet at creation time.
+
+New `updateProject` action (`office/projects/actions.ts`) covers
+everything `createProject` already takes — name, start/end date, status —
+no app-level role check needed: unlike `updateUser`'s email-sync step
+(which goes through the admin client and bypasses RLS), this is a plain
+`.update()`, and `projects_update` RLS already restricts it to
+manager/superadmin, the same policy `createProject`'s insert already
+relies on. UI mirrors the "Edit" button + inline pre-filled form pattern
+from the users/edit-job-panel addenda — same visual language as the
+existing "Add a project" section, just Save/Cancel instead of Add.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 309 passed (no new tests — no new pure logic, same as the
+edit-user addendum's reasoning), same 2 pre-existing Supabase-dependent
+failures as every addendum in this sandbox, no regressions.
