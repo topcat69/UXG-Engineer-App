@@ -3501,3 +3501,55 @@ postcodes.io can't, postcodes.io success never calls Nominatim, both
 providers failing still returns null cleanly, an empty Nominatim result
 array is handled), same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-24 — Nominatim fallback was plotting a Cork site in Belfast
+
+The Ireland fix above worked (the site now got coordinates, and appeared
+on the map) but in the wrong place: a real site — Unit 8, Mahon Retail
+Park, Co. Cork, T12 D291 — geocoded to Belfast instead of Cork.
+
+Two compounding causes, both in `geocodeViaNominatim`
+(`lib/geo/postcode.ts`):
+
+1. `geocodePostcode` was only ever called with the bare postcode string
+   (`createSiteForClient`/`updateSiteForClient` in
+   `office/clients/actions.ts` never passed the site's address line or
+   town through). A UK postcode is enough on its own for postcodes.io's
+   structured lookup, but an Eircode has no equivalent structure for
+   Nominatim's free-text search to key off — a bare `T12 D291` query has
+   nothing but a routing-key-shaped string to match against, so it's
+   matching on text coincidence rather than a real place.
+2. The Nominatim fallback was scoped to `countrycodes=gb,ie`. Nominatim
+   files Northern Ireland under `gb`, not `ie` — so leaving `gb` in scope
+   meant a weak/ambiguous match could resolve to Belfast. Since this
+   fallback only ever runs *after* postcodes.io has already failed to
+   place the postcode in the UK, reaching it at all means it's not a UK
+   address in the first place; `gb` had no reason to still be in scope.
+
+Fixed both: `geocodePostcode` now takes an optional `{ addressLine1,
+town }` context, which `createSiteForClient`/`updateSiteForClient` pass
+through from the site's own fields; the Nominatim query is built from
+`address_line1, town, postcode` when available (falling back to the bare
+postcode when they're not) instead of the postcode alone. The Nominatim
+fallback is now scoped to `countrycodes=ie` only, not `gb,ie`.
+
+Deliberately not done: `media-capture.ts`'s `siteLocationFallback` (the
+field app's GPS-fallback path) still calls `geocodePostcode` with the
+postcode alone, no address context — `SiteForLocationFallback` doesn't
+carry address text. It still benefits from the `ie`-only scoping (the
+main fix for the wrong-country class of bug), just not from the extra
+disambiguation a full address gives; a genuinely ambiguous Eircode-alone
+query in that path returns null (no fallback location) rather than a
+wrong one, which is the safe failure mode either way.
+
+Existing Irish sites created/saved before this fix may have been placed
+incorrectly (same as the Belfast case) or not at all — each one needs
+its postcode/address re-saved once (Clients → site → Edit → Save) to
+pick up a corrected position; there is no automatic backfill.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 315 passed (2 new: the Nominatim fallback now scopes to
+`countrycodes=ie` not `gb,ie`; the query string is built from
+address/town/postcode when address context is given), same 2
+pre-existing Supabase-dependent failures as every addendum in this
+sandbox, no regressions.

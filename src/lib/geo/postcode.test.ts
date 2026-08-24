@@ -63,6 +63,28 @@ describe("geocodePostcode", () => {
     expect(nominatimUrl.searchParams.get("q")).toBe("D02 AF30");
   });
 
+  it("scopes the Nominatim fallback to Ireland only, not GB — a bare Eircode must never match a Northern Ireland result", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false })
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ lat: "53.3498", lon: "-6.2603" }] });
+    vi.stubGlobal("fetch", fetchMock);
+    await geocodePostcode("D02 AF30");
+    const nominatimUrl = fetchMock.mock.calls[1][0] as URL;
+    expect(nominatimUrl.searchParams.get("countrycodes")).toBe("ie");
+  });
+
+  it("builds the Nominatim query from street/town context plus the postcode, when given", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false })
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ lat: "51.9", lon: "-8.47" }] });
+    vi.stubGlobal("fetch", fetchMock);
+    await geocodePostcode("T12 D291", { addressLine1: "Unit 8, Mahon Retail Park", town: "Cork" });
+    const nominatimUrl = fetchMock.mock.calls[1][0] as URL;
+    expect(nominatimUrl.searchParams.get("q")).toBe("Unit 8, Mahon Retail Park, Cork, T12 D291");
+  });
+
   it("returns null when both postcodes.io and Nominatim have nothing", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false });
     vi.stubGlobal("fetch", fetchMock);
