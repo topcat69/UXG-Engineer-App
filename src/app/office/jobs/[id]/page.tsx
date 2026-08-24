@@ -246,6 +246,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <FormField label="Power source" value={installForm.power_source} />
               <FormField label="Network" value={installForm.network_type} />
               <FormField label="WiFi signal" value={installForm.wifi_signal} />
+              <FormField label="Network port" value={installForm.network_port} />
               <FormField label="Player boot test" value={humanize(installForm.player_boot_test ?? "")} />
               <FormField label="Content displaying" value={humanize(installForm.content_displaying ?? "")} />
               <FormField label="Issues found" value={installForm.issues_found ? "Yes" : "No"} />
@@ -271,6 +272,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   <FormField label="Power source" value={jobDetails.power_source} />
                   <FormField label="Network" value={jobDetails.network_type} />
                   <FormField label="WiFi signal" value={jobDetails.wifi_signal} />
+                  <FormField label="Network port" value={jobDetails.network_port} />
                   <FormField label="Player boot test" value={humanize(jobDetails.player_boot_test ?? "")} />
                   <FormField label="Content displaying" value={humanize(jobDetails.content_displaying ?? "")} />
                 </>

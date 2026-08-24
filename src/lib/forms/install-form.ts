@@ -13,6 +13,7 @@ export type InstallFormValues = {
   power_source: string;
   network_type: string;
   wifi_signal: string;
+  network_port: string;
   player_boot_test: string;
   content_displaying: string;
   issues_found: boolean;
@@ -28,6 +29,7 @@ export const EMPTY_INSTALL_FORM: InstallFormValues = {
   power_source: "",
   network_type: "",
   wifi_signal: "",
+  network_port: "",
   player_boot_test: "",
   content_displaying: "",
   issues_found: false,
@@ -63,6 +65,7 @@ export function installFormRowToValues(row: InstallFormRow | undefined): Install
     power_source: row.power_source ?? "",
     network_type: row.network_type ?? "",
     wifi_signal: row.wifi_signal ?? "",
+    network_port: row.network_port ?? "",
     player_boot_test: row.player_boot_test ?? "",
     content_displaying: row.content_displaying ?? "",
     issues_found: row.issues_found ?? false,
@@ -74,6 +77,10 @@ export function installFormRowToValues(row: InstallFormRow | undefined): Install
 
 export function showWifiSignal(values: InstallFormValues): boolean {
   return values.network_type === "WiFi";
+}
+
+export function showNetworkPort(values: InstallFormValues): boolean {
+  return values.network_type === "Ethernet";
 }
 
 export function showIssueDetail(values: InstallFormValues): boolean {
@@ -119,6 +126,7 @@ export function validateInstallForm(
   if (!values.power_source) errors.push("Power source is required.");
   if (!values.network_type) errors.push("Network type is required.");
   if (showWifiSignal(values) && !values.wifi_signal) errors.push("WiFi signal is required.");
+  if (showNetworkPort(values) && !values.network_port.trim()) errors.push("Network port is required.");
   if (!values.player_boot_test) errors.push("Player boot test result is required.");
   if (!values.content_displaying) errors.push("Content displaying result is required.");
   if (showIssueDetail(values) && !values.issue_detail.trim()) errors.push("Issue detail is required.");

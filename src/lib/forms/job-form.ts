@@ -32,6 +32,7 @@ export type JobDetailsValues = {
   power_source: string;
   network_type: string;
   wifi_signal: string;
+  network_port: string;
   player_boot_test: string;
   content_displaying: string;
   parking_notified: boolean;
@@ -49,6 +50,7 @@ export const EMPTY_JOB_DETAILS: JobDetailsValues = {
   power_source: "",
   network_type: "",
   wifi_signal: "",
+  network_port: "",
   player_boot_test: "",
   content_displaying: "",
   parking_notified: false,
@@ -110,6 +112,7 @@ export type RequirableFieldKey =
   | "power_source"
   | "network_type"
   | "wifi_signal"
+  | "network_port"
   | "player_boot_test"
   | "content_displaying"
   | "reported_to_site_manager"
@@ -129,6 +132,7 @@ export function requirableFieldsFor(jobType: JobDetailsType): RequirableField[] 
       { key: "power_source", label: "Power source" },
       { key: "network_type", label: "Network type" },
       { key: "wifi_signal", label: "WiFi signal" },
+      { key: "network_port", label: "Network port" },
       { key: "player_boot_test", label: "Player boot test" },
       { key: "content_displaying", label: "Content displaying" },
     );
@@ -141,6 +145,10 @@ export function requirableFieldsFor(jobType: JobDetailsType): RequirableField[] 
 
 export function showWifiSignal(values: JobDetailsValues): boolean {
   return values.network_type === "WiFi";
+}
+
+export function showNetworkPort(values: JobDetailsValues): boolean {
+  return values.network_type === "Ethernet";
 }
 
 export function showIssueDetail(values: JobDetailsValues): boolean {
@@ -157,6 +165,7 @@ export function jobDetailsRowToValues(row: JobDetailsRow | undefined): JobDetail
     power_source: row.power_source ?? "",
     network_type: row.network_type ?? "",
     wifi_signal: row.wifi_signal ?? "",
+    network_port: row.network_port ?? "",
     player_boot_test: row.player_boot_test ?? "",
     content_displaying: row.content_displaying ?? "",
     parking_notified: row.parking_notified ?? false,
@@ -222,6 +231,8 @@ export function validateJobDetails(
     if (requires("power_source") && !values.power_source) errors.push("Power source is required.");
     if (requires("network_type") && !values.network_type) errors.push("Network type is required.");
     if (requires("wifi_signal") && showWifiSignal(values) && !values.wifi_signal) errors.push("WiFi signal is required.");
+    if (requires("network_port") && showNetworkPort(values) && !values.network_port.trim())
+      errors.push("Network port is required.");
     if (requires("player_boot_test") && !values.player_boot_test) errors.push("Player boot test result is required.");
     if (requires("content_displaying") && !values.content_displaying) errors.push("Content displaying result is required.");
   }

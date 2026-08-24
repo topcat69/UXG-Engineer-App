@@ -131,6 +131,7 @@ export type Database = {
           issues_found: boolean | null
           job_id: string | null
           mount_type: string | null
+          network_port: string | null
           network_type: string | null
           player_boot_test: Database["public"]["Enums"]["pass_fail"] | null
           player_serial: string | null
@@ -149,6 +150,7 @@ export type Database = {
           issues_found?: boolean | null
           job_id?: string | null
           mount_type?: string | null
+          network_port?: string | null
           network_type?: string | null
           player_boot_test?: Database["public"]["Enums"]["pass_fail"] | null
           player_serial?: string | null
@@ -167,6 +169,7 @@ export type Database = {
           issues_found?: boolean | null
           job_id?: string | null
           mount_type?: string | null
+          network_port?: string | null
           network_type?: string | null
           player_boot_test?: Database["public"]["Enums"]["pass_fail"] | null
           player_serial?: string | null
@@ -270,6 +273,7 @@ export type Database = {
           job_id: string | null
           job_information: string | null
           mount_type: string | null
+          network_port: string | null
           network_type: string | null
           parking_notified: boolean | null
           player_boot_test: Database["public"]["Enums"]["pass_fail"] | null
@@ -294,6 +298,7 @@ export type Database = {
           job_id?: string | null
           job_information?: string | null
           mount_type?: string | null
+          network_port?: string | null
           network_type?: string | null
           parking_notified?: boolean | null
           player_boot_test?: Database["public"]["Enums"]["pass_fail"] | null
@@ -318,6 +323,7 @@ export type Database = {
           job_id?: string | null
           job_information?: string | null
           mount_type?: string | null
+          network_port?: string | null
           network_type?: string | null
           parking_notified?: boolean | null
           player_boot_test?: Database["public"]["Enums"]["pass_fail"] | null

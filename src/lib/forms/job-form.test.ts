@@ -5,6 +5,7 @@ import {
   photoSlotsFor,
   requirableFieldsFor,
   showIssueDetail,
+  showNetworkPort,
   showWifiSignal,
   showsAvFields,
   showsIssuesSection,
@@ -23,6 +24,7 @@ const completeAvValues: JobDetailsValues = {
   mount_type: "Wall",
   power_source: "Existing socket",
   network_type: "Ethernet",
+  network_port: "24",
   player_boot_test: "pass",
   content_displaying: "pass",
   reported_to_site_manager: true,
@@ -90,6 +92,11 @@ describe("showWifiSignal / showIssueDetail", () => {
     expect(showIssueDetail({ ...completeAvValues, issues_found: true })).toBe(true);
     expect(showIssueDetail({ ...completeAvValues, issues_found: false })).toBe(false);
   });
+
+  it("shows network port only when network type is Ethernet", () => {
+    expect(showNetworkPort({ ...completeAvValues, network_type: "Ethernet" })).toBe(true);
+    expect(showNetworkPort({ ...completeAvValues, network_type: "WiFi" })).toBe(false);
+  });
 });
 
 describe("validateJobDetails", () => {
@@ -122,6 +129,14 @@ describe("validateJobDetails", () => {
     );
   });
 
+  it("requires network_port when Ethernet is selected, but not for WiFi", () => {
+    const ethernetNoPort = { ...completeAvValues, network_type: "Ethernet", network_port: "" };
+    expect(validateJobDetails("install", ethernetNoPort, avSlots, true)).toContain("Network port is required.");
+
+    const wifiNoPort = { ...completeAvValues, network_type: "WiFi", wifi_signal: "Good", network_port: "" };
+    expect(validateJobDetails("install", wifiNoPort, avSlots, true)).not.toContain("Network port is required.");
+  });
+
   it("lists every missing required photo by name for the job type's own slot set", () => {
     const errors = validateJobDetails("delivery", { ...EMPTY_JOB_DETAILS, reported_to_site_manager: true }, new Set(), true);
     expect(errors).toContain("Photo required: before packing.");
@@ -134,6 +149,7 @@ describe("requirableFieldsFor", () => {
   it("includes AV fields plus reported-to-site-manager and revisit for install", () => {
     const keys = requirableFieldsFor("install").map((f) => f.key);
     expect(keys).toContain("player_serial");
+    expect(keys).toContain("network_port");
     expect(keys).toContain("reported_to_site_manager");
     expect(keys).toContain("issue_detail");
     expect(keys).toContain("revisit_required");

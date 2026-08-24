@@ -30,6 +30,7 @@ import {
   WIFI_SIGNALS,
   installFormRowToValues,
   showIssueDetail as showIssueDetailInstall,
+  showNetworkPort as showNetworkPortInstall,
   showWifiSignal as showWifiSignalInstall,
   validateInstallForm,
   type InstallFormValues,
@@ -39,6 +40,7 @@ import {
   jobDetailsRowToValues,
   photoSlotsFor,
   showIssueDetail as showIssueDetailJobDetails,
+  showNetworkPort as showNetworkPortJobDetails,
   showWifiSignal as showWifiSignalJobDetails,
   showsAvFields,
   showsIssuesSection,
@@ -140,6 +142,7 @@ export function JobWorkflow({
       power_source: installValues.power_source || null,
       network_type: installValues.network_type || null,
       wifi_signal: installValues.wifi_signal || null,
+      network_port: installValues.network_port || null,
       player_boot_test: (installValues.player_boot_test || null) as InstallFormRow["player_boot_test"],
       content_displaying: (installValues.content_displaying || null) as InstallFormRow["content_displaying"],
       issues_found: installValues.issues_found,
@@ -161,6 +164,7 @@ export function JobWorkflow({
       power_source: detailsValues.power_source || null,
       network_type: detailsValues.network_type || null,
       wifi_signal: detailsValues.wifi_signal || null,
+      network_port: detailsValues.network_port || null,
       player_boot_test: (detailsValues.player_boot_test || null) as JobDetailsRow["player_boot_test"],
       content_displaying: (detailsValues.content_displaying || null) as JobDetailsRow["content_displaying"],
       rams_storage_path: detailsRow?.rams_storage_path ?? null,
@@ -490,6 +494,16 @@ function InstallFormSection({
         </Field>
       )}
 
+      {showNetworkPortInstall(values) && (
+        <Field label="Network port">
+          <input
+            value={values.network_port}
+            onChange={(e) => setValues((v) => ({ ...v, network_port: e.target.value }))}
+            className="border-input h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+          />
+        </Field>
+      )}
+
       <Field label="Player boot test">
         <Select value={values.player_boot_test} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, player_boot_test: v }))} labelFor={humanize} />
       </Field>
@@ -678,6 +692,15 @@ function JobDetailsSection({
           {showWifiSignalJobDetails(values) && (
             <Field label="WiFi signal">
               <Select value={values.wifi_signal} options={WIFI_SIGNALS} onChange={(v) => setValues((prev) => ({ ...prev, wifi_signal: v }))} />
+            </Field>
+          )}
+          {showNetworkPortJobDetails(values) && (
+            <Field label="Network port">
+              <input
+                value={values.network_port}
+                onChange={(e) => setValues((v) => ({ ...v, network_port: e.target.value }))}
+                className="border-input h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+              />
             </Field>
           )}
           <Field label="Player boot test">

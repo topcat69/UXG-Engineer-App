@@ -3655,3 +3655,32 @@ Supabase to sign in against in this sandbox, and the fix is specifically
 about live-photo rendering, which needs a real captured asset to be
 meaningful) — flagged so this gets a real look once deployed, not just
 trusted from the code.
+
+## 2026-08-24 — Network port field when Ethernet is selected
+
+"Network" already had a WiFi-only follow-up field (`wifi_signal`) but
+nothing on the Ethernet side — an engineer patching into a switch had
+nowhere to record which port. Added the symmetric field: `network_port`
+(migration `20260125000000_network_port.sql`, added to both
+`job_details` — install/sla/maintenance — and `install_forms`, the
+legacy table `survey` still uses; see the job-type-form-architecture
+addendum above for why those are two separate tables). A new
+`showNetworkPort(values)` predicate (`network_type === "Ethernet"`) in
+both `job-form.ts` and `install-form.ts`, mirroring the existing
+`showWifiSignal`; the field renders right after WiFi signal in the field
+app (`job-workflow.tsx`, both AV sections), is required exactly when
+shown (same `requires("network_port") && showNetworkPort(values) &&
+!values.network_port.trim()` shape as every other conditionally-required
+field, and — for job_details — respects a manager's per-job optional-field
+override the same way every other `RequirableFieldKey` does, since it's
+just one more entry in `requirableFieldsFor`'s list, not a special case).
+Surfaced wherever `wifi_signal` already was: the office job detail page's
+Form data section and the completion PDF's Form answers section.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 325 passed (4 new: `showNetworkPort` true for Ethernet/false for
+WiFi in both `job-form.test.ts` and `install-form.test.ts`; network_port
+required when Ethernet is selected and not otherwise, in both files' own
+`validateJobDetails`/`validateInstallForm` tests), same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions. Needs `supabase db push` on deploy (new columns).

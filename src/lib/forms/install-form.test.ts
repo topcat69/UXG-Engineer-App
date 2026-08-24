@@ -4,6 +4,7 @@ import {
   PHOTO_SLOTS,
   detectAutoIssues,
   showIssueDetail,
+  showNetworkPort,
   showWifiSignal,
   validateInstallForm,
   type InstallFormValues,
@@ -16,6 +17,7 @@ const completeValues: InstallFormValues = {
   power_source: "Existing socket",
   network_type: "Ethernet",
   wifi_signal: "",
+  network_port: "24",
   player_boot_test: "pass",
   content_displaying: "pass",
   issues_found: false,
@@ -36,6 +38,11 @@ describe("showWifiSignal / showIssueDetail", () => {
     expect(showIssueDetail({ ...completeValues, issues_found: true })).toBe(true);
     expect(showIssueDetail({ ...completeValues, issues_found: false })).toBe(false);
   });
+
+  it("shows network port only when network type is Ethernet", () => {
+    expect(showNetworkPort({ ...completeValues, network_type: "Ethernet" })).toBe(true);
+    expect(showNetworkPort({ ...completeValues, network_type: "WiFi" })).toBe(false);
+  });
 });
 
 describe("validateInstallForm", () => {
@@ -55,6 +62,14 @@ describe("validateInstallForm", () => {
 
     const withWifiFilled = { ...withWifi, wifi_signal: "Good" };
     expect(validateInstallForm(withWifiFilled, allSlots, true)).toEqual([]);
+  });
+
+  it("requires network_port when network_type is Ethernet, but not otherwise", () => {
+    const withEthernet = { ...completeValues, network_type: "Ethernet", network_port: "" };
+    expect(validateInstallForm(withEthernet, allSlots, true)).toContain("Network port is required.");
+
+    const withWifi = { ...completeValues, network_type: "WiFi", wifi_signal: "Good", network_port: "" };
+    expect(validateInstallForm(withWifi, allSlots, true)).not.toContain("Network port is required.");
   });
 
   it("requires issue_detail only when issues_found is true", () => {
