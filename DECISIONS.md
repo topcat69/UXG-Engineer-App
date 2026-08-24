@@ -3836,3 +3836,37 @@ fabricated data through a temporary local harness, not the real app —
 flagged so this gets one real look through the actual office UI once
 deployed, the same caveat every PDF-generation addendum in this sandbox
 carries.
+
+## 2026-08-24 — Parking notes and site manager contact details
+
+"Parking notified" and "Reported to site manager" were both bare Yes/No
+questions with nowhere to record the actual detail behind the answer —
+what parking restrictions apply, and who at the site the engineer
+actually reported to. Added three columns to `job_details` (migration
+`20260126000000_parking_notes_site_manager_contact.sql`):
+`parking_notes`, `site_manager_name`, `site_manager_phone`. Wired through
+`job-form.ts` (`JobDetailsValues`/`EMPTY_JOB_DETAILS`/
+`jobDetailsRowToValues`), the field app (`job-workflow.tsx` — a
+`Textarea` for parking notes right after the Parking notified Yes/No, two
+plain inputs for the site manager's name/number right after Reported to
+site manager), the office job detail page's Form data section, and the
+completion PDF's Form Details.
+
+All three are plain optional text — no validation added, matching
+`parking_notified` itself (which, unlike `reported_to_site_manager`, was
+never in `RequirableFieldKey`/validated as required either). None of the
+three were added to `RequirableFieldKey` for the same reason: that list
+is for fields validated as mandatory-by-default that a manager can opt a
+job out of: an unvalidated free-text note has nothing to opt out of.
+
+Only `job_details` (install/sla/maintenance/delivery) got these fields,
+not `install_forms` (the legacy path `survey` still uses) — that table's
+`InstallFormValues` never had `parking_notified`/`reported_to_site_manager`
+at all, so there was no existing Yes/No question to attach a detail field
+to there.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 327 passed (unchanged; no new pure logic — three optional text
+fields with no validation to unit test), same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions. Needs `supabase db push` on deploy (new columns).

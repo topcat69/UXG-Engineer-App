@@ -275,6 +275,7 @@ export type Database = {
           mount_type: string | null
           network_port: string | null
           network_type: string | null
+          parking_notes: string | null
           parking_notified: boolean | null
           player_boot_test: Database["public"]["Enums"]["pass_fail"] | null
           player_serial: string | null
@@ -283,6 +284,8 @@ export type Database = {
           reported_to_site_manager: boolean | null
           revisit_required: boolean | null
           screen_serial: string | null
+          site_manager_name: string | null
+          site_manager_phone: string | null
           site_plan_storage_path: string | null
           sla_requirement_detail: string | null
           submitted_at: string | null
@@ -300,6 +303,7 @@ export type Database = {
           mount_type?: string | null
           network_port?: string | null
           network_type?: string | null
+          parking_notes?: string | null
           parking_notified?: boolean | null
           player_boot_test?: Database["public"]["Enums"]["pass_fail"] | null
           player_serial?: string | null
@@ -308,6 +312,8 @@ export type Database = {
           reported_to_site_manager?: boolean | null
           revisit_required?: boolean | null
           screen_serial?: string | null
+          site_manager_name?: string | null
+          site_manager_phone?: string | null
           site_plan_storage_path?: string | null
           sla_requirement_detail?: string | null
           submitted_at?: string | null
@@ -325,6 +331,7 @@ export type Database = {
           mount_type?: string | null
           network_port?: string | null
           network_type?: string | null
+          parking_notes?: string | null
           parking_notified?: boolean | null
           player_boot_test?: Database["public"]["Enums"]["pass_fail"] | null
           player_serial?: string | null
@@ -333,6 +340,8 @@ export type Database = {
           reported_to_site_manager?: boolean | null
           revisit_required?: boolean | null
           screen_serial?: string | null
+          site_manager_name?: string | null
+          site_manager_phone?: string | null
           site_plan_storage_path?: string | null
           sla_requirement_detail?: string | null
           submitted_at?: string | null

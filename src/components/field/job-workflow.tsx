@@ -172,7 +172,10 @@ export function JobWorkflow({
       sla_requirement_detail: detailsRow?.sla_requirement_detail ?? null,
       job_information: detailsRow?.job_information ?? null,
       parking_notified: detailsValues.parking_notified,
+      parking_notes: detailsValues.parking_notes || null,
       reported_to_site_manager: detailsValues.reported_to_site_manager,
+      site_manager_name: detailsValues.site_manager_name || null,
+      site_manager_phone: detailsValues.site_manager_phone || null,
       revisit_required: detailsValues.revisit_required === "" ? null : detailsValues.revisit_required === "yes",
       issues_found: detailsValues.issues_found,
       issue_detail: detailsValues.issue_detail || null,
@@ -653,9 +656,26 @@ function JobDetailsSection({
       <Field label="Parking notified">
         <YesNoButtons value={values.parking_notified} onChange={(v) => setValues((prev) => ({ ...prev, parking_notified: v }))} />
       </Field>
+      <Field label="Parking considerations / restrictions">
+        <Textarea value={values.parking_notes} onChange={(e) => setValues((v) => ({ ...v, parking_notes: e.target.value }))} />
+      </Field>
 
       <Field label="Reported to site manager">
         <YesNoButtons value={values.reported_to_site_manager} onChange={(v) => setValues((prev) => ({ ...prev, reported_to_site_manager: v }))} />
+      </Field>
+      <Field label="Site manager name">
+        <input
+          value={values.site_manager_name}
+          onChange={(e) => setValues((v) => ({ ...v, site_manager_name: e.target.value }))}
+          className="border-input h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+        />
+      </Field>
+      <Field label="Site manager contact number">
+        <input
+          value={values.site_manager_phone}
+          onChange={(e) => setValues((v) => ({ ...v, site_manager_phone: e.target.value }))}
+          className="border-input h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+        />
       </Field>
 
       {showsAvFields(jobType) && (

@@ -36,7 +36,10 @@ export type JobDetailsValues = {
   player_boot_test: string;
   content_displaying: string;
   parking_notified: boolean;
+  parking_notes: string;
   reported_to_site_manager: boolean;
+  site_manager_name: string;
+  site_manager_phone: string;
   revisit_required: string; // "" | "yes" | "no" — tri-state so an unanswered question is distinguishable from "no"
   issues_found: boolean;
   issue_detail: string;
@@ -54,7 +57,10 @@ export const EMPTY_JOB_DETAILS: JobDetailsValues = {
   player_boot_test: "",
   content_displaying: "",
   parking_notified: false,
+  parking_notes: "",
   reported_to_site_manager: false,
+  site_manager_name: "",
+  site_manager_phone: "",
   revisit_required: "",
   issues_found: false,
   issue_detail: "",
@@ -169,7 +175,10 @@ export function jobDetailsRowToValues(row: JobDetailsRow | undefined): JobDetail
     player_boot_test: row.player_boot_test ?? "",
     content_displaying: row.content_displaying ?? "",
     parking_notified: row.parking_notified ?? false,
+    parking_notes: row.parking_notes ?? "",
     reported_to_site_manager: row.reported_to_site_manager ?? false,
+    site_manager_name: row.site_manager_name ?? "",
+    site_manager_phone: row.site_manager_phone ?? "",
     revisit_required: row.revisit_required === null ? "" : row.revisit_required ? "yes" : "no",
     issues_found: row.issues_found ?? false,
     issue_detail: row.issue_detail ?? "",

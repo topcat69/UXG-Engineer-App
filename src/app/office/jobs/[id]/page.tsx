@@ -278,7 +278,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                 </>
               )}
               <FormField label="Parking notified" value={jobDetails.parking_notified ? "Yes" : "No"} />
+              <FormField label="Parking considerations / restrictions" value={jobDetails.parking_notes} />
               <FormField label="Reported to site manager" value={jobDetails.reported_to_site_manager ? "Yes" : "No"} />
+              <FormField label="Site manager name" value={jobDetails.site_manager_name} />
+              <FormField label="Site manager contact number" value={jobDetails.site_manager_phone} />
               {jobDetails.revisit_required !== null && (
                 <FormField label="Revisit required" value={jobDetails.revisit_required ? "Yes" : "No"} />
               )}
