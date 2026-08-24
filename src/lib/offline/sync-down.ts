@@ -33,6 +33,13 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
     siteIds.length > 0 ? await supabase.from("sites").select("*").in("id", siteIds) : { data: [], error: null };
   if (sitesError) throw sitesError;
 
+  // The engineer needs the client's name alongside the site name for
+  // context — a site name alone (e.g. "Store 42") doesn't say who it's for.
+  const clientIds = Array.from(new Set((sites ?? []).map((s) => s.client_id)));
+  const { data: clients, error: clientsError } =
+    clientIds.length > 0 ? await supabase.from("clients").select("*").in("id", clientIds) : { data: [], error: null };
+  if (clientsError) throw clientsError;
+
   const jobIds = (jobs ?? []).map((j) => j.id);
 
   const pendingOps = await db.outbox.toArray();
@@ -97,6 +104,7 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
     [
       db.jobs,
       db.sites,
+      db.clients,
       db.installForms,
       db.surveyForms,
       db.jobTasks,
@@ -108,6 +116,7 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
     async () => {
       await db.jobs.bulkPut(jobs ?? []);
       await db.sites.bulkPut(sites ?? []);
+      await db.clients.bulkPut(clients ?? []);
 
       for (const row of installForms ?? []) {
         if (row.job_id && overwritableJobIds.has(row.job_id)) await db.installForms.put(row);

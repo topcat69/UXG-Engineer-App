@@ -23,6 +23,8 @@ export function JobList({
   );
   const sites = useLiveQuery(() => db.sites.toArray(), [], []);
   const siteById = new Map((sites ?? []).map((s) => [s.id, s]));
+  const clients = useLiveQuery(() => db.clients.toArray(), [], []);
+  const clientById = new Map((clients ?? []).map((c) => [c.id, c]));
 
   if (jobs === undefined) {
     return <p className="text-muted-foreground p-4 text-sm">Loading…</p>;
@@ -39,6 +41,7 @@ export function JobList({
       <ul className="flex flex-col gap-2">
         {jobs.map((job) => {
           const site = siteById.get(job.site_id);
+          const client = site ? clientById.get(site.client_id) : undefined;
           return (
             <li key={job.id}>
               <button
@@ -50,7 +53,9 @@ export function JobList({
                   <span className="font-medium">{job.job_number}</span>
                   <Badge variant="secondary">{humanize(job.status)}</Badge>
                 </div>
-                <p className="text-muted-foreground text-sm">{site?.name ?? "Unknown site"}</p>
+                <p className="text-muted-foreground text-sm">
+                  {client ? `${client.name} — ${site?.name ?? "Unknown site"}` : (site?.name ?? "Unknown site")}
+                </p>
                 <p className="text-muted-foreground text-sm">
                   {job.scheduled_start ? new Date(job.scheduled_start).toLocaleString() : "Not scheduled"}
                 </p>

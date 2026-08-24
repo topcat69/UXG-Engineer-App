@@ -78,6 +78,7 @@ export function JobWorkflow({
 }) {
   const job = useLiveQuery(() => db.jobs.get(jobId), [jobId]);
   const site = useLiveQuery(() => (job ? db.sites.get(job.site_id) : undefined), [job?.site_id]);
+  const client = useLiveQuery(() => (site ? db.clients.get(site.client_id) : undefined), [site?.client_id]);
   const formRow = useLiveQuery(() => db.installForms.where("job_id").equals(jobId).first(), [jobId]);
   const detailsRow = useLiveQuery(() => db.jobDetails.where("job_id").equals(jobId).first(), [jobId]);
   const equipment = useLiveQuery(() => db.jobEquipment.where("job_id").equals(jobId).sortBy("position"), [jobId], []);
@@ -324,7 +325,7 @@ export function JobWorkflow({
           <h1 className="text-lg font-semibold">{job.job_number}</h1>
           <Badge variant="secondary">{humanize(job.status)}</Badge>
         </div>
-        <p className="text-muted-foreground text-sm">{site?.name}</p>
+        <p className="text-muted-foreground text-sm">{client ? `${client.name} — ${site?.name}` : site?.name}</p>
         <p className="text-muted-foreground text-sm">
           {[site?.address_line1, site?.town, site?.postcode].filter(Boolean).join(", ")}
         </p>

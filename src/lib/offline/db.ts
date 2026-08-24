@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/database.types";
 
 export type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 export type SiteRow = Database["public"]["Tables"]["sites"]["Row"];
+export type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
 export type InstallFormRow = Database["public"]["Tables"]["install_forms"]["Row"];
 export type SurveyFormRow = Database["public"]["Tables"]["survey_forms"]["Row"];
 export type JobDetailsRow = Database["public"]["Tables"]["job_details"]["Row"];
@@ -92,6 +93,7 @@ export type SyncMeta = {
 class OfflineDB extends Dexie {
   jobs!: EntityTable<JobRow, "id">;
   sites!: EntityTable<SiteRow, "id">;
+  clients!: EntityTable<ClientRow, "id">;
   installForms!: EntityTable<InstallFormRow, "id">;
   surveyForms!: EntityTable<SurveyFormRow, "id">;
   outbox!: Table<OutboxOperation, string>;
@@ -140,6 +142,23 @@ class OfflineDB extends Dexie {
     this.version(4).stores({
       jobs: "id, status, assigned_to, scheduled_start, site_id",
       sites: "id",
+      installForms: "id, job_id",
+      surveyForms: "id, job_id",
+      outbox: "id, createdAt",
+      mediaQueue: "id, jobId, status",
+      syncMeta: "key",
+      jobTasks: "id, job_id, is_done",
+      jobDetails: "id, job_id",
+      jobEquipment: "id, job_id",
+      jobOptionalFields: "id, job_id",
+    });
+    // clients: read-only reference data the same shape as sites — the
+    // engineer needs the client's name alongside the site name for context
+    // (a site name alone, e.g. "Store 42", doesn't say who it's for).
+    this.version(5).stores({
+      jobs: "id, status, assigned_to, scheduled_start, site_id",
+      sites: "id",
+      clients: "id",
       installForms: "id, job_id",
       surveyForms: "id, job_id",
       outbox: "id, createdAt",

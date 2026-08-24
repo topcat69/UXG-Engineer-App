@@ -3553,3 +3553,46 @@ clean — 315 passed (2 new: the Nominatim fallback now scopes to
 address/town/postcode when address context is given), same 2
 pre-existing Supabase-dependent failures as every addendum in this
 sandbox, no regressions.
+
+## 2026-08-24 — Field app: show client name alongside site name
+
+The field app's job list and job workflow screen only ever showed the
+site name (e.g. "Store 42") — no indication of which client it belongs
+to, unlike the office side (job list/detail/dashboard/reports all
+already surface Client — see the 2026-08 addendum for that feature).
+Same request as that one, just for the engineer's own view of a job:
+context on who the work is for, not just where.
+
+The field app is fully offline-first (Dexie/IndexedDB, synced down from
+Supabase — see Phase 3), and `clients` was never one of the tables
+pulled into that local cache; `sites` was, but a site only carries
+`client_id`, not the client's name. Added a `clients` Dexie store
+(version 5 of the schema — `id` only indexed, same shape as `sites`),
+populated by `syncDown` (`lib/offline/sync-down.ts`) from the distinct
+`client_id`s of the sites just fetched, alongside the existing per-job
+`sites` fetch. `clients` is reference data the engineer never writes
+(same category as `job_equipment`/`job_optional_fields`), so it's a
+plain `bulkPut`, no pending-outbox guard needed. RLS already allows any
+signed-in user to read `clients` (`clients_select ... using (true)`,
+`20260116000000_clients.sql`), so no policy change was needed.
+
+`JobList` and `JobWorkflow` (`components/field/job-list.tsx`,
+`job-workflow.tsx`) both now look up the site's client via
+`site.client_id` and render "Client — Site" wherever the site name
+already appeared, falling back to the site name alone if the client
+lookup comes up empty (a stale/not-yet-synced cache, same defensive
+posture as the existing "Unknown site" fallback).
+
+Not visually verified in a live browser (no running Supabase to sign in
+against in this sandbox, and the offline path specifically needs a real
+IndexedDB-backed browser session to exercise the Dexie schema bump) —
+the two display call sites are a direct, mechanical extension of the
+same `siteById`/`clientById` lookup pattern already used and tested
+elsewhere in this app.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 315 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions. (No new unit tests: the
+change is two lookup-map extensions and two render-string edits, no new
+pure logic to test in isolation — `sync-down.ts`'s only exported pure
+function, `jobIdsSafeToOverwrite`, is unaffected.)
