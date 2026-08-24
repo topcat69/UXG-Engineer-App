@@ -7,21 +7,13 @@ import { applyJobListFilters, hasAnyFilter, parseJobListFilters, type JobListSea
 import { humanize } from "@/lib/format/text";
 
 const PAGE_SIZE = 50;
-const JOB_STATUSES: Database["public"]["Enums"]["job_status"][] = [
-  "draft",
-  "scheduled",
-  "dispatched",
-  "accepted",
-  "travelling",
-  "on_site",
-  "in_progress",
-  "submitted",
-  "under_review",
-  "approved",
-  "closed",
-  "on_hold",
-  "cancelled",
-];
+// Reports only makes sense for a job that's actually finished, one way or
+// another — "closed" (completed, approved through QA) or "cancelled". A job
+// still in progress has no meaningful report to produce yet. Narrower than
+// the full job_status enum on purpose: might need to open this back up to
+// every status later (per the feature request that raised this), at which
+// point this becomes a filter option rather than a hard restriction.
+const REPORT_STATUSES: Database["public"]["Enums"]["job_status"][] = ["closed", "cancelled"];
 
 function param(searchParams: JobListSearchParams, key: string): string {
   const value = searchParams[key];
@@ -29,13 +21,14 @@ function param(searchParams: JobListSearchParams, key: string): string {
 }
 
 /**
- * Every job here can produce a report — a job report is "as applicable"
- * (per the feature request): missing form answers, photos, or signatures
- * just make for a shorter PDF/zip (see generateCompletionReport), so this
- * page isn't filtered down to completed/approved jobs only. Downloads hit
- * /api/jobs/[id]/report/{pdf,zip}, which generate fresh on every request
- * rather than reusing jobs.completion_pdf_url (that field only exists
- * post-approval and can go stale) — see that route's comment.
+ * Only closed (completed) or cancelled jobs are listed — a report only
+ * makes sense for a job that's actually finished, one way or another (see
+ * REPORT_STATUSES above). Within that, a report is still "as applicable":
+ * missing form answers, photos, or signatures just make for a shorter
+ * PDF/zip (see generateCompletionReport), not a reason to exclude the job.
+ * Downloads hit /api/jobs/[id]/report/{pdf,zip}, which generate fresh on
+ * every request rather than reusing jobs.completion_pdf_url (that field
+ * only exists post-approval and can go stale) — see that route's comment.
  */
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<JobListSearchParams> }) {
   const sp = await searchParams;
@@ -51,6 +44,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         "id, job_number, status, scheduled_start, site:sites(name, client:clients(name)), project:projects(name)",
         { count: "exact" },
       )
+      .in("status", REPORT_STATUSES)
       .order("created_at", { ascending: false })
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
     filters,
@@ -94,7 +88,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
           >
             <option value="">All</option>
-            {JOB_STATUSES.map((s) => (
+            {REPORT_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {humanize(s)}
               </option>

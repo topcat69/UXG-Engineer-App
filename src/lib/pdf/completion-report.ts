@@ -7,6 +7,20 @@ import { JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 import { humanize } from "@/lib/format/text";
 import { formatDurationBetween } from "@/lib/format/duration";
 import { formatGpsTimestampOverlay } from "./overlay-text";
+import {
+  BRAND,
+  PAGE_MARGINS,
+  drawBanner,
+  drawFooters,
+  drawSectionBar,
+  drawSignatureBox,
+  fieldBlock,
+  labelledParagraph,
+  loadLogoBytes,
+  photoBlock,
+  severityAccent,
+  twoColumnRow,
+} from "./brand";
 
 type AnySupabaseClient = SupabaseClient<Database>;
 
@@ -26,7 +40,7 @@ function sha256Hex(buffer: Buffer): string {
 }
 
 /**
- * Formats one form-answer field for the "Form answers" section, or null to
+ * Formats one form-answer field for the "Form Details" section, or null to
  * skip it entirely (unanswered). Booleans render as Yes/No — this used to
  * print pdfkit's default `${value}` interpolation of `true`/`false`
  * literally, most visibly on "Revisit required". Pass/fail fields are
@@ -41,6 +55,10 @@ function formatFieldValue(label: string, value: string | boolean | null): string
   return value;
 }
 
+function formatDateTime(iso: string | null): string {
+  return iso ? new Date(iso).toLocaleString("en-GB") : "—";
+}
+
 /** Exported for job-archive.ts, which needs the same original bytes this file already downloads for embedding. */
 export async function downloadBytes(supabase: AnySupabaseClient, storagePath: string): Promise<Buffer | null> {
   const { data } = await supabase.storage.from("media").download(storagePath);
@@ -53,13 +71,27 @@ export async function downloadBytes(supabase: AnySupabaseClient, storagePath: st
  * Buffer — job details, form answers, photos with GPS/timestamp overlays,
  * signatures, and a hash manifest. Caller is responsible for uploading it
  * and setting `jobs.completion_pdf_url` (see qa/actions.ts's approveJob).
+ *
+ * Laid out to match the UXG Brand Manual (2023) and a reference report
+ * layout the office provided: a branded banner with the UXG logo on every
+ * page (brand.ts's drawBanner, registered against pdfkit's 'pageAdded'
+ * event so it also covers pages pdfkit adds itself when content
+ * overflows), a cover page of Job Details/Field Agent/Scheduling/
+ * Completion sections, then one labelled block per form field/photo/issue
+ * — the same "field name as a small heading, its answer beneath" shape the
+ * reference layout uses for its own RFI entries, just backed by this app's
+ * own job_details/install_forms fields and issues rather than AppSheet's
+ * RFI ids. See DECISIONS.md for what was deliberately simplified versus
+ * that reference (no Montserrat embedding, no per-field "completed by").
  */
 export async function generateCompletionReport(supabase: AnySupabaseClient, jobId: string): Promise<Buffer> {
   const [{ data: job }, { data: installForm }, { data: jobDetails }, { data: media }, { data: signatures }, { data: issues }] =
     await Promise.all([
       supabase
         .from("jobs")
-        .select("job_number, job_type, status, scheduled_start, actual_travel_start, actual_start, actual_end, site:sites(name, address_line1, address_line2, town, postcode), project:projects(name)")
+        .select(
+          "job_number, job_type, status, description, scheduled_start, actual_travel_start, actual_start, actual_end, site:sites(name, address_line1, address_line2, town, postcode, client:clients(name)), project:projects(name), assigned:users!jobs_assigned_to_fkey(name, email, phone, company)",
+        )
         .eq("id", jobId)
         .single(),
       supabase.from("install_forms").select("*").eq("job_id", jobId).maybeSingle(),
@@ -70,140 +102,165 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
     ]);
   if (!job) throw new Error(`Job ${jobId} not found`);
 
-  const doc = new PDFDocument({ margin: 50 });
+  const doc = new PDFDocument({ margins: PAGE_MARGINS, bufferPages: true });
   const chunks: Buffer[] = [];
   doc.on("data", (chunk: Buffer) => chunks.push(chunk));
   const done = new Promise<Buffer>((resolve) => doc.on("end", () => resolve(Buffer.concat(chunks))));
 
+  const logo = loadLogoBytes();
+  doc.on("pageAdded", () => drawBanner(doc, logo, "Job Report"));
+  drawBanner(doc, logo, "Job Report"); // 'pageAdded' doesn't fire for the page the constructor itself creates
+
   const manifest: ManifestEntry[] = [];
 
-  // --- Cover: job details ---
-  doc.fontSize(20).text("UXG Engineer Job Scheduler — Completion Report", { align: "center" });
-  doc.moveDown();
-  doc.fontSize(14).text(job.job_number);
-  doc.fontSize(10).fillColor("#555");
-  doc.text(`Site: ${job.site?.name ?? "—"}`);
-  doc.text(
-    `Address: ${[job.site?.address_line1, job.site?.address_line2, job.site?.town, job.site?.postcode].filter(Boolean).join(", ")}`,
-  );
-  doc.text(`Project: ${job.project?.name ?? "—"}`);
-  doc.text(`Job type: ${JOB_TYPE_LABELS[job.job_type as keyof typeof JOB_TYPE_LABELS] ?? humanize(job.job_type)}`);
-  doc.text(`Status: ${humanize(job.status)}`);
-  if (job.actual_travel_start) doc.text(`Travel started: ${new Date(job.actual_travel_start).toLocaleString("en-GB")}`);
-  if (job.actual_start) doc.text(`Started: ${new Date(job.actual_start).toLocaleString("en-GB")}`);
-  if (job.actual_end) doc.text(`Completed: ${new Date(job.actual_end).toLocaleString("en-GB")}`);
-  const travelDuration = formatDurationBetween(job.actual_travel_start, job.actual_start);
-  if (travelDuration) doc.text(`Time travelling: ${travelDuration}`);
-  const onSiteDuration = formatDurationBetween(job.actual_start, job.actual_end);
-  if (onSiteDuration) doc.text(`Time on job: ${onSiteDuration}`);
-  doc.fillColor("black");
+  // --- Cover: top summary row ---
+  const siteName = job.site?.name ?? "—";
+  const clientName = job.site?.client?.name ?? null;
+  const reportFor = clientName ? `${clientName} — ${siteName}` : siteName;
+  twoColumnRow(doc, ["Job Report For:", reportFor], ["Author:", job.assigned?.name]);
+  twoColumnRow(doc, ["No. Issues:", String(issues?.length ?? 0)], ["Date:", new Date().toLocaleDateString("en-GB")]);
+  doc.moveDown(0.5);
 
-  // --- Form answers ---
-  if (installForm) {
-    doc.moveDown().fontSize(14).text("Form answers");
-    doc.fontSize(10);
-    const fields: [string, string | boolean | null][] = [
-      ["Player serial", installForm.player_serial],
-      ["Screen serial", installForm.screen_serial],
-      ["Mount type", installForm.mount_type],
-      ["Power source", installForm.power_source],
-      ["Network type", installForm.network_type],
-      ["WiFi signal", installForm.wifi_signal],
-      ["Network port", installForm.network_port],
-      ["Player boot test", installForm.player_boot_test],
-      ["Content displaying", installForm.content_displaying],
-      ["Issues found", installForm.issues_found],
-      ["Issue detail", installForm.issue_detail],
-      ["Client name", installForm.client_name],
-      ["Engineer notes", installForm.engineer_notes],
-    ];
-    for (const [label, value] of fields) {
+  // --- Job Details ---
+  drawSectionBar(doc, "Job Details");
+  twoColumnRow(doc, ["Project Name:", job.project?.name], ["Job Code:", job.job_number]);
+  twoColumnRow(doc, ["Location Name:", siteName], ["Job Type:", JOB_TYPE_LABELS[job.job_type as keyof typeof JOB_TYPE_LABELS] ?? humanize(job.job_type)]);
+  twoColumnRow(doc, ["Status:", humanize(job.status)]);
+  const address = [job.site?.address_line1, job.site?.address_line2, job.site?.town, job.site?.postcode].filter(Boolean).join(", ");
+  labelledParagraph(doc, "Address:", address || null);
+  labelledParagraph(doc, "Job Description:", job.description);
+  doc.moveDown(0.3);
+
+  // --- Field Agent ---
+  drawSectionBar(doc, "Field Agent");
+  twoColumnRow(doc, ["Allocated To:", job.assigned?.company || "UX Global"], ["FA Mobile:", job.assigned?.phone]);
+  twoColumnRow(doc, ["FA Name:", job.assigned?.name], ["FA Email:", job.assigned?.email]);
+  doc.moveDown(0.3);
+
+  // --- Scheduling ---
+  drawSectionBar(doc, "Scheduling");
+  twoColumnRow(doc, ["Scheduled Start:", formatDateTime(job.scheduled_start)], ["Actual End:", formatDateTime(job.actual_end)]);
+  twoColumnRow(doc, ["Actual Start:", formatDateTime(job.actual_start)], ["Time on job:", formatDurationBetween(job.actual_start, job.actual_end)]);
+  twoColumnRow(doc, ["Travel started:", formatDateTime(job.actual_travel_start)], ["Time travelling:", formatDurationBetween(job.actual_travel_start, job.actual_start)]);
+  doc.moveDown(0.3);
+
+  // --- Completion ---
+  drawSectionBar(doc, "Completion");
+  const signature = signatures?.[0];
+  const signatureBytes = signature ? await downloadBytes(supabase, signature.storage_path) : null;
+  const completionY = doc.y;
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(BRAND.charcoal).text("Signed By:", PAGE_MARGINS.left, completionY, { width: 100, lineBreak: false });
+  doc.font("Helvetica").fillColor(BRAND.digitalPink).text(signature?.signer_name ?? "—", PAGE_MARGINS.left + 100, completionY, { lineBreak: false });
+  doc.font("Helvetica-Bold").fillColor(BRAND.charcoal).text("Job Title:", PAGE_MARGINS.left, completionY + 16, { width: 100, lineBreak: false });
+  doc.font("Helvetica").fillColor(BRAND.digitalPink).text(signature?.signer_role ?? "—", PAGE_MARGINS.left + 100, completionY + 16, { lineBreak: false });
+  doc.fillColor("black").font("Helvetica");
+  const sigBoxWidth = 220;
+  const sigBoxHeight = 90;
+  const sigBoxX = doc.page.width - PAGE_MARGINS.right - sigBoxWidth;
+  drawSignatureBox(doc, sigBoxX, completionY, sigBoxWidth, sigBoxHeight, signatureBytes);
+  doc.y = completionY + Math.max(40, sigBoxHeight) + 10;
+  if (signature && signatureBytes) {
+    manifest.push({ label: `Signature: ${signature.signer_name}`, sha256: sha256Hex(signatureBytes) });
+  }
+  // Any additional signatures beyond the first (rare — one client sign-off
+  // per job in practice) still get hashed into the manifest even though
+  // only the first is shown on the cover.
+  for (const extra of (signatures ?? []).slice(1)) {
+    const bytes = await downloadBytes(supabase, extra.storage_path);
+    if (bytes) manifest.push({ label: `Signature: ${extra.signer_name}`, sha256: sha256Hex(bytes) });
+  }
+
+  // --- Form Details ---
+  const formFields: [string, string | boolean | null][] = installForm
+    ? [
+        ["Player serial", installForm.player_serial],
+        ["Screen serial", installForm.screen_serial],
+        ["Mount type", installForm.mount_type],
+        ["Power source", installForm.power_source],
+        ["Network type", installForm.network_type],
+        ["WiFi signal", installForm.wifi_signal],
+        ["Network port", installForm.network_port],
+        ["Player boot test", installForm.player_boot_test],
+        ["Content displaying", installForm.content_displaying],
+        ["Issues found", installForm.issues_found],
+        ["Issue detail", installForm.issue_detail],
+        ["Client name", installForm.client_name],
+        ["Engineer notes", installForm.engineer_notes],
+      ]
+    : jobDetails
+      ? [
+          ["Player serial", jobDetails.player_serial],
+          ["Screen serial", jobDetails.screen_serial],
+          ["Mount type", jobDetails.mount_type],
+          ["Power source", jobDetails.power_source],
+          ["Network type", jobDetails.network_type],
+          ["WiFi signal", jobDetails.wifi_signal],
+          ["Network port", jobDetails.network_port],
+          ["Player boot test", jobDetails.player_boot_test],
+          ["Content displaying", jobDetails.content_displaying],
+          ["SLA requirement", jobDetails.sla_requirement_detail],
+          ["Parking notified", jobDetails.parking_notified],
+          ["Reported to site manager", jobDetails.reported_to_site_manager],
+          ["Revisit required", jobDetails.revisit_required],
+          ["Issues found", jobDetails.issues_found],
+          ["Issue detail", jobDetails.issue_detail],
+          ["Engineer notes", jobDetails.engineer_notes],
+        ]
+      : [];
+
+  if (formFields.length > 0) {
+    doc.addPage();
+    drawSectionBar(doc, "Form Details");
+    for (const [label, value] of formFields) {
       const formatted = formatFieldValue(label, value);
-      if (formatted !== null) doc.text(`${label}: ${formatted}`);
+      if (formatted !== null) fieldBlock(doc, label, formatted);
     }
   }
 
-  if (jobDetails) {
-    doc.moveDown().fontSize(14).text("Form answers");
-    doc.fontSize(10);
-    const fields: [string, string | boolean | null][] = [
-      ["Player serial", jobDetails.player_serial],
-      ["Screen serial", jobDetails.screen_serial],
-      ["Mount type", jobDetails.mount_type],
-      ["Power source", jobDetails.power_source],
-      ["Network type", jobDetails.network_type],
-      ["WiFi signal", jobDetails.wifi_signal],
-      ["Network port", jobDetails.network_port],
-      ["Player boot test", jobDetails.player_boot_test],
-      ["Content displaying", jobDetails.content_displaying],
-      ["SLA requirement", jobDetails.sla_requirement_detail],
-      ["Parking notified", jobDetails.parking_notified],
-      ["Reported to site manager", jobDetails.reported_to_site_manager],
-      ["Revisit required", jobDetails.revisit_required],
-      ["Issues found", jobDetails.issues_found],
-      ["Issue detail", jobDetails.issue_detail],
-      ["Engineer notes", jobDetails.engineer_notes],
-    ];
-    for (const [label, value] of fields) {
-      const formatted = formatFieldValue(label, value);
-      if (formatted !== null) doc.text(`${label}: ${formatted}`);
+  // --- Photos and videos, each beside its own caption, GPS/timestamp overlay burned in ---
+  if ((media ?? []).length > 0) {
+    doc.addPage();
+    drawSectionBar(doc, "Photos");
+    for (const photo of media ?? []) {
+      const bytes = await downloadBytes(supabase, photo.storage_path);
+      if (!bytes) continue;
+      const isVideo = photo.media_type === "video";
+      manifest.push({ label: `${isVideo ? "Video" : "Photo"}: ${photo.slot}`, sha256: sha256Hex(bytes) });
+
+      const caption = formatGpsTimestampOverlay(photo.latitude, photo.longitude, photo.captured_at);
+      photoBlock(
+        doc,
+        humanize(photo.slot.replace("photo_", "")),
+        caption,
+        isVideo ? { bytes: null, isVideo: true } : { bytes, isVideo: false },
+      );
     }
   }
 
   // --- Issues raised ---
   if (issues && issues.length > 0) {
-    doc.moveDown().fontSize(14).text("Issues raised");
-    doc.fontSize(10);
+    doc.addPage();
+    drawSectionBar(doc, "Issues");
     for (const issue of issues) {
-      doc.text(`[${humanize(issue.severity)}, ${humanize(issue.status ?? "")}] ${issue.description}`);
+      fieldBlock(
+        doc,
+        `${humanize(issue.severity)} — ${humanize(issue.status ?? "")}`,
+        issue.description,
+        severityAccent(issue.severity),
+      );
     }
-  }
-
-  // --- Photos and videos, one per page, GPS/timestamp overlay burned in ---
-  // pdfkit's .image() only understands JPEG/PNG, so a video can't be
-  // embedded the way a photo is — it still gets a page (label, overlay,
-  // and a manifest entry hashing the actual downloaded bytes, same
-  // evidentiary record as a photo), just as a note instead of an image.
-  for (const photo of media ?? []) {
-    const bytes = await downloadBytes(supabase, photo.storage_path);
-    if (!bytes) continue;
-    const isVideo = photo.media_type === "video";
-    manifest.push({ label: `${isVideo ? "Video" : "Photo"}: ${photo.slot}`, sha256: sha256Hex(bytes) });
-
-    doc.addPage();
-    doc.fontSize(12).text(humanize(photo.slot.replace("photo_", "")));
-    if (isVideo) {
-      doc.fontSize(10).text("Video captured on site — see the job record for playback.");
-    } else {
-      doc.image(bytes, { fit: [500, 600], align: "center" });
-    }
-    const overlay = formatGpsTimestampOverlay(photo.latitude, photo.longitude, photo.captured_at);
-    doc.fontSize(9).fillColor("#333").text(overlay, { align: "center" });
-    doc.fillColor("black");
-  }
-
-  // --- Signatures ---
-  for (const signature of signatures ?? []) {
-    const bytes = await downloadBytes(supabase, signature.storage_path);
-    if (!bytes) continue;
-    manifest.push({ label: `Signature: ${signature.signer_name}`, sha256: sha256Hex(bytes) });
-
-    doc.addPage();
-    doc.fontSize(12).text(`Signed by ${signature.signer_name} (${signature.signer_role})`);
-    doc.image(bytes, { fit: [400, 200] });
-    const overlay = formatGpsTimestampOverlay(signature.latitude, signature.longitude, signature.signed_at);
-    doc.fontSize(9).fillColor("#333").text(overlay);
-    doc.fillColor("black");
   }
 
   // --- Hash manifest: proves what's actually embedded above ---
   doc.addPage();
-  doc.fontSize(14).text("Hash manifest (SHA-256)");
+  drawSectionBar(doc, "Verification");
   doc.fontSize(8).font("Courier");
   for (const entry of manifest) {
-    doc.text(`${entry.sha256}  ${entry.label}`);
+    doc.text(`${entry.sha256}  ${entry.label}`, { width: doc.page.width - PAGE_MARGINS.left - PAGE_MARGINS.right });
   }
+  doc.font("Helvetica");
 
+  drawFooters(doc);
   doc.end();
   return done;
 }

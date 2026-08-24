@@ -92,6 +92,13 @@ test("manager pulls a job's PDF and zip report from /office/reports", async ({ p
   await page.getByRole("button", { name: /Check Out & Submit/ }).click();
   await expect(page.getByText("This job is submitted.")).toBeVisible({ timeout: 10_000 });
 
+  // The Reports page only lists closed/cancelled jobs (a report only makes
+  // sense once a job is actually finished) — moved straight to "closed"
+  // rather than going through full QA approval, since this test is about
+  // the report download itself, not the QA workflow, and completion_pdf_url
+  // must stay null either way to prove the PDF/zip generate fresh.
+  await admin.from("jobs").update({ status: "closed" }).eq("id", jobId);
+
   // --- Office: find the job on the Reports page (never QA-approved). ---
   const officePage = await page.context().browser()!.newPage();
   await loginAs(officePage, "manager@opoc.test");

@@ -3684,3 +3684,155 @@ required when Ethernet is selected and not otherwise, in both files' own
 `validateJobDetails`/`validateInstallForm` tests), same 2 pre-existing
 Supabase-dependent failures as every addendum in this sandbox, no
 regressions. Needs `supabase db push` on deploy (new columns).
+
+## 2026-08-24 — Reports page scoped to finished jobs; completion PDF rebranded to UXG
+
+Two requests: Reports should only list jobs that are actually finished,
+and the completion PDF should look like a real UXG report, not a plain
+text dump, per the UXG Brand Manual (2023) and a reference report layout
+the office provided.
+
+**Reports (`/office/reports`).** Was showing every job regardless of
+status — a report technically "works" (see the "as applicable" comment
+already on that page) for a job still in progress, but there's nothing
+useful to report on yet. Added `REPORT_STATUSES = ["closed", "cancelled"]`
+and an unconditional `.in("status", REPORT_STATUSES)` on the base query —
+"closed" is this app's completed/approved-through-QA terminal state (see
+Phase 2's QA queue addendum), "cancelled" the other terminal state. The
+status filter dropdown now only offers those two, rather than the full
+13-value `job_status` enum with 11 options that would always return zero
+rows. Left as a hard restriction, not a filter toggle, matching how the
+request was phrased ("may be a requirement in the future" to show all
+jobs — noted, not built ahead of being asked for). Updated
+`tests/e2e/job-reports.spec.ts` to move its test job to `status: "closed"`
+via the admin client straight after field submission (it was never headed
+through full QA approval, and still isn't — `completion_pdf_url` staying
+null is exactly what that test is proving), since the job's real status
+after field submission is `"submitted"`, not one of the two now required
+to appear on the page.
+
+**Completion PDF rebrand.** The generator (`lib/pdf/completion-report.ts`)
+previously produced a single unstyled `doc.text()` dump — a page title,
+then flat `Label: value` lines with no color, imagery, or structure.
+Split the layout/drawing concerns into their own files rather than
+growing completion-report.ts further:
+- `lib/pdf/brand-colors.ts` — the UXG palette (Brand Manual Section 2)
+  as hex constants: Charcoal `#515559`, Pale Grey `#E4E4E7`, LED Blue
+  `#00D1DB`, Digital Pink `#EA3865`, Retail Orange `#F19215`, Hub Blue
+  `#333A80`. Plain data, deliberately not `server-only`, so it (and
+  anything pure built on it) can be imported from a Vitest test.
+- `lib/pdf/severity.ts` — `severityAccent(severity)`, the one genuinely
+  pure piece of the new layout logic (critical/high issues get Digital
+  Pink, everything else Charcoal) — unit tested directly
+  (`severity.test.ts`), unlike the rest of this addendum's pdfkit-drawing
+  code, which (same as every other file under `lib/pdf/`, per Phase 5's
+  addendum) is `server-only` and only exercisable through a real
+  generated PDF.
+- `lib/pdf/brand.ts` — `server-only`, the actual pdfkit drawing
+  primitives: `drawBanner` (logo + "Job Report" title on a charcoal→grey
+  gradient bar, redrawn on every page via pdfkit's `'pageAdded'` event so
+  it also covers pages pdfkit adds itself on overflow, not just the ones
+  this file calls `addPage()` for), `drawSectionBar` (the "JOB DETAILS" /
+  "FORM DETAILS" / etc. bars), `twoColumnRow` (fixed-height label:value
+  pairs for short, predictable values — dates, names, codes),
+  `labelledParagraph` (label + wrapped body text, for anything too long
+  to trust to a fixed row height — descriptions, notes), `fieldBlock`
+  (one form-field/issue entry: coloured field name, a rule, the answer
+  beneath — manually page-break-checked via `heightOfString` rather than
+  relying on pdfkit's own per-`.text()`-call overflow handling, which
+  could otherwise split a block right after its label), `photoBlock`
+  (same shape, plus an actual thumbnail — or a placeholder for a video,
+  which pdfkit can't embed as an image — beside the text instead of on a
+  separate page), `drawSignatureBox` (dashed border, per the reference
+  layout; the real signature drawn inside once captured, "Not yet signed"
+  as a visible cue rather than a silent gap when it isn't), and
+  `drawFooters` (a rule + "Page X of Y", via `bufferedPageRange()` since
+  the total page count isn't known until every page already exists).
+  Reads `public/branding/uxg-logo.png` — the same logo file the office UI
+  itself already renders (`components/branding/uxg-logo.tsx`) — via
+  `process.cwd()`, which is the app root both under `next dev` and in the
+  standalone Docker runtime (`Dockerfile`: `WORKDIR /app`,
+  `COPY --from=builder /app/public ./public`).
+
+**Report structure now mirrors the reference layout's shape**, adapted to
+this app's own data model rather than copied field-for-field (it's an
+AppSheet/OPOC export with RFI ids this app has no equivalent of): a
+banner + Job Details/Field Agent/Scheduling/Completion cover page (client
+— site, the assigned engineer as both "Author" and the Field Agent
+contact — this app tracks no separate report-author role, so reusing the
+one real person on the job is the honest choice over inventing one;
+`allocated_to` falls back to the engineer's own `company` field, defaulting
+to "UX Global"), then one labelled block per form field/photo/issue on
+their own "Form Details"/"Photos"/"Issues" pages — the same "field name
+as a small heading, its answer beneath" shape the reference layout uses
+per RFI, just backed by `job_details`/`install_forms` fields and this
+app's own `issues` table. Photos sit beside their own caption (GPS +
+timestamp overlay, unchanged from before) rather than each getting a
+whole page to itself. The hash manifest page is unchanged in substance
+(still hashes bytes freshly downloaded at generation time, per Phase 5's
+own reasoning for why that matters as evidence) — restyled with the same
+section-bar treatment as everything else.
+
+**Deliberately not done:** no Montserrat embedding (the brand manual's
+own primary typeface) — pdfkit needs real font files on disk to embed
+non-standard fonts, and Phase 5 already hit one real bundler bug from
+pdfkit reading its own bundled Helvetica.afm files under Turbopack;
+adding a second font-loading path for this rebrand risked a repeat for a
+purely typographic upgrade. Helvetica (pdfkit's built-in) carries the
+rebrand instead via color, the logo, and layout structure, which is what
+this addendum actually changes. No per-field "completed by"/timestamp on
+each form-field entry (the reference layout has one because AppSheet
+records who answered each individual RFI question; this app's forms are
+one row per job, not one row per question, so there's nothing to attach
+that to per-field — the job-level "Author"/Field Agent already covers
+who did the work).
+
+**Real bugs found and fixed before shipping, by actually generating and
+looking at a sample PDF rather than trusting the code.** No live Supabase
+exists in this sandbox to click "Generate PDF" through the real UI, so
+verification instead meant temporarily neutralizing the `server-only`
+import guard (which unconditionally throws outside Next's bundler — see
+Phase 4's addendum on why every `lib/pdf/*` file is normally untestable
+directly), running `generateCompletionReport` against a fake Supabase
+client with realistic fabricated data via `tsx`, and rendering the result
+to PNG with `pdftoppm` — restored immediately afterward, never committed.
+This caught three real defects a code read alone hadn't:
+1. **The cover page's top summary row rendered overlapping the banner.**
+   pdfkit's `.text()` moves the `x`/`y` cursor to just past what it drew
+   even when given explicit coordinates — `drawBanner`'s own "Job Report"
+   title text left `doc.y` around 42, well above where content should
+   start (`PAGE_MARGINS.top`, 86), so the very next content call inherited
+   that leftover position instead of starting fresh below the banner.
+   Fixed by having `drawBanner` explicitly reset `doc.x`/`doc.y` to the
+   page margins after it finishes drawing.
+2. **The hash manifest page's text was indented ~100pt from the left
+   margin for no reason.** Same root cause, different call site:
+   `drawSectionBar` reset `doc.y` after itself but not `doc.x`, so a
+   later `.text()` call made without explicit coordinates (the manifest
+   listing) inherited whatever `doc.x` a much earlier, unrelated block on
+   a previous page had left behind. Fixed by having `drawSectionBar`
+   reset `doc.x` too.
+3. **The document was silently doubling in page count** (10 pages
+   generated for 5 real sections). `drawFooters` writes into the bottom
+   margin on purpose (that's what `PAGE_MARGINS.bottom` reserves the
+   space for) — but pdfkit's `.text()` checks the target `y` against the
+   page's printable area (`height - margins.bottom`) even with explicit
+   coordinates, and silently started a *new* page before drawing each
+   footer, since the footer's own `y` sits below that boundary by design.
+   Fixed with the standard workaround: temporarily zero
+   `doc.page.margins.bottom` for the duration of each footer write, then
+   restore it — nothing else runs against that page afterward, so there's
+   nothing left for the margin to protect there.
+   All three were confirmed fixed by regenerating the sample PDF and
+   re-rendering it — clean margins, correct page count, no overlap — not
+   just inferred from re-reading the diff.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 327 passed (2 new: `severityAccent` in `severity.test.ts`), same
+2 pre-existing Supabase-dependent failures as every addendum in this
+sandbox, no regressions. The visual verification above is real (an actual
+generated PDF was inspected, not just imagined) but was done against
+fabricated data through a temporary local harness, not the real app —
+flagged so this gets one real look through the actual office UI once
+deployed, the same caveat every PDF-generation addendum in this sandbox
+carries.
