@@ -133,14 +133,50 @@ export async function checkIn(
   });
 }
 
-/** Persists the in-progress form draft locally. Called on a 15s timer and on capture events. */
+/**
+ * Persists the in-progress form draft locally (on a 15s timer and on
+ * capture events) AND queues a matching upsert outbox op under a fixed,
+ * per-job id — otherwise the draft exists nowhere but this device's own
+ * Dexie cache, with no outbox op referencing it, so the sync engine's own
+ * periodic syncDown() (every 30s, or on reopening the app) sees no reason
+ * not to overwrite it with the server's still-empty pre-submission copy,
+ * silently erasing everything the engineer just typed — exactly what
+ * "close the job and reopen it, my answers are gone" was. Reusing the same
+ * outbox id every tick (rather than a fresh one) means editing for several
+ * minutes only ever has one pending draft-upsert queued, not a pile of
+ * superseded ones; draining it pushes the exact same content the sync
+ * engine is about to pull back down, so the round trip changes nothing.
+ * See DECISIONS.md for the full trace of why this was silently losing data.
+ */
 export async function saveInstallFormDraft(row: InstallFormRow): Promise<void> {
-  await db.installForms.put(row);
+  await db.transaction("rw", [db.installForms, db.outbox], async () => {
+    await db.installForms.put(row);
+    const opId = `draft-install-${row.job_id}`;
+    const existing = await db.outbox.get(opId);
+    await db.outbox.put({
+      id: opId,
+      type: "install_form_upsert",
+      row,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+      attempts: 0,
+    });
+  });
 }
 
-/** job_details equivalent of saveInstallFormDraft, for install/sla/maintenance/delivery. */
+/** job_details equivalent of saveInstallFormDraft, for install/sla/maintenance/delivery — same reasoning above. */
 export async function saveJobDetailsDraft(row: JobDetailsRow): Promise<void> {
-  await db.jobDetails.put(row);
+  await db.transaction("rw", [db.jobDetails, db.outbox], async () => {
+    await db.jobDetails.put(row);
+    const opId = `draft-details-${row.job_id}`;
+    const existing = await db.outbox.get(opId);
+    await db.outbox.put({
+      id: opId,
+      type: "job_details_upsert",
+      row,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+      attempts: 0,
+    });
+  });
 }
 
 /** Ticks/unticks a job task. Optimistic local write + queued outbox op, same shape as checkIn. */

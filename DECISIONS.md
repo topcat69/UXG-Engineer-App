@@ -3917,3 +3917,81 @@ clean — 327 passed (unchanged — two new server actions and UI wiring, no
 new pure logic), same 2 pre-existing Supabase-dependent failures as every
 addendum in this sandbox, no regressions. No new migration — reuses the
 columns the previous addendum already added.
+
+## 2026-08-24 — Real bug: in-progress form drafts could be silently wiped by the next sync-down
+
+Reported symptom: an engineer fills in a job's form, navigates back to the
+job list, then back into the job — and everything they'd typed is gone.
+
+**Root cause.** Phase 3's autosave (`saveJobDetailsDraft`/
+`saveInstallFormDraft` in `field-actions.ts`, called every 15s and on
+capture events) only ever wrote the draft directly to Dexie
+(`db.jobDetails.put(row)`), with no outbox operation queued for it —
+correct for surviving a force-quit (an IndexedDB write is durable the
+instant it lands), but it meant the draft was invisible to the one thing
+Phase 3 built specifically to protect in-flight local edits:
+`jobIdsSafeToOverwrite`/`syncDown()` only refuse to overwrite a job's
+local `job_details`/`install_forms` row when that job has a *pending
+outbox operation* referencing it (see that phase's own addendum: "Sync-down
+protects in-flight local edits"). A draft with zero outbox ops attached
+looks, to `syncDown()`, exactly like a job with nothing unsynced —
+perfectly safe to overwrite with the server's copy. And the server's copy,
+for a job not yet submitted, has never had anything written to
+`job_details`/`install_forms` at all — so `syncDown()` (which runs on
+mount, on `visibilitychange`, on reconnect, and every 30 seconds while the
+app is open — `use-sync-engine.ts`) would routinely overwrite the
+mid-edit local draft with an empty row, well before the engineer ever
+tapped Submit. The on-screen form didn't blank out in real time (it's
+rendering React state, not reading Dexie live), so nothing looked wrong
+until the engineer actually left and reopened the job — at which point
+`job-workflow.tsx`'s hydration effect re-read `detailsRow` from Dexie,
+now empty, and repopulated the form from `EMPTY_JOB_DETAILS`. Exactly the
+reported symptom.
+
+**Fix.** `saveJobDetailsDraft`/`saveInstallFormDraft` now also queue a
+matching `job_details_upsert`/`install_form_upsert` outbox operation,
+under a fixed, deterministic id (`` `draft-details-${jobId}` ``/
+`` `draft-install-${jobId}` ``) rather than a fresh one each tick — so
+minutes of editing only ever has one pending draft-upsert queued, its
+content simply replaced in place on every autosave, not piled up. This
+makes the existing `jobIdsSafeToOverwrite` protection apply to drafts the
+same way it already applies to a submitted-but-not-yet-drained job — no
+changes needed there at all. Working through the *existing* outbox
+machinery, not a parallel protection scheme, also gets a second benefit
+for free: since the sync engine always drains the outbox *before* it
+calls `syncDown()` in the same pass (`drainOutbox(); drainMediaQueue(); if
+(online) syncDown();` — `use-sync-engine.ts`), by the time `syncDown()`
+would consider overwriting this job, the pending draft-upsert has usually
+already pushed the exact same content to the server moments earlier — so
+the pull-down that follows is a no-op round trip of identical data, not a
+real overwrite. If the push itself fails (offline, a transient error),
+the op simply stays pending and the existing protection covers it exactly
+as it always has.
+
+Deliberately not done: no attempt to resolve concurrent edits between the
+draft-upsert and the *previous* addendum's new office-side
+`updateParkingNotes`/`updateSiteManagerContact` actions writing the same
+row from the other side — that tradeoff (last write wins, safe in the
+"office sets it before the engineer starts" case this was actually built
+for) was already accepted explicitly in that addendum and this fix doesn't
+change it either way.
+
+Added `field-actions.test.ts` (new — this file had no tests before):
+confirms the draft lands in Dexie, confirms the matching outbox op is
+queued, confirms repeated ticks reuse the same op id instead of
+accumulating duplicates, confirms the op's `createdAt` stays pinned to
+when it was first queued (so it always sorts before a later real submit's
+own op in the drain replay order), and the same coverage for the legacy
+`install_forms` path.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 332 passed (5 new, all in the new `field-actions.test.ts`), same
+2 pre-existing Supabase-dependent failures as every addendum in this
+sandbox, no regressions. Not verified against a live, running field app
+in a real browser (no live Supabase in this sandbox to sign in against) —
+the fix was traced by reading the actual sync-down/autosave code paths
+against the exact reported symptom, and is covered by a real Dexie test
+(against `fake-indexeddb`, not a mock) proving the outbox protection now
+exists, but the full "walk away and come back" scenario end-to-end
+through a real browser session has not been re-run. Flagged for a real
+check once deployed.
