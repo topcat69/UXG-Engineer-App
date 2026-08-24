@@ -36,4 +36,46 @@ describe("geocodePostcode", () => {
     await expect(geocodePostcode("  ")).resolves.toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("never calls Nominatim once postcodes.io already succeeded", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 200, result: { latitude: 53.2, longitude: -0.5 } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await geocodePostcode("LN4 1DZ");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to Nominatim for an Eircode postcodes.io has no UK-only coverage for", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false }) // postcodes.io: not found
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ lat: "53.3498", lon: "-6.2603" }],
+      });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(geocodePostcode("D02 AF30")).resolves.toEqual({ latitude: 53.3498, longitude: -6.2603 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const nominatimUrl = fetchMock.mock.calls[1][0] as URL;
+    expect(nominatimUrl.toString()).toContain("nominatim.openstreetmap.org");
+    expect(nominatimUrl.searchParams.get("q")).toBe("D02 AF30");
+  });
+
+  it("returns null when both postcodes.io and Nominatim have nothing", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(geocodePostcode("NOT A POSTCODE")).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns null when Nominatim's result array is empty", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false })
+      .mockResolvedValueOnce({ ok: true, json: async () => [] });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(geocodePostcode("D02 AF30")).resolves.toBeNull();
+  });
 });

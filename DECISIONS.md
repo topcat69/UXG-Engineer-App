@@ -3459,3 +3459,45 @@ clean — 309 passed (2 existing tests updated to match the new behavior:
 `requirableFieldsFor("delivery")` now includes `issue_detail`), same 2
 pre-existing Supabase-dependent failures as every addendum in this
 sandbox, no regressions.
+
+## 2026-08-24 — Irish sites weren't appearing on the dashboard map
+
+Root cause: `geocodePostcode` (`lib/geo/postcode.ts`) only ever called
+postcodes.io, a free UK-only postcode API (Royal Mail/OS Open Data
+derived) — it has no Irish coverage at all. An Irish site's Eircode
+(e.g. `D02 AF30`) always got a 404 from postcodes.io, so
+`createSiteForClient`/`updateSiteForClient` silently saved the site with
+no `latitude`/`longitude` (best-effort, no error surfaced — see that
+function's own existing comment). `buildJobMapMarkers`
+(`lib/dashboard/map-markers.ts`) drops any job whose site has no
+coordinates, so the job was created and scheduled fine, just invisible
+on the map — exactly the reported symptom, and exactly why re-pointing
+the same job at a UK address "fixed" it: a UK postcode was the one thing
+postcodes.io could actually resolve.
+
+Fixed by falling back to Nominatim (OpenStreetMap's free geocoder, no API
+key) whenever postcodes.io comes back empty — it has real Irish coverage
+and generally works for any country, scoped here to `countrycodes=gb,ie`
+since that's where this app's sites actually are, so a postcode-shaped
+typo can't silently resolve to some unrelated country's coordinates. UK
+postcodes are unaffected: postcodes.io still resolves them on the first
+try, so Nominatim is never called for the common case (confirmed by a
+new test asserting `fetch` is called exactly once in that path). Verified
+against the *real* Nominatim API (not just a mocked test) that a real
+Dublin Eircode resolves correctly — `D02 AF30` → `53.3403, -6.2580`.
+
+Same fix covers the field app's own GPS fallback (`siteLocationFallback`
+in `media-capture.ts`) too, which goes through this same function when
+live GPS isn't available — Irish jobs get proper location fallback for
+check-in/travel now as well, not just a map marker.
+
+No client-side format validation existed to blame either (the postcode
+field is a plain free-text input) — the restriction was entirely
+postcodes.io's own dataset, not anything this app's code was filtering.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 313 passed (4 new: Nominatim fallback resolves an Eircode
+postcodes.io can't, postcodes.io success never calls Nominatim, both
+providers failing still returns null cleanly, an empty Nominatim result
+array is handled), same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.
