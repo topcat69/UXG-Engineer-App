@@ -3422,3 +3422,40 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
 clean — 309 passed (no new tests — no new pure logic, same as the
 edit-user addendum's reasoning), same 2 pre-existing Supabase-dependent
 failures as every addendum in this sandbox, no regressions.
+
+## 2026-08-21 — Delivery jobs can now log an issue too
+
+`showsIssuesSection` (`lib/forms/job-form.ts`) originally gated the field
+app's "Issues found?"/"Issue detail" section to install/sla/maintenance
+only — delivery jobs had no way for an engineer to log a problem
+(wrong item, damaged in transit, wrong address) at all, per the
+original spec note in `20260117000000_job_details.sql` ("delivery has
+none"). Revisited that on request: delivery now shows the same Issues
+section as every other job_details type.
+
+One predicate change is all this took, since `showsIssuesSection` is
+the single source of truth already threaded through everywhere that
+matters:
+- `job-workflow.tsx` — the field app now renders the "Issues found?"
+  toggle and conditional "Issue detail" textarea for delivery jobs, same
+  as install/sla/maintenance.
+- `requirableFieldsFor` — a manager can now toggle "Issue detail"
+  optional/required for a specific delivery job too, same as the other
+  types.
+- `detectAutoIssues`'s manual-issue branch and the office job detail
+  page's "Form data" section already handled `issues_found`/`issue_detail`
+  for any job type unconditionally (never gated on `showsIssuesSection`
+  to begin with), so neither needed a change — nor did the completion PDF
+  generator, which already prints both fields for any job_details type.
+
+Not visually verified in a live browser (same reason as other recent
+field-app-adjacent addenda — no running Supabase to sign in against in
+this sandbox); the change is a single boolean predicate already covered
+by direct unit tests on both call sites that read it.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 309 passed (2 existing tests updated to match the new behavior:
+`showsIssuesSection` now expects `true` for delivery, and
+`requirableFieldsFor("delivery")` now includes `issue_detail`), same 2
+pre-existing Supabase-dependent failures as every addendum in this
+sandbox, no regressions.

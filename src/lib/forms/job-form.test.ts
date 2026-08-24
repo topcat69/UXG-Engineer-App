@@ -60,11 +60,11 @@ describe("per-type section visibility", () => {
     expect(showsSlaRequirement("delivery")).toBe(false);
   });
 
-  it("shows the issues section for install/sla/maintenance, not delivery", () => {
+  it("shows the issues section for every job_details type, including delivery", () => {
     expect(showsIssuesSection("install")).toBe(true);
     expect(showsIssuesSection("sla")).toBe(true);
     expect(showsIssuesSection("maintenance")).toBe(true);
-    expect(showsIssuesSection("delivery")).toBe(false);
+    expect(showsIssuesSection("delivery")).toBe(true);
   });
 
   it("shows revisit required for install + sla only", () => {
@@ -139,8 +139,8 @@ describe("requirableFieldsFor", () => {
     expect(keys).toContain("revisit_required");
   });
 
-  it("drops AV fields, issue detail, and revisit for delivery — only reported-to-site-manager remains", () => {
-    expect(requirableFieldsFor("delivery").map((f) => f.key)).toEqual(["reported_to_site_manager"]);
+  it("drops AV fields and revisit for delivery, but keeps issue detail — reported-to-site-manager and issue detail remain", () => {
+    expect(requirableFieldsFor("delivery").map((f) => f.key)).toEqual(["reported_to_site_manager", "issue_detail"]);
   });
 
   it("keeps issue detail but drops revisit for maintenance", () => {

@@ -75,8 +75,15 @@ export function showsSiteplanAndEquipment(jobType: JobDetailsType): boolean {
 export function showsSlaRequirement(jobType: JobDetailsType): boolean {
   return jobType === "sla" || jobType === "maintenance";
 }
+/**
+ * Every job_details type gets the issues section, including delivery —
+ * originally spec'd as install/sla/maintenance only ("delivery has none",
+ * see 20260117000000_job_details.sql), but a delivery can go wrong (wrong
+ * item, damaged in transit, wrong address) just as much as an install can,
+ * and there was no way for an engineer to log that at all.
+ */
 export function showsIssuesSection(jobType: JobDetailsType): boolean {
-  return jobType === "install" || jobType === "sla" || jobType === "maintenance";
+  return jobType === "install" || jobType === "sla" || jobType === "maintenance" || jobType === "delivery";
 }
 export function showsRevisitRequired(jobType: JobDetailsType): boolean {
   return jobType === "install" || jobType === "sla";
