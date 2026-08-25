@@ -4236,3 +4236,85 @@ Playwright coverage in `tests/e2e/phase2-office-workflow.spec.ts` doesn't
 reference `scheduler-card`/`scheduler-number` selectors so nothing needed
 updating), same 2 pre-existing Supabase-dependent failures as every
 addendum in this sandbox, no regressions.
+
+## 2026-08-25 — Completion PDF report: embedded site location map
+
+"On the reports, I would like the location of the site included with the
+site address" — the completion PDF already prints the address as plain
+text; the office wanted the same visual the job detail page already gives
+them (`components/site-map.tsx`'s Leaflet map: address + pin on an actual
+map), not just the address restated a second way.
+
+Since the whole PDF is generated server-side (`generateCompletionReport`),
+this means the *server*, not the reader's browser, has to fetch map tiles
+— genuinely new risk given this session's Nominatim saga (three separate
+bugs from trusting OpenStreetMap's infrastructure to be reliably reachable
+from this app's own server). Flagged that risk to the office before
+building anything; asked to try it anyway, with a plain map link as the
+agreed fallback if OSM's tile server turns out to be as unreliable from
+here as Nominatim's search API was.
+
+Split into three files, pure-vs-network, same convention as everywhere
+else in this codebase that talks to a real network service
+(`sync-logic.ts`/`calendar.ts`, `templates.ts`/`send-job-emails.ts`):
+- `lib/pdf/tile-math.ts` (no `server-only`, fully unit tested) — the pure
+  slippy-map geometry: `lonLatToPixel` (standard Web Mercator tile math)
+  and `computeMapWindow`, which works out which OSM tiles cover a box of
+  a given PDF point size centred on a lat/lng, and exactly where the
+  site's own marker lands in pixels within that window. `windowWidthPx`/
+  `windowHeightPx` are always sized as `targetPt * 1.5` in both
+  dimensions, so the marker is provably always exactly at the window's
+  centre regardless of location — pinned by a unit test, not just eyeballed.
+- `lib/pdf/site-map.ts` (`server-only`, untested directly, same as
+  `resend.ts`) — fetches the tiles `computeMapWindow` says are needed from
+  `tile.openstreetmap.org` (same identifying User-Agent convention as the
+  old Nominatim calls), returns `null` if **any** tile fails rather than a
+  half-populated grid — a map with holes in it reads as broken in a way a
+  map that's simply absent from the report doesn't.
+- `brand.ts`'s new `drawSiteMap` — draws the fetched tiles into a clipped
+  box (pdfkit's own `.save()`/`.rect().clip()`/`.restore()`, no extra
+  image-compositing dependency needed) plus a pin marker at the exact
+  computed position, plus the "© OpenStreetMap contributors" attribution
+  OSM's tile usage policy requires wherever their tiles are shown (the
+  same text the in-app Leaflet map already carries).
+
+Wired into `completion-report.ts` right after the Address line — the same
+position the office's reference screenshot showed — guarded by its own
+local `try/catch` so a network hiccup degrades to "no map" rather than
+failing the whole report (this app's standing "best-effort, never
+blocking" rule for anything that talks to a third-party service, restated
+for the third time by OpenStreetMap specifically this session).
+
+**Real bug caught by the sandbox's own PDF visual-verification technique
+(temporarily neutralising `server-only`, generating a real PDF against
+fabricated data, rendering to PNG with `pdftoppm`, viewing it) — the exact
+same class of bug as three earlier ones in this file** (`drawBanner`,
+`drawSectionBar`, `drawFooters` all needed the identical fix): the first
+render showed a ~300pt blank gap between the map and "Job Description",
+and the page count had ballooned from a correct "Page 1 of 2" to "Page 1
+of 17". Root cause: `.image()` calls inside `drawSiteMap`'s tile loop
+leave `doc.y` wherever the *last* tile's own (unclipped) placement left
+it — an edge tile is drawn at full size before the clip hides the
+overflowing part, so pdfkit's internal cursor ends up tracking a position
+well past the visible map box, not the box's actual bottom edge. Fixed
+the same way as the three earlier instances: `drawSiteMap` now explicitly
+resets `doc.x`/`doc.y` to a known position (the map box's own bottom-left
+corner) before returning, rather than leaving the caller to guess where
+pdfkit's cursor actually ended up. Re-verified after the fix: gap gone,
+correct page count, address → map → Job Description flow immediately as
+one continuous block, pin lands precisely on Liffey Valley/Clondalkin for
+the exact site (`D22 XH22`) from the original bug report. Tile fetching
+itself worked without issue from this sandbox both times — no repeat of
+the Nominatim blocking problem, though this is a different OSM service
+with its own usage policy, so the agreed map-link fallback stays the plan
+if it ever proves unreliable from the actual production VM.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 341 passed (5 new, all in `tile-math.test.ts`: `lonLatToPixel`'s
+known-good centre point and directional sanity checks, `computeMapWindow`
+proving the always-exactly-centred marker invariant, correct window
+scaling, and a gap-free bounded tile grid that fully covers the requested
+window), same 2 pre-existing Supabase-dependent failures as every
+addendum in this sandbox, no regressions. `site-map.ts`'s actual tile
+fetch is untested directly, consistent with every other `server-only`
+network-calling module in this app.
