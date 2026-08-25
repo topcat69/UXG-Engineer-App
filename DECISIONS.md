@@ -4216,3 +4216,23 @@ already fully exercise (no live network call at all for the Ireland
 path), but confirming the Currys/Halfords sites actually show pins after
 deploy + backfill is still the real proof and is flagged for a check
 once that happens.
+
+## 2026-08-25 — Scheduler: clicking a job's number opens the job
+
+The scheduler board's job cards were a dead end — no way to get from a
+card to that job's own detail page without going back through the jobs
+list and searching for it. The job number (`scheduler-board.tsx`) is now
+a real `Link` to `/office/jobs/{id}`, with `onClick`'s `stopPropagation()`
+so it doesn't also register as the start of the card's own native drag
+gesture (the whole card stays `draggable` for reschedule-by-drop, which
+this had to not break). Deliberately just the job number, not the whole
+card — the card's entire surface already has a job to do (drag target),
+and turning all of it into a navigation link would make an accidental
+click while trying to pick a card up for a drag mis-navigate instead.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — no new tests (no pure logic to unit test; the existing scheduler
+Playwright coverage in `tests/e2e/phase2-office-workflow.spec.ts` doesn't
+reference `scheduler-card`/`scheduler-number` selectors so nothing needed
+updating), same 2 pre-existing Supabase-dependent failures as every
+addendum in this sandbox, no regressions.

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -177,7 +178,13 @@ function FragmentRow({
                   title={`${job.job_number} · ${siteLabel(job.site)} · ${lane.label} · ${humanize(job.status)}`}
                 >
                   <div className="flex items-center justify-between gap-1">
-                    <span className="font-medium">{job.job_number}</span>
+                    <Link
+                      href={`/office/jobs/${job.id}`}
+                      className="font-medium hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {job.job_number}
+                    </Link>
                     {spanDays.length > 1 && (
                       <span className="text-muted-foreground shrink-0 text-[10px]">
                         Day {dayIndex}/{spanDays.length}
