@@ -4468,3 +4468,51 @@ pre-existing Supabase-dependent failures as every addendum in this
 sandbox, no regressions. Not verified against a live pause/resume cycle
 in a running instance (no live Supabase/browser in this sandbox) —
 flagged for a real check once deployed.
+
+## 2026-08-25 — Moved Assign & Schedule to the bottom of the job detail page
+
+"As soon as you assign a job and save it — the flow that feels right when
+creating one — RAMS/site plans/etc. added afterward never make it into
+the email, since the engineer can miss vital information." Confirmed by
+reading the actual page: `AssignSchedulePanel` sat right at the top,
+above `JobDetailsPanel` (RAMS/site plan/job information/equipment)
+further down — so scheduling immediately after creating a job, the
+natural first instinct, fired `sendJobScheduledEmail` (which attaches
+whatever RAMS/site plan exist *at that moment*) before any of that
+existed to attach.
+
+Proposed two options: reorder the page so scheduling is the last action
+(a "master save"), or additionally add an explicit "resend" action for
+the case where documents arrive after the job's already scheduled. Office
+chose the reorder only — "no point sending out multiple emails for the
+same job." Implemented exactly that, nothing else: `AssignSchedulePanel`
+moved from the top-right header block to a new "Assign & schedule"
+section at the very bottom of the page, below Job Details/Required
+Fields/Tasks/Media/Issues, right before Share Links — the last thing on
+the page before the peripheral share-link feature. Added one line of
+explanatory text in that section stating why it's positioned there and
+what saving it does, since that's exactly the behaviour that was
+confusing.
+
+The component itself was originally styled to fit a compact right-aligned
+corner widget (`text-right`, `items-end`); moved to a full-width section
+alongside every other left-aligned section on the page, those became
+left-aligned instead — a required part of relocating it correctly, not a
+separate redesign. The Duplicate/Cancel/Delete job buttons, which shared
+the same top-right block, stay exactly where they were — only the
+schedule-and-email-triggering panel moved.
+
+Deliberately not built (per the office's own explicit choice): no
+separate "resend job details" action. The existing side-channel way to
+force a resend — reopening Assign & Schedule and saving again with no
+actual change, since the email trigger checks "is a date present" not
+"did it change" — still exists, unchanged, and is now harder to stumble
+into by accident (a good side effect, not a designed one) since the panel
+no longer sits where an office user's eye lands first.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 353 passed (unchanged; a pure layout/position change, no logic
+touched, nothing new to unit test), same 2 pre-existing Supabase-dependent
+failures as every addendum in this sandbox, no regressions. Not verified
+visually in a running browser (no live Supabase in this sandbox) —
+flagged for a real check once deployed.

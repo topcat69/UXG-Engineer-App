@@ -14,10 +14,15 @@ function toLocalInputValue(iso: string | null): string {
 }
 
 /**
- * Lives in the same top-right summary block the job detail page already
- * had ("Assigned: X" / scheduled date) — view mode renders identically to
- * before, edit mode swaps in an engineer picker + datetime input in place,
- * per the request to keep the existing layout rather than add a new section.
+ * Deliberately positioned as the last thing on the job detail page, below
+ * every panel that can add something worth attaching to the "New Job
+ * Scheduled" email (RAMS/site plan/job information/equipment) — this is
+ * the action that actually sends that email, and it used to sit at the
+ * top of the page, so scheduling right after creating a job (a natural
+ * first instinct) sent it before any of that existed to attach. See
+ * DECISIONS.md. Was originally styled to fit a compact top-right corner
+ * (right-aligned); now a full-width section like everything else on the
+ * page, so it's left-aligned instead.
  */
 export function AssignSchedulePanel({
   jobId,
@@ -55,7 +60,7 @@ export function AssignSchedulePanel({
         ? ` → ${new Date(scheduledEnd).toLocaleString()}`
         : "";
     return (
-      <div className="text-right text-sm">
+      <div className="text-sm">
         <p>Assigned: {assignedName ?? "Unassigned"}</p>
         <p className="text-muted-foreground">
           {scheduledStart ? new Date(scheduledStart).toLocaleString() : "Not scheduled"}
@@ -69,8 +74,8 @@ export function AssignSchedulePanel({
   }
 
   return (
-    <div className="flex flex-col items-end gap-2 text-sm">
-      <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-start gap-2 text-sm">
+      <div className="flex flex-col items-start gap-1">
         <label className="text-muted-foreground text-xs">Assigned to</label>
         <select
           value={engineerId}
@@ -85,7 +90,7 @@ export function AssignSchedulePanel({
           ))}
         </select>
       </div>
-      <div className="flex flex-col items-end gap-1">
+      <div className="flex flex-col items-start gap-1">
         <label className="text-muted-foreground text-xs">Scheduled start</label>
         <input
           type="datetime-local"
@@ -94,7 +99,7 @@ export function AssignSchedulePanel({
           className="border-input h-8 rounded-md border bg-transparent px-2 text-sm"
         />
       </div>
-      <div className="flex flex-col items-end gap-1">
+      <div className="flex flex-col items-start gap-1">
         <label className="text-muted-foreground text-xs">Scheduled end</label>
         <input
           type="datetime-local"

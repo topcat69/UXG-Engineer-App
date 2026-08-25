@@ -158,20 +158,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             sites={allSites ?? []}
           />
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <AssignSchedulePanel
-            jobId={job.id}
-            assignedTo={job.assigned_to}
-            assignedName={job.assigned?.name ?? null}
-            scheduledStart={job.scheduled_start}
-            scheduledEnd={job.scheduled_end}
-            engineers={engineers ?? []}
-          />
-          <div className="flex items-center gap-2">
-            <DuplicateJobButton jobId={job.id} />
-            <CancelJobButton jobId={job.id} status={job.status} />
-            <DeleteJobButton jobId={job.id} jobNumber={job.job_number} />
-          </div>
+        <div className="flex items-center gap-2">
+          <DuplicateJobButton jobId={job.id} />
+          <CancelJobButton jobId={job.id} status={job.status} />
+          <DeleteJobButton jobId={job.id} jobNumber={job.job_number} />
         </div>
       </div>
 
@@ -364,6 +354,23 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           ))}
         </ul>
         {job.site_id && <IssueForm jobId={job.id} siteId={job.site_id} />}
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="font-medium">Assign &amp; schedule</h2>
+        <p className="text-muted-foreground text-sm">
+          Save this once everything above (RAMS, site plan, job information, equipment) is ready — scheduling sends
+          the &quot;New Job Scheduled&quot; email to the assigned engineer with whatever&apos;s attached at that
+          point.
+        </p>
+        <AssignSchedulePanel
+          jobId={job.id}
+          assignedTo={job.assigned_to}
+          assignedName={job.assigned?.name ?? null}
+          scheduledStart={job.scheduled_start}
+          scheduledEnd={job.scheduled_end}
+          engineers={engineers ?? []}
+        />
       </section>
 
       <ShareLinkPanel jobId={job.id} links={activeShareLinks} />
