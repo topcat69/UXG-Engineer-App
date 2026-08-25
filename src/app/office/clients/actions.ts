@@ -105,9 +105,7 @@ export async function createSiteForClient(
   // it just won't have coordinates yet (no marker on the dashboard map,
   // and check-in falls back to live GPS only rather than GPS-or-postcode;
   // see the postcode-fallback and dashboard-map addenda in DECISIONS.md).
-  const coords = postcode
-    ? await geocodePostcode(postcode, { addressLine1: input.address_line1, town: input.town })
-    : null;
+  const coords = postcode ? await geocodePostcode(postcode) : null;
 
   const supabase = await createSupabaseClient();
   const { data, error } = await supabase
@@ -157,9 +155,7 @@ export async function updateSiteForClient(
   // rather than nulling out coordinates a previous successful save set —
   // a transient geocoding hiccup shouldn't be able to un-plot a site that
   // was already on the map.
-  const coords = postcode
-    ? await geocodePostcode(postcode, { addressLine1: input.address_line1, town: input.town })
-    : null;
+  const coords = postcode ? await geocodePostcode(postcode) : null;
 
   const supabase = await createSupabaseClient();
   const { data, error } = await supabase

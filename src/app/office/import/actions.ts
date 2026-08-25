@@ -37,17 +37,12 @@ export async function importSitesCsv(formData: FormData): Promise<ImportSitesRes
   // site imported this way was saved with no coordinates at all: invisible
   // on the dashboard map, and with nothing for the field app's
   // Start Travelling/Check In location fallback to fall back to either —
-  // see DECISIONS.md. Sequential, not Promise.all: a large batch (a couple
-  // hundred rows isn't unusual) could otherwise fire that many concurrent
-  // Nominatim requests at once, well past its stated rate limit.
+  // see DECISIONS.md.
   const rowsWithClient: ((typeof rows)[number] & { client_id: string })[] = [];
   for (const row of rows) {
     let { latitude, longitude } = row;
     if (latitude == null && longitude == null && row.postcode) {
-      const coords = await geocodePostcode(row.postcode, {
-        addressLine1: row.address_line1 ?? undefined,
-        town: row.town ?? undefined,
-      });
+      const coords = await geocodePostcode(row.postcode);
       if (coords) {
         latitude = coords.latitude;
         longitude = coords.longitude;

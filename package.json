@@ -16,6 +16,7 @@
     "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts",
     "migrate:appsheet": "tsx --env-file=.env.local scripts/migrate-appsheet.ts",
     "migrate:media": "tsx --env-file=.env.local scripts/migrate-media.ts",
+    "backfill:site-coordinates": "tsx --env-file=.env.local scripts/backfill-site-coordinates.ts",
     "load-test": "tsx --env-file=.env.local scripts/load-test.ts"
   },
   "dependencies": {

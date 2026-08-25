@@ -4142,3 +4142,77 @@ already have full unit coverage from earlier addenda, and
 pre-existing Supabase-dependent failures as every addendum in this
 sandbox, no regressions. Not verified against a live import in a running
 instance — flagged for a real check once deployed.
+
+## 2026-08-25 — Removed the Nominatim dependency entirely for Ireland
+
+The previous addendum's fix (geocode CSV-imported sites, same as the
+manual site form already did) was deployed, but the reported symptom
+persisted: a brand-new site (Currys — Dublin, `D01 E7W2`, created after
+the deploy specifically to test the fix) still saved with "No coordinates
+on file for this site", and an existing Irish site that had previously
+had *some* pin on the dashboard map lost it entirely rather than gaining
+a correct one.
+
+This is the third distinct Nominatim-related bug this session (after "no
+Irish coverage at all" and "a Cork site plotted in Belfast"), and this
+time the live evidence points at Nominatim itself not being reliably
+reachable from this app's own production server at all — a direct test
+request to Nominatim from this development sandbox during
+troubleshooting came back `403 Access denied. See
+operations.osmfoundation.org/policies/nominatim` (their own policy-block
+response, not a local network error), and the earlier Belfast-mismatch
+fix made the query *more* specific, which would produce a *null* result
+(not a wrong one) for a genuinely ambiguous or failing lookup — consistent
+with "used to show something (wrong) and now shows nothing." Nominatim's
+usage policy explicitly discourages exactly this kind of automated,
+datacenter-server use case; three rounds of fixing symptoms without being
+able to see the actual production failure (no logging existed, and there's
+no access to the VM here) is the point at which the dependency itself,
+not the query shape, is the problem.
+
+Replaced it outright with a static reference table:
+`src/lib/geo/eircode-routing-keys.ts` maps all 139 of Ireland's official
+Eircode routing keys (An Post's published list, e.g. `D22`, `T12`, `D6W`
+— the first 3 characters of any Eircode) to that routing area's approximate
+post-town coordinates. `geocodePostcode` (`lib/geo/postcode.ts`) now tries
+postcodes.io for the UK first, same as always, then this static table —
+no live network call, no rate limit, nothing to block. Between the two,
+UK (postcodes.io, exact) + Ireland (routing-key table, post-town accuracy)
+is this app's entire real-world scope per the existing comments in this
+file, so there's nothing left for a live third-party geocoder to add —
+only a new way for the request to fail. `GeocodeContext` (the
+address/town disambiguation the Belfast fix added) is gone along with
+Nominatim — the routing-key lookup only ever needs the postcode itself,
+so `createSiteForClient`/`updateSiteForClient`/`importSitesCsv` no longer
+pass or need it, and the field app's `siteLocationFallback`
+(`media-capture.ts`) — which could never pass that context anyway, see
+the Belfast addendum's "deliberately not done" — now gets the exact same
+reliable resolution as every other call site for free.
+
+Trade-off, stated plainly: post-town accuracy (a pin lands at the routing
+area's town centre, a few km from the actual site) rather than
+building-level precision. That's what the dashboard map and the field
+app's location fallback actually need — "where in the country is the
+work" and "a reasonable fallback point," not turn-by-turn — and it's
+strictly better than the status quo of frequently getting no pin at all.
+
+**Backfill for sites already saved with no coordinates**: added
+`scripts/backfill-site-coordinates.ts` (`pnpm backfill:site-coordinates`)
+— finds every site with a postcode but no lat/lng and re-geocodes it in
+one pass, superseding the previous addendum's "re-save each one by hand"
+guidance now that the geocoding call is fast and reliable enough to run
+in bulk without any rate-limit concern.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — `postcode.test.ts` rewritten for the new two-step (postcodes.io →
+routing-key table) behavior, no more Nominatim-specific assertions; new
+`eircode-routing-keys.test.ts` covers case/spacing-insensitive lookup, a
+routing key with a letter in the third position (`D6W`), an unrecognised
+but well-formed key, and non-Eircode-shaped input. Same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions. Not verified against a live deploy yet — the whole point of
+this fix is that it no longer depends on anything this sandbox couldn't
+already fully exercise (no live network call at all for the Ireland
+path), but confirming the Currys/Halfords sites actually show pins after
+deploy + backfill is still the real proof and is flagged for a check
+once that happens.
