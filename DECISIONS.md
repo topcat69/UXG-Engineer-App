@@ -4516,3 +4516,72 @@ touched, nothing new to unit test), same 2 pre-existing Supabase-dependent
 failures as every addendum in this sandbox, no regressions. Not verified
 visually in a running browser (no live Supabase in this sandbox) —
 flagged for a real check once deployed.
+
+## 2026-08-25 — Diagnosed: DB webhooks (Monday.com, status-submitted, issue-blocks-completion) all silently failing in production
+
+Following on from the 2026-08-19 addendum (`app_settings` seeded,
+`pg_net` extension enabled) — issues still weren't reaching Monday.com.
+Diagnosed for real this time by reading `pg_net`'s own delivery log
+rather than guessing:
+
+```sql
+select id, status_code, content, error_msg, created
+from net._http_response order by created desc limit 10;
+```
+
+Every single logged attempt (all three webhooks share this failure, not
+just the Monday.com one — `app_settings` has all three pointing at the
+same host) showed the identical signature: DNS/connect resolving in a
+few milliseconds, then the full 5000ms timeout spent on the TCP/SSL
+handshake with no response at all. That's not a slow or erroring app —
+it's a connection nothing ever answered, the classic signature of a
+firewall silently dropping the packets rather than the target actively
+refusing them.
+
+**Root cause**: `app_settings`'s three webhook URLs
+(`webhook_url`/`issue_webhook_url`/`monday_issue_webhook_url`) all point
+directly at `http://<VM_IP>:3000/...`, bypassing Caddy entirely. But
+`deploy/setup-vm.sh` only opens ports 22/80/443 in `ufw` — port 3000 was
+only ever meant to be reachable during the "pre-domain testing phase"
+(see `docker-compose.yml`'s own comment on the `app` service's `ports:`
+mapping, which explicitly says to close 3000 once Caddy/HTTPS is the real
+front door). So Supabase Cloud's outbound `pg_net` requests to `:3000`
+are being correctly blocked by the VM's own firewall — this is the
+firewall doing exactly what it's configured to do, not a bug.
+
+**Deliberately not opened up as a workaround** — the office's own call:
+"best not to leave exposed even for testing at the moment." `sudo ufw
+allow 3000/tcp` would fix the symptom immediately but means the app sits
+on the public internet with no TLS in front of it, which is a worse
+trade than three DB webhooks staying broken a while longer.
+
+**Known limitation of the current infrastructure, tracked as a go-live
+task, not fixed here**: this sandbox has no access to the production
+Supabase project or the VM, so the actual fix — updating all three
+`app_settings` rows to the real HTTPS domain once Caddy/DNS are live —
+has to happen by hand against production, the same way the original
+`app_settings` seeding did. Until that's done: Monday.com issue sync,
+the "submitted" manager-notification email, and the automatic revisit
+job on a blocking issue are all silently non-functional in production
+(each fails the same way — best-effort, so nothing else breaks, but
+none of the three actually happens). The blocking issue → auto-revisit
+one is worth flagging specifically: with no notification firing, an
+office user has no obvious clue anything's wrong beyond noticing a
+revisit job that should exist doesn't.
+
+**Go-live checklist item**: once the real domain + Caddy/TLS are live,
+run in the Supabase SQL Editor:
+```sql
+update app_settings set value = 'https://<real-domain>/api/webhooks/status-submitted' where key = 'webhook_url';
+update app_settings set value = 'https://<real-domain>/api/webhooks/issue-blocks-completion' where key = 'issue_webhook_url';
+update app_settings set value = 'https://<real-domain>/api/webhooks/issue-monday-sync' where key = 'monday_issue_webhook_url';
+```
+then re-check `net._http_response` for a fresh `status_code: 200` after
+raising a real test issue, per the same diagnostic steps used here. Port
+3000 should stay closed in `ufw` and the `ports: "3000:3000"` mapping in
+`docker-compose.yml` should come out at the same time, per that file's
+own comment — Caddy (443) becomes the only front door.
+
+Verified: nothing in this addendum changed application code (pure
+diagnosis, run entirely against the live production Supabase project by
+the user), so no check suite re-run applies.
