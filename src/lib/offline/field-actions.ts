@@ -134,6 +134,63 @@ export async function checkIn(
 }
 
 /**
+ * Stops the clock on a multi-day job without submitting it — otherwise a
+ * job checked in Monday and not submitted until Wednesday reports ~48
+ * hours "worked" (a plain actual_end - actual_start subtraction has no
+ * notion of an overnight gap). `to_status: "on_hold"` and a required
+ * reason, per the office's own decision (a paused job could be for a
+ * multitude of reasons — waiting on parts, site closed, end of shift — and
+ * that's worth capturing every time, not just optionally). No GPS: pause/
+ * resume isn't one of the three moments (check-in, check-out, media
+ * capture) this app's non-negotiable "GPS only at those three points" rule
+ * covers, so none is requested or stored here. See worked-duration.ts for
+ * how the actual hours-worked figure is computed back out of the
+ * resulting status_events history.
+ */
+export async function pauseJob(jobId: string, reason: string): Promise<void> {
+  const job = await db.jobs.get(jobId);
+  if (!job) throw new Error("Job not found locally");
+  const nowIso = new Date().toISOString();
+
+  await db.transaction("rw", [db.jobs, db.outbox], async () => {
+    await db.jobs.update(jobId, { status: "on_hold" });
+    await db.outbox.add({
+      id: uuid(),
+      type: "status_event",
+      jobId,
+      fromStatus: job.status,
+      toStatus: "on_hold",
+      reason,
+      occurredAt: nowIso,
+      createdAt: nowIso,
+      attempts: 0,
+    });
+  });
+}
+
+/** The other half of pauseJob — resumes a paused job back to in_progress, opening a fresh worked-duration interval. */
+export async function resumeJob(jobId: string): Promise<void> {
+  const job = await db.jobs.get(jobId);
+  if (!job) throw new Error("Job not found locally");
+  const nowIso = new Date().toISOString();
+
+  await db.transaction("rw", [db.jobs, db.outbox], async () => {
+    await db.jobs.update(jobId, { status: "in_progress" });
+    await db.outbox.add({
+      id: uuid(),
+      type: "status_event",
+      jobId,
+      fromStatus: job.status,
+      toStatus: "in_progress",
+      reason: "Resumed",
+      occurredAt: nowIso,
+      createdAt: nowIso,
+      attempts: 0,
+    });
+  });
+}
+
+/**
  * Persists the in-progress form draft locally (on a 15s timer and on
  * capture events) AND queues a matching upsert outbox op under a fixed,
  * per-job id — otherwise the draft exists nowhere but this device's own

@@ -49,7 +49,7 @@ export function DashboardClient({
     const [{ data: freshJobs }, { data: freshIssues }, { data: freshMapJobs }] = await Promise.all([
       supabase
         .from("jobs")
-        .select("id, status, parent_job_id, scheduled_start, actual_start, actual_end, assigned_to")
+        .select("id, status, parent_job_id, scheduled_start, actual_start, actual_end, assigned_to, status_events(to_status, occurred_at)")
         .neq("status", "draft"),
       supabase.from("issues").select("job_id, category, status, revisit_job_id, created_at"),
       supabase

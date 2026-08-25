@@ -117,6 +117,27 @@ describe("computeAverageTimeOnSiteMinutes", () => {
     const jobs = [job({ actual_start: "2026-08-10T10:00:00Z", actual_end: "2026-08-10T09:00:00Z" })];
     expect(computeAverageTimeOnSiteMinutes(jobs)).toBeNull();
   });
+
+  it("excludes a paused overnight gap when status_events are available, instead of the raw actual_end - actual_start span", () => {
+    const jobs = [
+      job({
+        actual_start: "2026-08-10T09:00:00Z",
+        actual_end: "2026-08-11T13:00:00Z", // ~28h wall-clock span
+        status_events: [
+          { to_status: "in_progress", occurred_at: "2026-08-10T09:00:00Z" },
+          { to_status: "on_hold", occurred_at: "2026-08-10T17:00:00Z" }, // 8h
+          { to_status: "in_progress", occurred_at: "2026-08-11T09:00:00Z" },
+          { to_status: "submitted", occurred_at: "2026-08-11T13:00:00Z" }, // 4h
+        ],
+      }),
+    ];
+    expect(computeAverageTimeOnSiteMinutes(jobs)).toBe(12 * 60);
+  });
+
+  it("falls back to actual_end - actual_start when a job has no status_events to compute from", () => {
+    const jobs = [job({ actual_start: "2026-08-10T09:00:00Z", actual_end: "2026-08-10T10:00:00Z" })];
+    expect(computeAverageTimeOnSiteMinutes(jobs)).toBe(60);
+  });
 });
 
 describe("computeRevisitRateByCause", () => {

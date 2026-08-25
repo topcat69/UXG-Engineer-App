@@ -4,6 +4,8 @@
 // re-fetching (on mount and on every Realtime event); this file only does
 // arithmetic.
 
+import { computeWorkedMinutes } from "@/lib/jobs/worked-duration";
+
 export type DashboardJob = {
   id: string;
   status: string;
@@ -12,6 +14,8 @@ export type DashboardJob = {
   actual_start: string | null;
   actual_end: string | null;
   assigned_to: string | null;
+  /** Optional — only computeAverageTimeOnSiteMinutes uses it, and only to correct for a paused/multi-day job's overnight gaps (see worked-duration.ts). Absent fixtures just fall back to the plain actual_end - actual_start subtraction. */
+  status_events?: { to_status: string; occurred_at: string }[];
 };
 
 export type DashboardIssue = {
@@ -76,11 +80,18 @@ export function computeCompletedVsScheduled(jobs: DashboardJob[]): { completed: 
   };
 }
 
-/** In minutes. Null when no job has both actual_start and actual_end recorded. */
+/**
+ * In minutes. Null when no job has both actual_start and actual_end
+ * recorded. Prefers computeWorkedMinutes (sums the job's own in_progress
+ * intervals from its status_events, excluding any paused/overnight gaps —
+ * see worked-duration.ts) over a plain actual_end - actual_start
+ * subtraction, falling back to the subtraction only when a job has no
+ * usable status_events trail to compute from.
+ */
 export function computeAverageTimeOnSiteMinutes(jobs: DashboardJob[]): number | null {
   const durations = jobs
     .filter((j) => j.actual_start && j.actual_end)
-    .map((j) => (new Date(j.actual_end!).getTime() - new Date(j.actual_start!).getTime()) / 60_000)
+    .map((j) => computeWorkedMinutes(j.status_events ?? []) ?? (new Date(j.actual_end!).getTime() - new Date(j.actual_start!).getTime()) / 60_000)
     .filter((minutes) => minutes >= 0);
   if (durations.length === 0) return null;
   return durations.reduce((sum, m) => sum + m, 0) / durations.length;

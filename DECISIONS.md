@@ -4359,3 +4359,112 @@ in this sandbox, no regressions. Not verified against an actual large PDF
 upload in a running instance (no live Supabase/browser in this sandbox)
 — flagged for a real check once deployed, per the office's own original
 report (a real multi-page RAMS PDF).
+
+## 2026-08-25 — Pause/resume for multi-day jobs
+
+"An engineer needs to pause a job that spans multiple dates, otherwise the
+job keeps running until submitted and gives incorrect hours worked."
+Discussed the architecture with the office first, deliberately built
+nothing until they'd confirmed a direction internally; landed on manual
+pause (not an automatic end-of-day) with a required reason, since a pause
+"could be for a multitude of reasons" worth actually recording. An
+explicit "hours worked so far" figure surfaced to the office while a job
+is still paused was flagged as a nice-to-have, not required now — the
+status timeline already shows it for free (see below), so nothing further
+was built for that specifically.
+
+Investigated before building anything: `on_hold` was already a defined
+`job_status` enum value with full UI support already in place (scheduler
+board legend/colour, `isInEngineerQueue`'s own comment already says a
+paused job "should still show up in an engineer's queue... not a finished
+one") but nothing anywhere ever actually transitioned a job to it.
+`status_events` already had a `reason text` column, already unused by
+nothing else that needed it. `status_event` was already a defined outbox
+operation type carrying an optional `reason`, already wired end-to-end
+through the existing offline sync machinery. Given all of that, this
+needed **no schema migration, no new table, and no new sync mechanism** —
+purely reusing infrastructure that (per the AppSheet-parity groundwork
+this whole app was built against) was clearly always meant for this.
+
+**Root cause of the "incorrect hours" problem, confirmed by reading the
+actual duration code**: every duration shown anywhere (`completion-
+report.ts`'s "Time on job", `dashboard/metrics.ts`'s average-time-on-site
+stat) was a single `actual_end - actual_start` subtraction — correct for
+a job worked in one sitting, wrong for one spanning days, since it counts
+every overnight gap as time worked.
+
+**Fix, in three layers:**
+- `lib/jobs/worked-duration.ts`'s `computeWorkedMinutes` (pure, unit
+  tested) sums every `in_progress -> (anything else)` interval from a
+  job's own `status_events` history instead of subtracting two
+  timestamps. A job that's never been paused reduces to exactly one
+  interval — the same number the old subtraction already gave — so this
+  is a strict correction, not a behaviour change, for the common case.
+- `lib/offline/field-actions.ts` gets `pauseJob(jobId, reason)` and
+  `resumeJob(jobId)`, mirroring `checkIn`'s existing shape exactly: an
+  optimistic local Dexie write plus a queued `status_event` outbox op
+  (`in_progress -> on_hold` with the reason; `on_hold -> in_progress` on
+  resume). No GPS captured for either — pause/resume isn't one of the
+  three moments (check-in, check-out, media capture) this app's
+  non-negotiable "GPS only at those points" rule covers, so none is
+  requested.
+- `components/field/job-workflow.tsx`: a "Pause job" button while
+  `in_progress` reveals a required-reason textarea (Confirm is disabled
+  until non-empty) mirroring the office's existing `CancelJobButton`
+  reveal pattern; while `on_hold`, the form section is hidden (matching
+  `onSite`'s existing gate, which never included `on_hold`) in favour of
+  a single "Resume Job" button — pausing genuinely stops everything until
+  the engineer explicitly resumes, not just the clock.
+
+**Wired the corrected duration into both places it was wrong**, not just
+the one the office happened to mention, since leaving the dashboard stat
+silently wrong while fixing the PDF would leave two numbers that claim to
+mean the same thing quietly disagreeing: `completion-report.ts` now
+fetches `status_events` alongside everything else and computes "Time on
+job" via `computeWorkedMinutes`, falling back to the old subtraction only
+if a job has no usable status_events trail (a pre-this-feature migrated
+job) so a real `actual_start`/`actual_end` pair never regresses to a
+blank field. `dashboard/metrics.ts`'s `computeAverageTimeOnSiteMinutes`
+does the same, given each job's own `status_events` — `DashboardJob.
+status_events` is optional precisely so none of that file's many other
+test fixtures (for functions this doesn't touch) needed updating.
+`dashboard/page.tsx` and `dashboard-client.tsx`'s job queries both now
+embed `status_events(to_status, occurred_at)`.
+
+**What's already correct with zero further work**, confirmed by reading
+rather than assumed: `isInEngineerQueue` already keeps a paused job
+visible/actionable in "My Jobs" (its own comment already explained why);
+`sync-down.ts` pulls every job assigned to the user with no status filter
+at all, so a paused job syncs down like any other; the office job detail
+page's status timeline already renders `event.reason` when present, so a
+pause/resume with its reason shows up there automatically — this is the
+"office visibility" the discussion flagged as not urgent, and it turns
+out to already exist; the `jobs_update` RLS policy has no status-value
+restriction, so an engineer can write `on_hold`/`in_progress` to a job
+assigned to them exactly like every other status transition already
+does.
+
+**Not done, by explicit agreement**: an automatic end-of-day pause (stayed
+manual, per the office's own call); a prominent "hours worked so far"
+figure surfaced anywhere while a job is still paused (the status timeline
+already shows the same information, just not pre-summed — noted as a
+possible follow-up, not built); `dashboard/metrics.ts`'s
+`ACTIVE_STATUSES` (used for the per-engineer "active jobs" workload
+count) still excludes `on_hold`, unchanged from before this feature —
+whether a paused job should count toward an engineer's active workload
+is a judgement call nobody's made yet, so it was left exactly as it was
+rather than decided unilaterally here.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 353 passed (17 new: 7 for `computeWorkedMinutes` covering the
+no-pause/single-overnight-gap/multiple-pauses/order-independence/still-
+open-interval cases, 2 new `computeAverageTimeOnSiteMinutes` cases for
+the paused-job and no-status_events-fallback paths, 3 for `pauseJob`/
+`resumeJob` against the real Dexie `db` via `fake-indexeddb`, plus the
+existing `formatDurationBetween` suite unchanged after the
+`formatDurationMinutes` extraction — same output for every existing case,
+confirmed by the untouched test file all still passing), same 2
+pre-existing Supabase-dependent failures as every addendum in this
+sandbox, no regressions. Not verified against a live pause/resume cycle
+in a running instance (no live Supabase/browser in this sandbox) —
+flagged for a real check once deployed.

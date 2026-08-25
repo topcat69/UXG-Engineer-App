@@ -1,6 +1,41 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { db, type InstallFormRow, type JobDetailsRow } from "./db";
-import { saveInstallFormDraft, saveJobDetailsDraft } from "./field-actions";
+import { db, type InstallFormRow, type JobDetailsRow, type JobRow } from "./db";
+import { pauseJob, resumeJob, saveInstallFormDraft, saveJobDetailsDraft } from "./field-actions";
+
+function jobRow(overrides: Partial<JobRow> = {}): JobRow {
+  return {
+    id: "job-1",
+    job_number: "UXG-2026-0001",
+    job_type: "install",
+    status: "in_progress",
+    site_id: "site-1",
+    project_id: null,
+    assigned_to: null,
+    priority: null,
+    description: null,
+    parent_job_id: null,
+    source_issue_id: null,
+    scheduled_start: null,
+    scheduled_end: null,
+    actual_travel_start: null,
+    actual_start: "2026-08-24T09:00:00Z",
+    actual_end: null,
+    travel_start_lat: null,
+    travel_start_lng: null,
+    check_in_lat: null,
+    check_in_lng: null,
+    geofence_variance_m: null,
+    media_pending: null,
+    calendar_event_id: null,
+    email_thread_id: null,
+    completion_pdf_url: null,
+    qa_status: null,
+    qa_notes: null,
+    created_at: "2026-08-24T08:00:00Z",
+    updated_at: null,
+    ...overrides,
+  };
+}
 
 function jobDetailsRow(overrides: Partial<JobDetailsRow> = {}): JobDetailsRow {
   return {
@@ -105,5 +140,56 @@ describe("saveJobDetailsDraft / saveInstallFormDraft", () => {
     expect(row?.player_serial).toBe("PLR-3");
     const op = await db.outbox.get("draft-install-job-1");
     expect(op).toMatchObject({ type: "install_form_upsert" });
+  });
+});
+
+describe("pauseJob / resumeJob", () => {
+  beforeEach(async () => {
+    await db.jobs.clear();
+    await db.outbox.clear();
+  });
+  afterEach(async () => {
+    await db.jobs.clear();
+    await db.outbox.clear();
+  });
+
+  it("sets the job on_hold locally and queues a status_event carrying the required reason", async () => {
+    await db.jobs.put(jobRow({ status: "in_progress" }));
+    await pauseJob("job-1", "Waiting on parts");
+
+    const job = await db.jobs.get("job-1");
+    expect(job?.status).toBe("on_hold");
+
+    const ops = await db.outbox.toArray();
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({
+      type: "status_event",
+      jobId: "job-1",
+      fromStatus: "in_progress",
+      toStatus: "on_hold",
+      reason: "Waiting on parts",
+    });
+  });
+
+  it("resumes a paused job back to in_progress, queuing a matching status_event", async () => {
+    await db.jobs.put(jobRow({ status: "on_hold" }));
+    await resumeJob("job-1");
+
+    const job = await db.jobs.get("job-1");
+    expect(job?.status).toBe("in_progress");
+
+    const ops = await db.outbox.toArray();
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({
+      type: "status_event",
+      jobId: "job-1",
+      fromStatus: "on_hold",
+      toStatus: "in_progress",
+    });
+  });
+
+  it("throws rather than silently no-op-ing when the job isn't in Dexie yet", async () => {
+    await expect(pauseJob("missing-job", "Reason")).rejects.toThrow("Job not found locally");
+    await expect(resumeJob("missing-job")).rejects.toThrow("Job not found locally");
   });
 });

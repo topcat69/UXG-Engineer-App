@@ -10,6 +10,8 @@ import { db, type InstallFormRow, type JobDetailsRow, type MediaQueueItem } from
 import { generateId } from "@/lib/offline/id";
 import {
   checkIn,
+  pauseJob,
+  resumeJob,
   saveInstallFormDraft,
   saveJobDetailsDraft,
   startTravelling,
@@ -102,6 +104,11 @@ export function JobWorkflow({
   const [errors, setErrors] = useState<string[]>([]);
   const [travelError, setTravelError] = useState<string | null>(null);
   const [checkInError, setCheckInError] = useState<string | null>(null);
+  const [confirmingPause, setConfirmingPause] = useState(false);
+  const [pauseReason, setPauseReason] = useState("");
+  const [isPausing, setIsPausing] = useState(false);
+  const [pauseError, setPauseError] = useState<string | null>(null);
+  const [isResuming, setIsResuming] = useState(false);
   const hydrated = useRef(false);
 
   // Hydrate local edit state from Dexie once per job, not on every autosave echo.
@@ -265,6 +272,33 @@ export function JobWorkflow({
     }
   }
 
+  async function handlePause() {
+    if (!pauseReason.trim()) return;
+    setIsPausing(true);
+    try {
+      await pauseJob(jobId, pauseReason.trim());
+      setPauseReason("");
+      setConfirmingPause(false);
+      onMutated?.();
+    } catch (err) {
+      setPauseError(err instanceof Error ? err.message : "Something went wrong pausing — please try again.");
+    } finally {
+      setIsPausing(false);
+    }
+  }
+
+  async function handleResume() {
+    setIsResuming(true);
+    try {
+      await resumeJob(jobId);
+      onMutated?.();
+    } catch {
+      // best-effort UI feedback only — resumeJob's own outbox op retries automatically, same as every other field action
+    } finally {
+      setIsResuming(false);
+    }
+  }
+
   async function handleToggleTask(taskId: string, isDone: boolean) {
     await toggleTask(taskId, jobId, isDone, currentUser.id);
     onMutated?.();
@@ -360,6 +394,40 @@ export function JobWorkflow({
           {checkInError && <p className="text-destructive text-sm">{checkInError}</p>}
         </div>
       )}
+
+      {job.status === "on_hold" && (
+        <div className="flex flex-col gap-2">
+          <p className="text-muted-foreground text-sm">This job is paused. Resume to carry on where you left off.</p>
+          <Button onClick={handleResume} disabled={isResuming}>
+            {isResuming ? "Resuming…" : "Resume Job"}
+          </Button>
+        </div>
+      )}
+
+      {job.status === "in_progress" &&
+        (confirmingPause ? (
+          <div className="flex flex-col gap-2 rounded-md border p-3">
+            <Textarea
+              value={pauseReason}
+              onChange={(e) => setPauseReason(e.target.value)}
+              placeholder="Reason for pausing (required) — e.g. waiting on parts, end of shift, site closed"
+              rows={2}
+            />
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmingPause(false)}>
+                Never mind
+              </Button>
+              <Button type="button" size="sm" disabled={isPausing || !pauseReason.trim()} onClick={handlePause}>
+                {isPausing ? "Pausing…" : "Confirm pause"}
+              </Button>
+            </div>
+            {pauseError && <p className="text-destructive text-sm">{pauseError}</p>}
+          </div>
+        ) : (
+          <Button type="button" variant="outline" size="sm" onClick={() => setConfirmingPause(true)}>
+            Pause job
+          </Button>
+        ))}
 
       {onSite && !detailsMode && (
         <InstallFormSection

@@ -5,7 +5,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 import { humanize } from "@/lib/format/text";
-import { formatDurationBetween } from "@/lib/format/duration";
+import { formatDurationBetween, formatDurationMinutes } from "@/lib/format/duration";
+import { computeWorkedMinutes } from "@/lib/jobs/worked-duration";
 import { formatGpsTimestampOverlay } from "./overlay-text";
 import {
   BRAND,
@@ -89,7 +90,7 @@ export async function downloadBytes(supabase: AnySupabaseClient, storagePath: st
  * that reference (no Montserrat embedding, no per-field "completed by").
  */
 export async function generateCompletionReport(supabase: AnySupabaseClient, jobId: string): Promise<Buffer> {
-  const [{ data: job }, { data: installForm }, { data: jobDetails }, { data: media }, { data: signatures }, { data: issues }] =
+  const [{ data: job }, { data: installForm }, { data: jobDetails }, { data: media }, { data: signatures }, { data: issues }, { data: statusEvents }] =
     await Promise.all([
       supabase
         .from("jobs")
@@ -103,6 +104,7 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
       supabase.from("media_assets").select("*").eq("job_id", jobId).order("slot"),
       supabase.from("signatures").select("*").eq("job_id", jobId),
       supabase.from("issues").select("severity, description, status").eq("job_id", jobId).order("created_at"),
+      supabase.from("status_events").select("to_status, occurred_at").eq("job_id", jobId).order("occurred_at"),
     ]);
   if (!job) throw new Error(`Job ${jobId} not found`);
 
@@ -163,7 +165,16 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
   // --- Scheduling ---
   drawSectionBar(doc, "Scheduling");
   twoColumnRow(doc, ["Scheduled Start:", formatDateTime(job.scheduled_start)], ["Actual End:", formatDateTime(job.actual_end)]);
-  twoColumnRow(doc, ["Actual Start:", formatDateTime(job.actual_start)], ["Time on job:", formatDurationBetween(job.actual_start, job.actual_end)]);
+  // Sums only the actual in_progress intervals from the status_events
+  // history — a plain actual_end - actual_start subtraction would count a
+  // paused overnight gap on a multi-day job as time worked (see
+  // worked-duration.ts and DECISIONS.md's pause/resume addendum). Falls
+  // back to the plain subtraction only if there's no usable status_events
+  // trail at all (e.g. a pre-pause-feature migrated job) — a rough number
+  // beats a blank field once actual_start/actual_end genuinely are set.
+  const workedMinutes = computeWorkedMinutes(statusEvents ?? []);
+  const timeOnJob = workedMinutes !== null ? formatDurationMinutes(workedMinutes) : formatDurationBetween(job.actual_start, job.actual_end);
+  twoColumnRow(doc, ["Actual Start:", formatDateTime(job.actual_start)], ["Time on job:", timeOnJob]);
   twoColumnRow(doc, ["Travel started:", formatDateTime(job.actual_travel_start)], ["Time travelling:", formatDurationBetween(job.actual_travel_start, job.actual_start)]);
   doc.moveDown(0.3);
 
