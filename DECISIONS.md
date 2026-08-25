@@ -4318,3 +4318,44 @@ window), same 2 pre-existing Supabase-dependent failures as every
 addendum in this sandbox, no regressions. `site-map.ts`'s actual tile
 fetch is untested directly, consistent with every other `server-only`
 network-calling module in this app.
+
+## 2026-08-25 — RAMS PDF upload failed with a generic "server error" page
+
+Reported: uploading a PDF for RAMS threw a generic Next.js server-error
+page ("This page couldn't load — A server error occurred"); images and
+Word documents through the same upload button worked fine.
+
+Root cause: `uploadJobDocument` (`office/jobs/[id]/actions.ts`, wired up
+from `JobDetailsPanel`'s RAMS/site-plan upload buttons) is a real Server
+Action that receives the raw `File` straight through `FormData`. Next.js
+caps a Server Action's request body at **1MB by default**
+(`experimental.serverActions.bodySizeLimit`, confirmed against this
+Next.js version's own vendored docs — see `AGENTS.md`'s "check the
+vendored docs, don't assume" rule) specifically to bound how much a
+single action call can make the server parse. A RAMS document (a
+multi-page risk assessment/method statement, routinely photographed or
+scanned) commonly exceeds 1MB; a compressed site-plan image or a short
+Word doc often doesn't — exactly the split in the reported symptom. The
+request gets rejected by the framework itself before `uploadJobDocument`'s
+own code ever runs, which is why it surfaced as a generic, unhelpful
+error page rather than anything this app's own error handling could
+shape into a real message.
+
+Fixed by setting `experimental.serverActions.bodySizeLimit: "20mb"` in
+`next.config.ts` — a single, app-wide setting (Next doesn't support
+scoping it per-action), so it also raises the ceiling for the other
+Server-Action file upload in this app, the CSV site importer
+(`importSitesCsv`), which was never reported as broken but was under the
+same 1MB ceiling for an unusually large export. Deliberately does not
+touch anything about the field app's own photo/video capture — that goes
+straight from the browser to Supabase Storage via the Phase 3 outbox,
+never through a Server Action, so it was never subject to this limit and
+needed no change.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 341 passed (unchanged; a `next.config.ts` option, nothing to unit
+test), same 2 pre-existing Supabase-dependent failures as every addendum
+in this sandbox, no regressions. Not verified against an actual large PDF
+upload in a running instance (no live Supabase/browser in this sandbox)
+— flagged for a real check once deployed, per the office's own original
+report (a real multi-page RAMS PDF).

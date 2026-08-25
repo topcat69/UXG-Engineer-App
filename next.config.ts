@@ -16,6 +16,18 @@ const nextConfig: NextConfig = {
   // the node_modules subset it actually needs, instead of requiring the
   // full node_modules (incl. devDependencies) inside the runtime image.
   output: "standalone",
+  experimental: {
+    // Next's own default is 1MB for any Server Action's request body —
+    // uploadJobDocument (office/jobs/[id]/actions.ts, the RAMS/site-plan
+    // upload) sends the raw file straight through a Server Action's
+    // FormData, so a multi-page RAMS PDF routinely exceeds that default
+    // and gets rejected by the framework itself before the action ever
+    // runs, surfacing as a generic "server error" page with no useful
+    // message. Field-app photo/video capture is unaffected — that goes
+    // straight to Supabase Storage from the browser (Phase 3's outbox),
+    // never through a Server Action.
+    serverActions: { bodySizeLimit: "20mb" },
+  },
 };
 
 export default nextConfig;
