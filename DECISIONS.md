@@ -4081,3 +4081,64 @@ unit-tested beyond the pure template layer, per the established
 three-layer split). Not verified against a live Resend send or a real
 cancelled job in a running instance — flagged for a real check once
 deployed.
+
+## 2026-08-25 — CSV-imported Irish sites never got coordinates at all
+
+Reported symptom: a newly created Irish site (Halfords — Liffey Valley,
+`D22 XH22`) wasn't showing on the dashboard map, and the field app
+refused to let the engineer start travelling to it — "Location is
+required to start travelling — enable location services, or make sure
+this site has a postcode set, and try again" — despite the site having a
+postcode.
+
+Root cause: two earlier addenda this session (2026-08-24, "Irish sites
+weren't appearing on the dashboard map" and "Nominatim fallback was
+plotting a Cork site in Belfast") fixed geocoding for sites created or
+edited through the office's manual "Clients → site → New/Edit" form
+(`createSiteForClient`/`updateSiteForClient` in
+`office/clients/actions.ts`), which does call `geocodePostcode`. Bulk CSV
+import (`importSitesCsv` in `office/import/actions.ts`) is a completely
+separate code path that was never touched by either fix — it inserted
+whatever rows `parseSitesCsv` produced straight into `sites`, and that
+parser only ever fills `latitude`/`longitude` from explicit CSV columns
+(by design — it's a pure parser, no network calls). A CSV with only
+address/postcode columns (the normal case) therefore saved every site
+with no coordinates at all: invisible on `buildJobMapMarkers`'s map (it
+drops any site without coordinates), and with nothing for the field app's
+`siteLocationFallback` to fall back to when live GPS isn't available —
+which then tries `geocodePostcode` on the bare postcode with no address
+context (a known, deliberate limitation — see the Belfast addendum), and
+for an Eircode that's frequently not enough on its own to resolve,
+producing exactly the reported block.
+
+Fixed `importSitesCsv` to geocode any row missing both `latitude` and
+`longitude` (using its `postcode` plus `address_line1`/`town` as context,
+same as the manual form) before inserting — bringing the CSV path in line
+with the manual one. Deliberately sequential (a plain loop, not
+`Promise.all`): a real import batch can be a couple hundred rows in one
+file (see the existing comment on `rowsWithClient`), and firing that many
+concurrent requests at Nominatim's free public instance would breach its
+stated rate limit; UK rows still resolve via postcodes.io on the first
+call as before; a row whose postcode can't be resolved at all is still
+imported, just without coordinates, same "best-effort" contract as the
+manual form.
+
+Not done: backfilling sites already imported before this fix (including
+the Halfords site from the report) — there's no automatic backfill, same
+as the prior addendum's note. The existing fix for that is unchanged: an
+already-broken site picks up coordinates by being re-saved once via
+Clients → site → Edit → Save, which re-geocodes on every save. If it
+turns out there are many such sites already in the production database
+rather than just this one, say so and a one-off backfill script (in the
+style of `scripts/migrate-appsheet.ts`) is a quick follow-up rather than
+requiring a re-save per site.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 336 passed (unchanged; `geocodePostcode` and `parseSitesCsv`
+already have full unit coverage from earlier addenda, and
+`importSitesCsv` itself has never been unit-tested directly — it's a
+`"use server"` action making a real Supabase call, consistent with
+`createSiteForClient`/`updateSiteForClient` having none either), same 2
+pre-existing Supabase-dependent failures as every addendum in this
+sandbox, no regressions. Not verified against a live import in a running
+instance — flagged for a real check once deployed.

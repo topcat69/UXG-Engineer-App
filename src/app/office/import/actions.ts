@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseSitesCsv } from "@/lib/csv/sites";
+import { geocodePostcode } from "@/lib/geo/postcode";
 import { nextJobNumber } from "@/lib/jobs/job-number";
 import { maxJobSequenceForYear } from "@/lib/jobs/next-job-number";
 
@@ -29,7 +30,31 @@ export async function importSitesCsv(formData: FormData): Promise<ImportSitesRes
 
   // A whole CSV batch is one client's sites (e.g. FootAsylum's 200 stores in
   // one file) — client_id isn't a column in the CSV itself, see sites.ts.
-  const rowsWithClient = rows.map((row) => ({ ...row, client_id: clientId }));
+  //
+  // Rows with no latitude/longitude columns (the common case — most CSVs
+  // only ever had address/postcode) get geocoded here, same as the manual
+  // "New site" form's createSiteForClient already does. Without this, a
+  // site imported this way was saved with no coordinates at all: invisible
+  // on the dashboard map, and with nothing for the field app's
+  // Start Travelling/Check In location fallback to fall back to either —
+  // see DECISIONS.md. Sequential, not Promise.all: a large batch (a couple
+  // hundred rows isn't unusual) could otherwise fire that many concurrent
+  // Nominatim requests at once, well past its stated rate limit.
+  const rowsWithClient: ((typeof rows)[number] & { client_id: string })[] = [];
+  for (const row of rows) {
+    let { latitude, longitude } = row;
+    if (latitude == null && longitude == null && row.postcode) {
+      const coords = await geocodePostcode(row.postcode, {
+        addressLine1: row.address_line1 ?? undefined,
+        town: row.town ?? undefined,
+      });
+      if (coords) {
+        latitude = coords.latitude;
+        longitude = coords.longitude;
+      }
+    }
+    rowsWithClient.push({ ...row, latitude, longitude, client_id: clientId });
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase.from("sites").insert(rowsWithClient).select("id");
