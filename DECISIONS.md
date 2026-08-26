@@ -5048,3 +5048,24 @@ passed, same 2 pre-existing Supabase-dependent failures as every
 addendum in this sandbox, no regressions.
 
 No migration, no deploy-order dependency — pure app-code fix.
+
+## 2026-08-26 — Office landing page changed from Jobs to Dashboard
+
+"When someone logs in for the first time via the magic link, the home
+page should be the dashboard." The root `/` route (`src/app/page.tsx`)
+is the one landing point every sign-in path already funnels through —
+the magic-link callback's default `next` param, and the OTP-code
+fallback's `window.location.href = "/"` — so this is a single-line
+change, not a "first login only" special case: `redirect("/office/jobs")`
+for superadmin/manager becomes `redirect("/office/dashboard")`. Engineers
+still land on `/my-jobs`, unaffected.
+
+Checked for anything else assuming Jobs was the landing page: no
+Playwright test navigates via `/` and asserts on `/office/jobs` — they
+all `goto()` job URLs directly — so nothing else needed touching.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean. 379 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.
+
+No migration, no deploy-order dependency — pure app-code fix.
