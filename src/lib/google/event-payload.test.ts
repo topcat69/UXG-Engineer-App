@@ -23,6 +23,7 @@ const job = {
   description: "Replace faulty player and re-test content playback.",
   job_type: "install",
   priority: "P2",
+  status: "scheduled" as const,
   assignedName: "Sam Carter",
   jobInformation: "Site manager expects us before 9am, park round the back.",
   slaRequirementDetail: "4-hour response",
@@ -46,6 +47,16 @@ describe("buildEventPayload", () => {
   it("titles the event '{job_number} — {site.name}'", () => {
     const payload = buildEventPayload(job, site, "https://uxgengineering.example.com");
     expect(payload.summary).toBe("UXG-2026-0042 — Riverside Retail Park");
+  });
+
+  it("prefixes the title with 'PROVISIONAL —' in capitals when the job is provisional", () => {
+    const payload = buildEventPayload({ ...job, status: "provisional" }, site, "https://uxgengineering.example.com");
+    expect(payload.summary).toBe("PROVISIONAL — UXG-2026-0042 — Riverside Retail Park");
+  });
+
+  it("does not prefix the title for a plain scheduled job", () => {
+    const payload = buildEventPayload(job, site, "https://uxgengineering.example.com");
+    expect(payload.summary).not.toContain("PROVISIONAL");
   });
 
   it("sets location to the full postal address, not just the site name", () => {

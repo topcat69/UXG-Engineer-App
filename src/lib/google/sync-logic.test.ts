@@ -23,6 +23,7 @@ const scheduledJob = {
   description: null as string | null,
   job_type: "install",
   priority: "P3",
+  status: "scheduled" as const,
   assignedName: null as string | null,
   jobInformation: null as string | null,
   slaRequirementDetail: null as string | null,

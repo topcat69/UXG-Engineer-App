@@ -16,7 +16,15 @@ export type CalendarEquipmentItem = { model: string; serial: string | null };
  */
 export type CalendarJob = Pick<
   JobRow,
-  "id" | "job_number" | "scheduled_start" | "scheduled_end" | "calendar_event_id" | "description" | "job_type" | "priority"
+  | "id"
+  | "job_number"
+  | "scheduled_start"
+  | "scheduled_end"
+  | "calendar_event_id"
+  | "description"
+  | "job_type"
+  | "priority"
+  | "status"
 > & {
   assignedName: string | null;
   jobInformation: string | null;
@@ -113,8 +121,11 @@ export function buildEventPayload(job: CalendarJob, site: CalendarSite, deepLink
     `${deepLinkBaseUrl}/office/jobs/${job.id}`,
   ].filter((line): line is string => !!line);
 
+  const summary =
+    job.status === "provisional" ? `PROVISIONAL — ${job.job_number} — ${site.name}` : `${job.job_number} — ${site.name}`;
+
   return {
-    summary: `${job.job_number} — ${site.name}`,
+    summary,
     location: fullSiteAddress(site),
     description: descriptionLines.join("\n"),
     start: { date: job.scheduled_start.slice(0, 10) },

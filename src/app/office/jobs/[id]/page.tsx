@@ -369,6 +369,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           assignedName={job.assigned?.name ?? null}
           scheduledStart={job.scheduled_start}
           scheduledEnd={job.scheduled_end}
+          isProvisional={job.status === "provisional"}
           engineers={engineers ?? []}
         />
       </section>

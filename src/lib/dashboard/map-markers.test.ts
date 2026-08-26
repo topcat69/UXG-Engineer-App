@@ -23,6 +23,14 @@ describe("categorizeJob", () => {
     expect(categorizeJob("scheduled", true)).toBe("revisit");
     expect(categorizeJob("on_site", true)).toBe("revisit");
   });
+
+  it("categorizes a provisional job as 'provisional'", () => {
+    expect(categorizeJob("provisional", false)).toBe("provisional");
+  });
+
+  it("still overrides to revisit even when the status is provisional", () => {
+    expect(categorizeJob("provisional", true)).toBe("revisit");
+  });
 });
 
 describe("buildJobMapMarkers", () => {
@@ -51,15 +59,17 @@ describe("buildJobMapMarkers", () => {
     expect(markers).toHaveLength(0);
   });
 
-  it("keeps scheduled and travelling/on_site/in_progress jobs", () => {
+  it("keeps scheduled, provisional, and travelling/on_site/in_progress jobs", () => {
     const site = { name: "Site A", latitude: 53.1, longitude: -0.5 };
     const markers = buildJobMapMarkers([
       { id: "1", job_number: "UXG-1", status: "scheduled", parent_job_id: null, project_id: null, site, assigned: null },
       { id: "2", job_number: "UXG-2", status: "travelling", parent_job_id: null, project_id: null, site, assigned: null },
       { id: "3", job_number: "UXG-3", status: "on_site", parent_job_id: null, project_id: null, site, assigned: null },
       { id: "4", job_number: "UXG-4", status: "in_progress", parent_job_id: null, project_id: null, site, assigned: null },
+      { id: "5", job_number: "UXG-5", status: "provisional", parent_job_id: null, project_id: null, site, assigned: null },
     ]);
-    expect(markers).toHaveLength(4);
+    expect(markers).toHaveLength(5);
+    expect(markers.find((m) => m.id === "5")!.category).toBe("provisional");
   });
 
   it("categorizes a revisit job as 'revisit' rather than its status bucket", () => {

@@ -1067,6 +1067,7 @@ export type Database = {
     Enums: {
       job_status:
         | "draft"
+        | "provisional"
         | "scheduled"
         | "dispatched"
         | "accepted"
@@ -1214,6 +1215,7 @@ export const Constants = {
     Enums: {
       job_status: [
         "draft",
+        "provisional",
         "scheduled",
         "dispatched",
         "accepted",

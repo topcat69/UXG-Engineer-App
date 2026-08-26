@@ -20,7 +20,7 @@ export async function syncCalendarForJob(supabase: AnySupabaseClient, jobId: str
     const { data: job } = await supabase
       .from("jobs")
       .select(
-        "id, job_number, scheduled_start, scheduled_end, calendar_event_id, description, job_type, priority, assigned:users!jobs_assigned_to_fkey(name), job_details(job_information, sla_requirement_detail), job_equipment(model, serial), site:sites(name, address_line1, address_line2, town, postcode, access_notes, contact_name, contact_phone, latitude, longitude)",
+        "id, job_number, scheduled_start, scheduled_end, calendar_event_id, description, job_type, priority, status, assigned:users!jobs_assigned_to_fkey(name), job_details(job_information, sla_requirement_detail), job_equipment(model, serial), site:sites(name, address_line1, address_line2, town, postcode, access_notes, contact_name, contact_phone, latitude, longitude)",
       )
       .eq("id", jobId)
       .single();
@@ -35,6 +35,7 @@ export async function syncCalendarForJob(supabase: AnySupabaseClient, jobId: str
       description: job.description,
       job_type: job.job_type,
       priority: job.priority,
+      status: job.status,
       assignedName: job.assigned?.name ?? null,
       jobInformation: job.job_details?.job_information ?? null,
       slaRequirementDetail: job.job_details?.sla_requirement_detail ?? null,

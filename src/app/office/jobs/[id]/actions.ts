@@ -403,13 +403,17 @@ export type AssignScheduleResult = { ok: true; message: string; warning?: string
  * touch both fields at once. `scheduledEndLocal` can be on a later
  * calendar date than the start — some jobs run across several on-site
  * days — so this deliberately takes an explicit end instant rather than a
- * same-day duration.
+ * same-day duration. `isProvisional` marks the job as unconfirmed (own
+ * scheduler/map colour, "PROVISIONAL —" calendar title, blocked from
+ * starting in the field app) while still sending the assignment
+ * email/calendar event immediately — see PRE_WORK_STATUSES below.
  */
 export async function assignAndScheduleJob(
   jobId: string,
   engineerId: string | null,
   scheduledStartLocal: string,
   scheduledEndLocal: string,
+  isProvisional: boolean,
 ): Promise<AssignScheduleResult> {
   const supabase = await createClient();
   const { data: job } = await supabase
@@ -470,15 +474,26 @@ export async function assignAndScheduleJob(
   if (error) return { ok: false, message: error.message };
 
   const user = await getCurrentUser();
-  if (job.status === "draft" && newStart) {
-    await supabase.from("jobs").update({ status: "scheduled" }).eq("id", jobId);
-    await supabase.from("status_events").insert({
-      job_id: jobId,
-      from_status: "draft",
-      to_status: "scheduled",
-      user_id: user?.id,
-      reason: "Scheduled from job detail",
-    });
+  // "draft" and "provisional" are both pre-work states this action can move
+  // a job out of once a start date is set: to "provisional" if the
+  // checkbox is on, otherwise straight to "scheduled" (this also lets the
+  // office confirm a provisional job by re-saving with the checkbox off).
+  // A no-op when the target matches the current status, so re-saving a
+  // provisional job's time without touching the checkbox doesn't log a
+  // spurious status_events row.
+  const PRE_WORK_STATUSES = new Set(["draft", "provisional"]);
+  if (PRE_WORK_STATUSES.has(job.status) && newStart) {
+    const targetStatus = isProvisional ? "provisional" : "scheduled";
+    if (targetStatus !== job.status) {
+      await supabase.from("jobs").update({ status: targetStatus }).eq("id", jobId);
+      await supabase.from("status_events").insert({
+        job_id: jobId,
+        from_status: job.status,
+        to_status: targetStatus,
+        user_id: user?.id,
+        reason: "Scheduled from job detail",
+      });
+    }
   }
 
   // Same best-effort, non-blocking contract as rescheduleJob/bulkAssignJobs

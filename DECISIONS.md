@@ -4629,3 +4629,114 @@ Supabase-dependent failures as every addendum in this sandbox, no
 regressions. Confirmed none of the five pre-existing `detectConflicts`
 tests' fixtures cross the new 8h threshold, so all five still pass
 unchanged against the new behaviour.
+
+## 2026-08-26 — New "provisional" job status
+
+Spec, quoted verbatim: "I would like a new status called provisional,
+that will have a separate colour in maps and scheduler. When a job is
+created with provision an email and calendar event is still to be
+triggered. The calendar event must have provisional in the title in
+capitals. The job is viewable by the engineer on the app, but they
+cannot start it until it has been changed to a scheduled job."
+
+**Schema**: new `job_status` enum value `'provisional'`, positioned right
+after `'draft'` (`alter type job_status add value if not exists
+'provisional' after 'draft';` — Postgres 12+'s `BEFORE`/`AFTER`
+positioning). Same value added to `database.types.ts`'s two enum
+listings (the `Enums.job_status` union and the runtime `Constants` array)
+by hand, matching how every prior enum addition in this project has kept
+generated types in sync without a live `supabase gen types` round trip
+against this sandbox's DB.
+
+**Assign & Schedule panel** (`office/jobs/[id]/assign-schedule-panel.tsx`
++ its `assignAndScheduleJob` action): added a "Provisional" checkbox next
+to the existing start/end date fields. `assignAndScheduleJob` gained an
+`isProvisional: boolean` parameter and the existing `if (job.status ===
+"draft" && newStart) { … set "scheduled" … }` auto-transition was
+generalized into a `PRE_WORK_STATUSES = new Set(["draft", "provisional"])`
+check: when a start date is set and the job is currently draft or
+provisional, it moves to `"provisional"` (checkbox on) or `"scheduled"`
+(checkbox off) — whichever the office asked for, skipping the DB write
+and `status_events` row entirely when the target already matches the
+current status, so re-saving a provisional job's time without touching
+the checkbox doesn't log a spurious transition. This is also how the
+office *confirms* a provisional job later: open the panel, un-tick the
+box, save — status moves from `provisional` straight to `scheduled`, same
+as the original draft path. Deliberately left `rescheduleJob` (the
+scheduler's drag-and-drop path, `office/scheduler/actions.ts`) untouched
+— it only auto-promotes `"draft"` jobs, so dragging a provisional job to
+a new slot keeps it provisional rather than silently confirming it,
+which would bypass the office's explicit "not yet confirmed" choice.
+
+**Email/calendar still fire immediately, per spec**: no change was
+needed to the trigger condition itself — `assignAndScheduleJob`'s
+existing `if (newStart && effectiveEngineerId) { sendJobScheduledEmail
+… }` already fires purely off "was a schedule/engineer present in this
+save," not the resulting status value, so a provisional job's first save
+sends the same "New Job Scheduled" email and creates the same calendar
+event a confirmed job's would. The email content itself doesn't mention
+"provisional" — not asked for, and the calendar event (which the office
+actually watches day-to-day) already carries that signal in its title.
+
+**Calendar title** (`lib/google/event-payload.ts`): `CalendarJob`'s
+`Pick<JobRow, …>` gained `"status"`; `buildEventPayload` now prefixes the
+summary with `PROVISIONAL — ` (capitals, per spec) when `job.status ===
+"provisional"`, otherwise unchanged. `sync-job-calendar.ts`'s Supabase
+select and the `calendarJob` object it builds both pass `status` through
+— the one place `assignAndScheduleJob`/`rescheduleJob` funnel every
+schedule/reschedule through, so no call site needed touching.
+
+**Scheduler colour** (`lib/scheduler/status-colors.ts`): new `"provisional"`
+bucket (pink — `bg-pink-50 border-l-pink-500` card, `bg-pink-500`
+swatch), the first new bucket added since the original seven; picked pink
+since every other colour already in use (gray/blue/orange/purple/green/
+yellow/red/teal) means something else on this board.
+
+**Map colour + category** (`lib/dashboard/map-markers.ts`,
+`components/jobs-map.tsx`, dashboard legend): `MapCategory` gained
+`"provisional"`; `VISIBLE_STATUSES` now includes it so provisional jobs
+plot on the dashboard map at all; `categorizeJob` checks `status ===
+"provisional"` after the existing revisit override (a provisional
+revisit — rare, but possible — still shows as "revisit," matching how
+revisit already took priority over on_site/scheduled). Same pink hex
+(`#db2777`) as the scheduler dot, plus a new legend entry.
+
+**Field app** (`components/field/job-workflow.tsx`): `BEFORE_TRAVEL`
+already excluded `"provisional"` by construction (it only ever listed
+`draft`/`scheduled`/`dispatched`/`accepted`), so the "Start Travelling"
+button was already correctly hidden — added a comment making that
+exclusion explicit rather than relying on it being accidentally correct.
+Added a dedicated message for the provisional case ("This job is
+provisional and hasn't been confirmed yet — you'll be able to start
+travelling once the office changes it to scheduled") and excluded
+`"provisional"` from the generic `NOT_YET_ON_SITE`-based fallback message
+so the two don't both render at once. The job is otherwise fully
+viewable — job info, RAMS, site map, tasks — nothing else in the field
+app gates on status besides the travel/check-in buttons. No change
+needed to `lib/jobs/engineer-queue.ts`'s `QUEUE_EXIT_STATUSES`: it
+already excludes only `draft`/`submitted`/`under_review`/`approved`/
+`closed`/`cancelled`, so a provisional job shows up in "My Jobs" the
+same as a scheduled one, per "viewable by the engineer."
+
+**Jobs list filter** (`office/jobs/page.tsx`): added `"provisional"` to
+the status filter dropdown's `JOB_STATUSES` list, right after `"draft"`.
+Left `lib/migration/parse-jobs.ts`'s separate, historical-parity
+`JOB_STATUSES` list untouched — that's the one-time AppSheet CSV import
+parser, unrelated to statuses a job can be given going forward.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean. New/updated tests: `event-payload.test.ts` (PROVISIONAL title
+prefix present for a provisional job, absent otherwise — plus the base
+fixture and `sync-logic.test.ts`'s fixture both needed an explicit
+`status` field once `CalendarJob` required one), `map-markers.test.ts`
+(`categorizeJob` returns `"provisional"` for that status, still yields
+`"revisit"` when both apply; `buildJobMapMarkers` keeps provisional jobs
+visible), `status-colors.test.ts` (`statusColorBucket("provisional")`
+and its swatch/color-class presence). 361 passed, same 2 pre-existing
+Supabase-dependent failures (`tests/rls.test.ts`, `tests/migration.test.ts`)
+as every addendum in this sandbox, no regressions.
+
+**Deploy note**: this is a schema migration —
+`supabase/migrations/20260127000000_provisional_status.sql` needs
+`supabase db push` before the next `docker compose … up -d --build app`,
+same order as every other migration-bearing addendum.

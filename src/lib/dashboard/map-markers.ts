@@ -2,13 +2,13 @@
 // calls, no Leaflet, so it's independently testable, same convention as
 // metrics.ts.
 
-export type MapCategory = "scheduled" | "on_site" | "revisit";
+export type MapCategory = "scheduled" | "on_site" | "revisit" | "provisional";
 
 /** Engineer is currently there or travelling to it right now — the map's "happening now" color. */
 const ON_SITE_STATUSES = new Set(["travelling", "on_site", "in_progress"]);
 
 /** Everything the dashboard map plots — anything not scheduled or actively being worked stays off the map entirely (no dot at all, not just a dulled one): closed/cancelled/etc. jobs aren't "where the work is happening" any more. */
-const VISIBLE_STATUSES = new Set(["scheduled", ...ON_SITE_STATUSES]);
+const VISIBLE_STATUSES = new Set(["scheduled", "provisional", ...ON_SITE_STATUSES]);
 
 export function categorizeJobStatus(status: string): "scheduled" | "on_site" {
   return ON_SITE_STATUSES.has(status) ? "on_site" : "scheduled";
@@ -25,7 +25,9 @@ export function categorizeJobStatus(status: string): "scheduled" | "on_site" {
  * jobs list ?is_revisit= drill-through).
  */
 export function categorizeJob(status: string, isRevisit: boolean): MapCategory {
-  return isRevisit ? "revisit" : categorizeJobStatus(status);
+  if (isRevisit) return "revisit";
+  if (status === "provisional") return "provisional";
+  return categorizeJobStatus(status);
 }
 
 export type RawMapJob = {

@@ -165,6 +165,7 @@ export function DashboardClient({
             <div className="text-muted-foreground mt-2 flex gap-4 text-xs">
               <LegendDot color="#FF7A00" label="Travelling / on site / in progress" />
               <LegendDot color="#2563eb" label="Scheduled" />
+              <LegendDot color="#db2777" label="Provisional" />
               <LegendDot color="#0d9488" label="Revisit" />
             </div>
           </>

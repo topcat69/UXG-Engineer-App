@@ -63,6 +63,8 @@ const AUTOSAVE_INTERVAL_MS = 15_000;
 // Two distinct spec-required timestamps, two distinct pre-site statuses:
 // BEFORE_TRAVEL shows "Start Travelling" (-> "travelling", actual_travel_start);
 // once "travelling", the Check In button below takes over (-> "in_progress", actual_start).
+// "provisional" is deliberately excluded — that's what blocks an engineer
+// from starting a provisional job until the office confirms it.
 const BEFORE_TRAVEL: readonly string[] = ["draft", "scheduled", "dispatched", "accepted"];
 const NOT_YET_ON_SITE: readonly string[] = [...BEFORE_TRAVEL, "travelling"];
 
@@ -377,6 +379,13 @@ export function JobWorkflow({
         )}
       </div>
 
+      {job.status === "provisional" && (
+        <p className="text-muted-foreground text-sm">
+          This job is provisional and hasn&apos;t been confirmed yet — you&apos;ll be able to start travelling once
+          the office changes it to scheduled.
+        </p>
+      )}
+
       {BEFORE_TRAVEL.includes(job.status) && (
         <div className="flex flex-col gap-2">
           <Button onClick={handleStartTravel} disabled={isStartingTravel}>
@@ -467,7 +476,7 @@ export function JobWorkflow({
         />
       )}
 
-      {!NOT_YET_ON_SITE.includes(job.status) && !onSite && (
+      {job.status !== "provisional" && !NOT_YET_ON_SITE.includes(job.status) && !onSite && (
         <p className="text-muted-foreground text-sm">
           This job is {job.status.replace("_", " ")}. No further action needed here.
         </p>

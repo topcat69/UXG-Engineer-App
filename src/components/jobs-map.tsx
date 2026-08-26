@@ -16,6 +16,7 @@ const CATEGORY_COLORS: Record<MapCategory, string> = {
   on_site: "#FF7A00",
   scheduled: "#2563eb",
   revisit: "#0d9488",
+  provisional: "#db2777",
 };
 
 function iconFor(category: MapCategory): L.DivIcon {

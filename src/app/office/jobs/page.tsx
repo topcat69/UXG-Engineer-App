@@ -10,6 +10,7 @@ import { JobsTable, type JobRow } from "./jobs-table";
 const PAGE_SIZE = 50;
 const JOB_STATUSES: Database["public"]["Enums"]["job_status"][] = [
   "draft",
+  "provisional",
   "scheduled",
   "dispatched",
   "accepted",

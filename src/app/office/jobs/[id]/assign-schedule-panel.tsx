@@ -30,6 +30,7 @@ export function AssignSchedulePanel({
   assignedName,
   scheduledStart,
   scheduledEnd,
+  isProvisional,
   engineers,
 }: {
   jobId: string;
@@ -37,18 +38,20 @@ export function AssignSchedulePanel({
   assignedName: string | null;
   scheduledStart: string | null;
   scheduledEnd: string | null;
+  isProvisional: boolean;
   engineers: Engineer[];
 }) {
   const [editing, setEditing] = useState(false);
   const [engineerId, setEngineerId] = useState(assignedTo ?? "");
   const [scheduledLocal, setScheduledLocal] = useState(toLocalInputValue(scheduledStart));
   const [scheduledEndLocal, setScheduledEndLocal] = useState(toLocalInputValue(scheduledEnd));
+  const [provisional, setProvisional] = useState(isProvisional);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSave() {
     startTransition(async () => {
-      const result = await assignAndScheduleJob(jobId, engineerId || null, scheduledLocal, scheduledEndLocal);
+      const result = await assignAndScheduleJob(jobId, engineerId || null, scheduledLocal, scheduledEndLocal, provisional);
       setMessage(result.ok ? (result.warning ?? null) : result.message);
       if (result.ok) setEditing(false);
     });
@@ -66,6 +69,7 @@ export function AssignSchedulePanel({
           {scheduledStart ? new Date(scheduledStart).toLocaleString() : "Not scheduled"}
           {endLabel}
         </p>
+        {isProvisional && <p className="font-medium text-pink-600">Provisional — not yet confirmed</p>}
         <button type="button" onClick={() => setEditing(true)} className="text-xs underline">
           Assign / schedule
         </button>
@@ -108,6 +112,18 @@ export function AssignSchedulePanel({
           className="border-input h-8 rounded-md border bg-transparent px-2 text-sm"
         />
         <span className="text-muted-foreground text-[10px]">Can be a later date for a multi-day job</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="provisional-checkbox"
+          checked={provisional}
+          onChange={(e) => setProvisional(e.target.checked)}
+          className="h-4 w-4"
+        />
+        <label htmlFor="provisional-checkbox" className="text-xs">
+          Provisional — not confirmed yet (engineer can view but not start it)
+        </label>
       </div>
       <div className="flex gap-2">
         <Button type="button" size="sm" disabled={isPending} onClick={handleSave}>

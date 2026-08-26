@@ -6,10 +6,11 @@
 // apart from a plain "scheduled" card, which the map's coarser
 // on_site/completed/other split doesn't need to.
 
-export type StatusColorBucket = "draft" | "upcoming" | "active" | "review" | "done" | "hold" | "cancelled";
+export type StatusColorBucket = "draft" | "provisional" | "upcoming" | "active" | "review" | "done" | "hold" | "cancelled";
 
 const STATUS_BUCKETS: Record<string, StatusColorBucket> = {
   draft: "draft",
+  provisional: "provisional",
   scheduled: "upcoming",
   dispatched: "upcoming",
   accepted: "upcoming",
@@ -32,6 +33,7 @@ export function statusColorBucket(status: string): StatusColorBucket {
 /** Light background + left accent border per bucket, so status reads at a glance without opening the card. */
 export const STATUS_COLOR_CLASSES: Record<StatusColorBucket, string> = {
   draft: "bg-gray-50 border-l-gray-400",
+  provisional: "bg-pink-50 border-l-pink-500",
   upcoming: "bg-blue-50 border-l-blue-500",
   active: "bg-orange-50 border-l-orange-500",
   review: "bg-purple-50 border-l-purple-500",
@@ -50,6 +52,7 @@ export const STATUS_COLOR_CLASSES: Record<StatusColorBucket, string> = {
  */
 export const STATUS_SWATCH_CLASSES: Record<StatusColorBucket, string> = {
   draft: "bg-gray-400",
+  provisional: "bg-pink-500",
   upcoming: "bg-blue-500",
   active: "bg-orange-500",
   review: "bg-purple-500",
