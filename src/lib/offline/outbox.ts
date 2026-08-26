@@ -5,6 +5,26 @@ import { db, type MediaQueueItem, type OutboxOperation } from "./db";
 
 export type DrainResult = { succeeded: number; failed: number };
 
+/**
+ * Mirrors the job_details_insert/update and install_forms_insert/update RLS
+ * policies' engineer condition exactly (see
+ * supabase/migrations/20260117000000_job_details.sql and
+ * 20260103000000_rls.sql) — once a job reaches one of these statuses, RLS
+ * permanently forbids the assigned engineer from writing to its
+ * install_forms/job_details row. A leftover draft-upsert op targeting a job
+ * already this far along can never succeed no matter how many times it's
+ * retried, which was a real bug: a stale draft op left queued from just
+ * before submission kept retrying forever after the job's own status_event
+ * landed, even though the submit itself (a separate, later op) had already
+ * synced the final data successfully.
+ */
+const FORM_WRITE_LOCKED_STATUSES = new Set(["submitted", "under_review", "approved", "closed"]);
+
+/** Pure so this can be unit tested without touching Dexie or Supabase. */
+export function isFormWriteLocked(jobStatus: string | undefined): boolean {
+  return !!jobStatus && FORM_WRITE_LOCKED_STATUSES.has(jobStatus);
+}
+
 /** Replays every pending outbox operation once, in the order it was queued. */
 export async function drainOutbox(): Promise<DrainResult> {
   const supabase = createClient();
@@ -53,6 +73,10 @@ async function applyOperation(supabase: ReturnType<typeof createClient>, op: Out
       return;
     }
     case "install_form_upsert": {
+      if (op.row.job_id && isFormWriteLocked((await db.jobs.get(op.row.job_id))?.status)) {
+        console.info(`Dropping stale install_form_upsert for job ${op.row.job_id} — already past submission`);
+        return;
+      }
       const { error } = await supabase.from("install_forms").upsert(op.row);
       if (error) throw error;
       return;
@@ -63,6 +87,10 @@ async function applyOperation(supabase: ReturnType<typeof createClient>, op: Out
       return;
     }
     case "job_details_upsert": {
+      if (op.row.job_id && isFormWriteLocked((await db.jobs.get(op.row.job_id))?.status)) {
+        console.info(`Dropping stale job_details_upsert for job ${op.row.job_id} — already past submission`);
+        return;
+      }
       const { error } = await supabase.from("job_details").upsert(op.row);
       if (error) throw error;
       return;

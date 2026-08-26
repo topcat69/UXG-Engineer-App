@@ -298,8 +298,16 @@ export async function submitJob(
       actual_end: nowIso,
     });
 
-    await db.outbox.add({
-      id: uuid(),
+    // Reuses saveInstallFormDraft's fixed per-job id, via put rather than
+    // add, so this collapses any still-pending pre-submission draft op into
+    // this final write instead of leaving it queued alongside it. A
+    // leftover draft op would retry forever once the status_event below
+    // lands and RLS permanently blocks any further engineer write to this
+    // job's install_forms row — see isFormWriteLocked in outbox.ts, which
+    // guards against this too, but there's no reason to leave anything
+    // behind for it to have to catch in the first place.
+    await db.outbox.put({
+      id: `draft-install-${jobId}`,
       type: "install_form_upsert",
       row: submittedForm,
       createdAt: formCreatedAt,
@@ -385,8 +393,10 @@ export async function submitJobDetails(
       actual_end: nowIso,
     });
 
-    await db.outbox.add({
-      id: uuid(),
+    // See the matching comment in submitJob above — collapses any still-
+    // pending pre-submission draft op into this final write.
+    await db.outbox.put({
+      id: `draft-details-${jobId}`,
       type: "job_details_upsert",
       row: submittedDetails,
       createdAt: detailsCreatedAt,

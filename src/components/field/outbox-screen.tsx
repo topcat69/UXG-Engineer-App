@@ -27,10 +27,18 @@ function describeOp(op: { type: string; jobId?: string }): string {
       return "Install form";
     case "survey_form_upsert":
       return "Survey form";
+    case "job_details_upsert":
+      return "Job form";
     case "signature_insert":
       return "Signature";
     case "issue_insert":
       return "Issue";
+    case "task_toggle":
+      return "Task";
+    case "media_pending_delta":
+      return "Media count update";
+    case "media_delete":
+      return "Media removal";
     default:
       return op.type;
   }

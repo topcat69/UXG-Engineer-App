@@ -4925,3 +4925,81 @@ every addendum in this sandbox, no regressions.
 
 No migration, no deploy-order dependency — pure app-code fix, live as
 soon as `docker compose … up -d --build app` runs.
+
+## 2026-08-26 — Fixed: stuck field-app outbox entries that retry forever
+
+Screenshot from a real device: 7 `job_details_upsert` entries stuck in
+the Outbox with 1–112 retries each, "26/08/2026, 11:31:14" as the last
+attempt — but "all changes etc have been recorded in the main app."
+That combination (data already correct server-side, yet an outbox entry
+that will never clear) pointed at one specific mechanism rather than a
+general sync failure.
+
+**Root cause**: `saveJobDetailsDraft`/`saveInstallFormDraft`
+(`field-actions.ts`) queue the in-progress form under a **fixed** per-job
+outbox id (`draft-details-{jobId}` / `draft-install-{jobId}`), reused on
+every 15s autosave tick — a deliberate earlier fix (see the 2026-08-24ish
+addendum on losing draft data) so editing for several minutes only ever
+leaves one pending draft-upsert queued, not a pile of superseded ones.
+`submitJobDetails`/`submitJob`, when the engineer actually checks out,
+queue their own **fresh**, randomly-`uuid()`'d upsert with the final
+data — leaving the old fixed-id draft entry sitting in the outbox
+untouched alongside it. Ordinarily both land in the same drain pass and
+neither op's outcome matters twice. But `drainOutbox` processes each
+queued op independently (its own try/catch; one op's failure doesn't
+stop the loop) and replays strictly in `createdAt` order — so on patchy
+connectivity, it's entirely possible for the draft op (an older
+timestamp, so replayed *first*) to hit a transient failure while the
+job's own status_event (queued *after* it, replayed later in the same or
+a subsequent pass) still succeeds and flips `jobs.status` to
+`"submitted"` server-side. From that point on, the leftover draft op
+retries forever and can *never* succeed: `job_details_insert`/`update`
+and `install_forms_insert`/`update`'s RLS policies
+(`20260117000000_job_details.sql`, `20260103000000_rls.sql`) only let
+the assigned engineer write while `jobs.status not in ('submitted',
+'under_review', 'approved', 'closed')` — a status that only ever moves
+forward. The submit's own fresh-id op, meanwhile, already carried the
+correct final data through successfully, which is exactly why the office
+app already showed everything right.
+
+**Two fixes, one preventive and one defensive**:
+
+1. `submitJob`/`submitJobDetails` now reuse the *same* fixed
+   `draft-install-{jobId}`/`draft-details-{jobId}` id for their own final
+   upsert too (`db.outbox.put`, not `.add`) — this collapses any
+   still-pending pre-submission draft straight into the final write
+   instead of leaving a second, now-superseded entry queued beside it.
+   There is never more than one form-upsert op per job in the outbox at
+   a time.
+
+2. Defensively, in case anything else ever leaves a stale form-upsert op
+   behind: `outbox.ts` gained `isFormWriteLocked(jobStatus)`, a pure
+   function mirroring the RLS predicate above exactly. `applyOperation`
+   now checks the job's *local* status (kept fresh by `syncDown` on every
+   pull regardless of any pending ops on that job — see
+   `jobIdsSafeToOverwrite`) before attempting an `install_form_upsert` or
+   `job_details_upsert`; if the job's already past submission, the op is
+   dropped (deleted, logged via `console.info`) rather than retried —
+   since by construction nothing useful could ever come from retrying it
+   once the job can no longer be written to. This is also what
+   self-heals the 7 entries already stuck on a real device today: the
+   very next drain attempt (automatic, or a tap of "Retry now") now
+   recognises and clears them without the engineer needing to do
+   anything.
+
+Also fixed while in this file: `outbox-screen.tsx`'s `describeOp`
+switch was missing `job_details_upsert`, `task_toggle`,
+`media_pending_delta`, and `media_delete` — falling through to the raw
+internal type string, which is exactly what the screenshot showed
+("job_details_upsert" as the item's label instead of a readable name).
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean. New tests: `outbox.test.ts` (`isFormWriteLocked` for every
+locked/unlocked/unknown status), `field-actions.test.ts` (`submitJob`/
+`submitJobDetails` collapse a pre-existing stale draft op into the final
+one rather than leaving both queued, resetting its attempts and content
+to the submitted values). 377 passed, same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions.
+
+No migration, no deploy-order dependency — pure app-code fix.

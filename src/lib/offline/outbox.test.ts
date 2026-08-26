@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MediaQueueItem, OutboxOperation } from "./db";
-import { summarizeOutbox } from "./outbox";
+import { isFormWriteLocked, summarizeOutbox } from "./outbox";
 
 function op(overrides: Partial<OutboxOperation> = {}): OutboxOperation {
   return {
@@ -75,5 +75,26 @@ describe("summarizeOutbox", () => {
       totalMediaBytes: 0,
       lastAttemptAt: null,
     });
+  });
+});
+
+describe("isFormWriteLocked", () => {
+  it("is locked once a job has reached a status RLS blocks engineer writes at", () => {
+    expect(isFormWriteLocked("submitted")).toBe(true);
+    expect(isFormWriteLocked("under_review")).toBe(true);
+    expect(isFormWriteLocked("approved")).toBe(true);
+    expect(isFormWriteLocked("closed")).toBe(true);
+  });
+
+  it("is not locked for any status the engineer can still edit through", () => {
+    expect(isFormWriteLocked("draft")).toBe(false);
+    expect(isFormWriteLocked("scheduled")).toBe(false);
+    expect(isFormWriteLocked("in_progress")).toBe(false);
+    expect(isFormWriteLocked("on_hold")).toBe(false);
+    expect(isFormWriteLocked("on_site")).toBe(false);
+  });
+
+  it("is not locked when the job's status is unknown (not found locally)", () => {
+    expect(isFormWriteLocked(undefined)).toBe(false);
   });
 });

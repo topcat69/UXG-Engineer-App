@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { db, type InstallFormRow, type JobDetailsRow, type JobRow } from "./db";
-import { pauseJob, resumeJob, saveInstallFormDraft, saveJobDetailsDraft } from "./field-actions";
+import { pauseJob, resumeJob, saveInstallFormDraft, saveJobDetailsDraft, submitJob, submitJobDetails } from "./field-actions";
 
 function jobRow(overrides: Partial<JobRow> = {}): JobRow {
   return {
@@ -142,6 +142,71 @@ describe("saveJobDetailsDraft / saveInstallFormDraft", () => {
     expect(row?.player_serial).toBe("PLR-3");
     const op = await db.outbox.get("draft-install-job-1");
     expect(op).toMatchObject({ type: "install_form_upsert" });
+  });
+});
+
+describe("submitJob / submitJobDetails", () => {
+  beforeEach(async () => {
+    await db.jobs.clear();
+    await db.jobDetails.clear();
+    await db.installForms.clear();
+    await db.outbox.clear();
+  });
+  afterEach(async () => {
+    await db.jobs.clear();
+    await db.jobDetails.clear();
+    await db.installForms.clear();
+    await db.outbox.clear();
+  });
+
+  it("collapses a stale pre-submission draft op into the final job_details_upsert instead of leaving both queued", async () => {
+    await db.jobs.put(jobRow({ status: "in_progress" }));
+    // Simulates a stale draft op left behind from an earlier autosave tick
+    // that never made it to the server — exactly the shape that used to
+    // retry forever once the status_event below landed and RLS locked the
+    // job's job_details row against further engineer writes.
+    await db.outbox.put({
+      id: "draft-details-job-1",
+      type: "job_details_upsert",
+      row: jobDetailsRow({ reported_to_site_manager: false }),
+      createdAt: "2026-08-24T09:00:00Z",
+      attempts: 40,
+    });
+
+    await submitJobDetails(
+      "job-1",
+      "delivery",
+      jobDetailsRow({ reported_to_site_manager: true, issues_found: false }),
+      null,
+      "engineer-1",
+    );
+
+    const detailsOps = (await db.outbox.toArray()).filter((op) => op.type === "job_details_upsert");
+    expect(detailsOps).toHaveLength(1);
+    expect(detailsOps[0]!.id).toBe("draft-details-job-1");
+    expect(detailsOps[0]!.attempts).toBe(0);
+    if (detailsOps[0]!.type === "job_details_upsert") {
+      expect(detailsOps[0]!.row.reported_to_site_manager).toBe(true);
+      expect(detailsOps[0]!.row.submitted_at).not.toBeNull();
+    }
+  });
+
+  it("does the same for the legacy install_forms submit path", async () => {
+    await db.jobs.put(jobRow({ status: "in_progress" }));
+    await db.outbox.put({
+      id: "draft-install-job-1",
+      type: "install_form_upsert",
+      row: installFormRow(),
+      createdAt: "2026-08-24T09:00:00Z",
+      attempts: 12,
+    });
+
+    await submitJob("job-1", installFormRow({ client_name: "Jane Doe" }), null, "engineer-1");
+
+    const installOps = (await db.outbox.toArray()).filter((op) => op.type === "install_form_upsert");
+    expect(installOps).toHaveLength(1);
+    expect(installOps[0]!.id).toBe("draft-install-job-1");
+    expect(installOps[0]!.attempts).toBe(0);
   });
 });
 
