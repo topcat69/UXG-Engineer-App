@@ -46,6 +46,7 @@ describe("buildScheduledEmail", () => {
     scheduledEnd: "2026-08-21T11:00:00.000Z",
     engineerName: "Jamie Vance",
     jobType: "Install",
+    status: "scheduled",
     description: "Replace faulty LED panel",
     jobInformation: "Access via loading bay",
     slaRequirementDetail: "4 hour response",
@@ -59,6 +60,11 @@ describe("buildScheduledEmail", () => {
   it("subject starts with 'New Job Scheduled' then the job number", () => {
     const email = buildScheduledEmail(base, []);
     expect(email.subject).toBe("New Job Scheduled — UXG-2026-0042");
+  });
+
+  it("prefixes the subject with 'PROVISIONAL —' when the job is provisional", () => {
+    const email = buildScheduledEmail({ ...base, status: "provisional" }, []);
+    expect(email.subject).toBe("PROVISIONAL — New Job Scheduled — UXG-2026-0042");
   });
 
   it("includes the full job detail set in the body", () => {

@@ -48,6 +48,8 @@ export type ScheduledEmailInput = {
   scheduledEnd: string | null;
   engineerName: string;
   jobType: string;
+  /** Prefixes the subject with "PROVISIONAL —" when the job hasn't been confirmed yet — see status-colors.ts/event-payload.ts for the same signal elsewhere (scheduler colour, calendar title). */
+  status: string;
   description: string | null;
   jobInformation: string | null;
   slaRequirementDetail: string | null;
@@ -100,7 +102,11 @@ export function buildScheduledEmail(input: ScheduledEmailInput, attachedFilename
   ].filter((line): line is string => !!line);
 
   const { html, text } = wrap(paragraphs);
-  return { subject: `New Job Scheduled — ${input.jobNumber}`, html, text };
+  const subject =
+    input.status === "provisional"
+      ? `PROVISIONAL — New Job Scheduled — ${input.jobNumber}`
+      : `New Job Scheduled — ${input.jobNumber}`;
+  return { subject, html, text };
 }
 
 export type DayBeforeEmailInput = {

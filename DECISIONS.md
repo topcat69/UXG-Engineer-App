@@ -4776,3 +4776,28 @@ from their fixtures; templates.test.ts also gained an explicit "no
 longer mentions priority" assertion). 362 passed, same 2 pre-existing
 Supabase-dependent failures as every addendum in this sandbox, no
 regressions.
+
+## 2026-08-26 — PROVISIONAL prefix on the scheduled email's subject too
+
+Follow-up to the "provisional" status addendum above: the calendar event
+title already got a `PROVISIONAL —` prefix, but the "New Job Scheduled"
+email's subject didn't — "For the email that gets sent out for a
+provisional job, can you add PROVISIONAL at the beginning of the subject
+field."
+
+Added a `status: string` field to `ScheduledEmailInput`
+(`lib/email/templates.ts`) and `buildScheduledEmail` now prefixes the
+subject with `PROVISIONAL — ` when `input.status === "provisional"`,
+giving `PROVISIONAL — New Job Scheduled — {jobNumber}` — same prefix
+text/casing as the calendar title, so the two surfaces read consistently.
+`send-job-emails.ts`'s `sendJobScheduledEmail` select gained `status` and
+passes it through; no other call site needed touching since this is the
+only builder of `ScheduledEmailInput`. Left the email body untouched —
+only the subject was asked for, and the subject line is what actually
+shows in an inbox list before opening the email, unlike the body.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean. New test in `templates.test.ts`: subject is exactly
+`"PROVISIONAL — New Job Scheduled — UXG-2026-0042"` for a provisional
+job. 363 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.
