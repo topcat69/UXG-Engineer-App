@@ -24,6 +24,7 @@ import { distanceMeters } from "@/lib/geo/distance";
 import { humanize } from "@/lib/format/text";
 import {
   EMPTY_INSTALL_FORM,
+  EQUIPMENT_DAMAGE_STATUSES,
   MOUNT_TYPES,
   NETWORK_TYPES,
   PASS_FAIL,
@@ -156,6 +157,7 @@ export function JobWorkflow({
       content_displaying: (installValues.content_displaying || null) as InstallFormRow["content_displaying"],
       issues_found: installValues.issues_found,
       issue_detail: installValues.issue_detail || null,
+      equipment_damage: (installValues.equipment_damage || null) as InstallFormRow["equipment_damage"],
       engineer_notes: installValues.engineer_notes || null,
       client_name: installValues.client_name || null,
       submitted_at: formRow?.submitted_at ?? null,
@@ -188,6 +190,7 @@ export function JobWorkflow({
       revisit_required: detailsValues.revisit_required === "" ? null : detailsValues.revisit_required === "yes",
       issues_found: detailsValues.issues_found,
       issue_detail: detailsValues.issue_detail || null,
+      equipment_damage: (detailsValues.equipment_damage || null) as JobDetailsRow["equipment_damage"],
       engineer_notes: detailsValues.engineer_notes || null,
       submitted_at: detailsRow?.submitted_at ?? null,
       created_at: detailsRow?.created_at ?? new Date().toISOString(),
@@ -601,6 +604,15 @@ function InstallFormSection({
         />
       </Field>
 
+      <Field label="Equipment damage">
+        <Select
+          value={values.equipment_damage}
+          options={EQUIPMENT_DAMAGE_STATUSES}
+          onChange={(v) => setValues((prev) => ({ ...prev, equipment_damage: v }))}
+          labelFor={humanize}
+        />
+      </Field>
+
       {showIssueDetailInstall(values) && (
         <Field label="Issue detail">
           <Textarea value={values.issue_detail} onChange={(e) => setValues((v) => ({ ...v, issue_detail: e.target.value }))} />
@@ -817,6 +829,14 @@ function JobDetailsSection({
             <YesNoButtons
               value={values.issues_found}
               onChange={(v) => setValues((prev) => ({ ...prev, issues_found: v, issue_detail: v ? prev.issue_detail : "" }))}
+            />
+          </Field>
+          <Field label="Equipment damage">
+            <Select
+              value={values.equipment_damage}
+              options={EQUIPMENT_DAMAGE_STATUSES}
+              onChange={(v) => setValues((prev) => ({ ...prev, equipment_damage: v }))}
+              labelFor={humanize}
             />
           </Field>
           {showIssueDetailJobDetails(values) && (

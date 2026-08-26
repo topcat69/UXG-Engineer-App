@@ -4801,3 +4801,69 @@ clean. New test in `templates.test.ts`: subject is exactly
 `"PROVISIONAL — New Job Scheduled — UXG-2026-0042"` for a provisional
 job. 363 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
+
+## 2026-08-26 — Equipment damage field, next to Issues found
+
+"Within the jobs, I would like to record if there is any damage to
+equipment recorded. If this could have a drop down for N/A, Yes,
+Accidental, Customer. This should be next to the issue item in all jobs
+that you can report issues on." Distinct from `issues.severity` — this
+is a standalone classification of *equipment* damage, always visible
+next to "Issues found?" rather than nested inside it (an engineer picks
+N/A/Yes/Accidental/Customer regardless of whether they also logged a
+separate issue).
+
+Schema: new `equipment_damage_status` enum ('na', 'yes', 'accidental',
+'customer'), same fixed-vocabulary-column pattern as the existing
+`pass_fail` enum used for the boot-test/content-displaying fields.
+Added an `equipment_damage` column to **both** places an engineer can
+report issues at all — `install_forms` (the legacy path, still used for
+the `survey` job type) and `job_details` (install/sla/maintenance/
+delivery) — since "all jobs that you can report issues on" spans both
+of this app's two parallel form systems, not just the newer one.
+
+Stored lowercase ("na"/"yes"/"accidental"/"customer") and displayed via
+the existing `humanize()` helper, which already special-cases `"na" ->
+"N/A"` for exactly this reason (it was built for `pass_fail`'s "na"
+value) — no new formatting code needed anywhere the value is shown.
+
+Wired into the same places every other job_details/install_forms field
+already goes: `lib/forms/install-form.ts` and `lib/forms/job-form.ts`
+(`EQUIPMENT_DAMAGE_STATUSES` option list, form values/defaults,
+row-mapping, required-by-default validation — unconditionally for
+install_forms since its issues section is always shown, gated on
+`showsIssuesSection(jobType)` for job_details as `RequirableFieldKey`
+`"equipment_damage"` so a manager can still mark it optional per job via
+the existing Required Fields panel, same override mechanism as every
+other field there); `job-workflow.tsx` (a `Select` next to "Issues
+found?" in both `InstallFormSection` and `JobDetailsSection`, and the
+row builders that autosave/submit each form); the office job detail page
+(a `FormField` next to the existing Issues found/Issue detail rows); and
+the completion PDF's Form Details section (added to both job-type
+branches and to `formatFieldValue`'s humanize-label list, alongside
+"Player boot test"/"Content displaying").
+
+Deliberately did **not** wire this into `detectAutoIssues` — selecting
+Accidental/Customer doesn't auto-raise an issue or notify Monday.com;
+the ask was to record it, not to trigger anything from it. Also left
+`lib/migration/parse-jobs.ts`'s historical AppSheet CSV import parsers
+untouched, same reasoning as every other new-field addendum: one-time
+historical-parity scripts aren't a home for a status that didn't exist
+when that data was captured. Dexie/sync-down needed no changes — both
+tables are synced with a plain `select("*")`, so the new nullable
+column flows through automatically without a Dexie schema version bump.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean. Updated fixtures in `install-form.test.ts`, `job-form.test.ts`,
+and `field-actions.test.ts` (the latter's `jobDetailsRow`/
+`installFormRow` helpers, which construct full `Row`-typed literals) for
+the new required field, plus new tests: equipment damage is required in
+both `validateInstallForm` and `validateJobDetails` (including for
+delivery, which has no AV fields at all), and `requirableFieldsFor`
+lists it alongside `issue_detail` for every `showsIssuesSection` type.
+365 passed, same 2 pre-existing Supabase-dependent failures as every
+addendum in this sandbox, no regressions.
+
+**Deploy note**: schema migration —
+`supabase/migrations/20260128000000_equipment_damage.sql` needs
+`supabase db push` before the next `docker compose … up -d --build app`.

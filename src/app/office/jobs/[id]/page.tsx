@@ -240,6 +240,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <FormField label="Player boot test" value={humanize(installForm.player_boot_test ?? "")} />
               <FormField label="Content displaying" value={humanize(installForm.content_displaying ?? "")} />
               <FormField label="Issues found" value={installForm.issues_found ? "Yes" : "No"} />
+              <FormField label="Equipment damage" value={installForm.equipment_damage ? humanize(installForm.equipment_damage) : null} />
               <FormField label="Client name" value={installForm.client_name} />
             </dl>
           )}
@@ -277,6 +278,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               )}
               <FormField label="Issues found" value={jobDetails.issues_found ? "Yes" : "No"} />
               {jobDetails.issues_found && <FormField label="Issue detail" value={jobDetails.issue_detail} />}
+              <FormField label="Equipment damage" value={jobDetails.equipment_damage ? humanize(jobDetails.equipment_damage) : null} />
               <FormField label="Engineer notes" value={jobDetails.engineer_notes} />
             </dl>
           )}

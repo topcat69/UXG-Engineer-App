@@ -126,6 +126,7 @@ export type Database = {
           content_displaying: Database["public"]["Enums"]["pass_fail"] | null
           created_at: string | null
           engineer_notes: string | null
+          equipment_damage: Database["public"]["Enums"]["equipment_damage_status"] | null
           id: string
           issue_detail: string | null
           issues_found: boolean | null
@@ -145,6 +146,7 @@ export type Database = {
           content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
           created_at?: string | null
           engineer_notes?: string | null
+          equipment_damage?: Database["public"]["Enums"]["equipment_damage_status"] | null
           id?: string
           issue_detail?: string | null
           issues_found?: boolean | null
@@ -164,6 +166,7 @@ export type Database = {
           content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
           created_at?: string | null
           engineer_notes?: string | null
+          equipment_damage?: Database["public"]["Enums"]["equipment_damage_status"] | null
           id?: string
           issue_detail?: string | null
           issues_found?: boolean | null
@@ -267,6 +270,7 @@ export type Database = {
           content_displaying: Database["public"]["Enums"]["pass_fail"] | null
           created_at: string | null
           engineer_notes: string | null
+          equipment_damage: Database["public"]["Enums"]["equipment_damage_status"] | null
           id: string
           issue_detail: string | null
           issues_found: boolean | null
@@ -295,6 +299,7 @@ export type Database = {
           content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
           created_at?: string | null
           engineer_notes?: string | null
+          equipment_damage?: Database["public"]["Enums"]["equipment_damage_status"] | null
           id?: string
           issue_detail?: string | null
           issues_found?: boolean | null
@@ -323,6 +328,7 @@ export type Database = {
           content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
           created_at?: string | null
           engineer_notes?: string | null
+          equipment_damage?: Database["public"]["Enums"]["equipment_damage_status"] | null
           id?: string
           issue_detail?: string | null
           issues_found?: boolean | null
@@ -1065,6 +1071,7 @@ export type Database = {
       }
     }
     Enums: {
+      equipment_damage_status: "na" | "yes" | "accidental" | "customer"
       job_status:
         | "draft"
         | "provisional"
@@ -1213,6 +1220,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      equipment_damage_status: ["na", "yes", "accidental", "customer"],
       job_status: [
         "draft",
         "provisional",

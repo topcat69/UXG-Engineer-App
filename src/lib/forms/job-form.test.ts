@@ -28,6 +28,7 @@ const completeAvValues: JobDetailsValues = {
   player_boot_test: "pass",
   content_displaying: "pass",
   reported_to_site_manager: true,
+  equipment_damage: "na",
 };
 
 describe("usesJobDetails", () => {
@@ -109,8 +110,18 @@ describe("validateJobDetails", () => {
   });
 
   it("does not require AV fields or revisit for delivery", () => {
-    const values = { ...EMPTY_JOB_DETAILS, reported_to_site_manager: true };
+    const values = { ...EMPTY_JOB_DETAILS, reported_to_site_manager: true, equipment_damage: "na" };
     expect(validateJobDetails("delivery", values, deliverySlots, true)).toEqual([]);
+  });
+
+  it("requires equipment_damage to be answered wherever the issues section shows", () => {
+    const values = { ...completeAvValues, revisit_required: "no", equipment_damage: "" };
+    expect(validateJobDetails("install", values, avSlots, true)).toContain("Equipment damage is required.");
+
+    const deliveryValues = { ...EMPTY_JOB_DETAILS, reported_to_site_manager: true };
+    expect(validateJobDetails("delivery", deliveryValues, deliverySlots, true)).toContain(
+      "Equipment damage is required.",
+    );
   });
 
   it("requires revisit_required to be answered for install/sla but not maintenance/delivery", () => {
@@ -152,16 +163,22 @@ describe("requirableFieldsFor", () => {
     expect(keys).toContain("network_port");
     expect(keys).toContain("reported_to_site_manager");
     expect(keys).toContain("issue_detail");
+    expect(keys).toContain("equipment_damage");
     expect(keys).toContain("revisit_required");
   });
 
-  it("drops AV fields and revisit for delivery, but keeps issue detail — reported-to-site-manager and issue detail remain", () => {
-    expect(requirableFieldsFor("delivery").map((f) => f.key)).toEqual(["reported_to_site_manager", "issue_detail"]);
+  it("drops AV fields and revisit for delivery, but keeps issue detail and equipment damage — reported-to-site-manager, issue detail, and equipment damage remain", () => {
+    expect(requirableFieldsFor("delivery").map((f) => f.key)).toEqual([
+      "reported_to_site_manager",
+      "issue_detail",
+      "equipment_damage",
+    ]);
   });
 
-  it("keeps issue detail but drops revisit for maintenance", () => {
+  it("keeps issue detail and equipment damage but drops revisit for maintenance", () => {
     const keys = requirableFieldsFor("maintenance").map((f) => f.key);
     expect(keys).toContain("issue_detail");
+    expect(keys).toContain("equipment_damage");
     expect(keys).not.toContain("revisit_required");
   });
 });

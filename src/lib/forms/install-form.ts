@@ -18,6 +18,7 @@ export type InstallFormValues = {
   content_displaying: string;
   issues_found: boolean;
   issue_detail: string;
+  equipment_damage: string;
   engineer_notes: string;
   client_name: string;
 };
@@ -34,6 +35,7 @@ export const EMPTY_INSTALL_FORM: InstallFormValues = {
   content_displaying: "",
   issues_found: false,
   issue_detail: "",
+  equipment_damage: "",
   engineer_notes: "",
   client_name: "",
 };
@@ -43,6 +45,8 @@ export const POWER_SOURCES = ["Existing socket", "New spur", "Requires electrici
 export const NETWORK_TYPES = ["WiFi", "Ethernet", "N/A"];
 export const WIFI_SIGNALS = ["Excellent", "Good", "Weak", "None", "N/A"];
 export const PASS_FAIL: readonly string[] = ["pass", "fail", "na"];
+/** Stored lowercase, displayed via humanize() — same convention as PASS_FAIL ("na" -> "N/A"). */
+export const EQUIPMENT_DAMAGE_STATUSES: readonly string[] = ["na", "yes", "accidental", "customer"];
 
 export const PHOTO_SLOTS = [
   "photo_before",
@@ -70,6 +74,7 @@ export function installFormRowToValues(row: InstallFormRow | undefined): Install
     content_displaying: row.content_displaying ?? "",
     issues_found: row.issues_found ?? false,
     issue_detail: row.issue_detail ?? "",
+    equipment_damage: row.equipment_damage ?? "",
     engineer_notes: row.engineer_notes ?? "",
     client_name: row.client_name ?? "",
   };
@@ -130,6 +135,7 @@ export function validateInstallForm(
   if (!values.player_boot_test) errors.push("Player boot test result is required.");
   if (!values.content_displaying) errors.push("Content displaying result is required.");
   if (showIssueDetail(values) && !values.issue_detail.trim()) errors.push("Issue detail is required.");
+  if (!values.equipment_damage) errors.push("Equipment damage is required.");
   if (!values.client_name.trim()) errors.push("Client name is required.");
 
   for (const slot of PHOTO_SLOTS) {

@@ -56,7 +56,7 @@ function sha256Hex(buffer: Buffer): string {
 function formatFieldValue(label: string, value: string | boolean | null): string | null {
   if (value === null || value === "") return null;
   if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (label === "Player boot test" || label === "Content displaying") return humanize(value);
+  if (label === "Player boot test" || label === "Content displaying" || label === "Equipment damage") return humanize(value);
   return value;
 }
 
@@ -218,6 +218,7 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
         ["Content displaying", installForm.content_displaying],
         ["Issues found", installForm.issues_found],
         ["Issue detail", installForm.issue_detail],
+        ["Equipment damage", installForm.equipment_damage],
         ["Client name", installForm.client_name],
         ["Engineer notes", installForm.engineer_notes],
       ]
@@ -241,6 +242,7 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
           ["Revisit required", jobDetails.revisit_required],
           ["Issues found", jobDetails.issues_found],
           ["Issue detail", jobDetails.issue_detail],
+          ["Equipment damage", jobDetails.equipment_damage],
           ["Engineer notes", jobDetails.engineer_notes],
         ]
       : [];

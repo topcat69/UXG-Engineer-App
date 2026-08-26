@@ -22,6 +22,7 @@ const completeValues: InstallFormValues = {
   content_displaying: "pass",
   issues_found: false,
   issue_detail: "",
+  equipment_damage: "na",
   engineer_notes: "",
   client_name: "Jane Doe",
 };
@@ -78,6 +79,11 @@ describe("validateInstallForm", () => {
 
     const withIssueDescribed = { ...withIssue, issue_detail: "Cable trunking missing" };
     expect(validateInstallForm(withIssueDescribed, allSlots, true)).toEqual([]);
+  });
+
+  it("requires equipment_damage to be answered", () => {
+    const withoutDamage = { ...completeValues, equipment_damage: "" };
+    expect(validateInstallForm(withoutDamage, allSlots, true)).toContain("Equipment damage is required.");
   });
 
   it("lists every missing required photo by name", () => {

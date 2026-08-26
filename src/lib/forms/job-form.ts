@@ -43,6 +43,7 @@ export type JobDetailsValues = {
   revisit_required: string; // "" | "yes" | "no" — tri-state so an unanswered question is distinguishable from "no"
   issues_found: boolean;
   issue_detail: string;
+  equipment_damage: string;
   engineer_notes: string;
 };
 
@@ -64,6 +65,7 @@ export const EMPTY_JOB_DETAILS: JobDetailsValues = {
   revisit_required: "",
   issues_found: false,
   issue_detail: "",
+  equipment_damage: "",
   engineer_notes: "",
 };
 
@@ -123,6 +125,7 @@ export type RequirableFieldKey =
   | "content_displaying"
   | "reported_to_site_manager"
   | "issue_detail"
+  | "equipment_damage"
   | "revisit_required";
 
 export type RequirableField = { key: RequirableFieldKey; label: string };
@@ -144,7 +147,10 @@ export function requirableFieldsFor(jobType: JobDetailsType): RequirableField[] 
     );
   }
   fields.push({ key: "reported_to_site_manager", label: "Reported to site manager" });
-  if (showsIssuesSection(jobType)) fields.push({ key: "issue_detail", label: "Issue detail" });
+  if (showsIssuesSection(jobType)) {
+    fields.push({ key: "issue_detail", label: "Issue detail" });
+    fields.push({ key: "equipment_damage", label: "Equipment damage" });
+  }
   if (showsRevisitRequired(jobType)) fields.push({ key: "revisit_required", label: "Revisit required" });
   return fields;
 }
@@ -182,6 +188,7 @@ export function jobDetailsRowToValues(row: JobDetailsRow | undefined): JobDetail
     revisit_required: row.revisit_required === null ? "" : row.revisit_required ? "yes" : "no",
     issues_found: row.issues_found ?? false,
     issue_detail: row.issue_detail ?? "",
+    equipment_damage: row.equipment_damage ?? "",
     engineer_notes: row.engineer_notes ?? "",
   };
 }
@@ -251,6 +258,9 @@ export function validateJobDetails(
   }
   if (requires("issue_detail") && showIssueDetail(values) && !values.issue_detail.trim()) {
     errors.push("Issue detail is required.");
+  }
+  if (requires("equipment_damage") && showsIssuesSection(jobType) && !values.equipment_damage) {
+    errors.push("Equipment damage is required.");
   }
   if (requires("revisit_required") && showsRevisitRequired(jobType) && !values.revisit_required) {
     errors.push("Revisit required must be answered.");
