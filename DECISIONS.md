@@ -5003,3 +5003,48 @@ Supabase-dependent failures as every addendum in this sandbox, no
 regressions.
 
 No migration, no deploy-order dependency — pure app-code fix.
+
+## 2026-08-26 — Fixed: dashboard "Open issues by age" counted closed jobs' issues
+
+"On the main app, under issues, closed jobs shouldn't be listed as
+they have been closed unless there is a reason why they're listed?" —
+first checked the standalone Issues page (`office/issues/page.tsx`),
+which already filters closed jobs out by design (its own comment
+explains why: nothing in this app ever moves an `issues.status` column
+away from `"open"`, so job-status is the only real signal). That page
+was correct. The user then pointed at the *dashboard's* "Open issues by
+age" chart instead — a 27-count for a handful of jobs, several of them
+already Closed per the Jobs list screenshot.
+
+That chart's `computeOpenIssuesByAge` (`lib/dashboard/metrics.ts`) never
+got the same fix — it only checked `issue.status !== "open"`, which
+(per the reasoning above) is true for every issue this app has ever
+raised, closed job or not. So it counted every issue from every job
+ever, including long-closed ones, while the Issues page right next to
+it correctly showed only genuinely-open ones. Two features answering
+"how many open issues are there" that disagreed with each other.
+
+Fixed by giving `computeOpenIssuesByAge` the same signal the Issues page
+already uses: `DashboardIssue` gained a `job: { status: string } | null`
+field, both places that fetch dashboard issues
+(`office/dashboard/page.tsx`'s initial load and
+`dashboard-client.tsx`'s Realtime `refetch`) now join
+`job:jobs!issues_job_id_fkey(status)` into the select, and the function
+skips an issue when `issue.job?.status === "closed"`. Also updated
+`computeOpenIssuesByAgeIds` (`dashboard-client.tsx`, the bar-click
+drill-through) with the identical check — it has to match the chart
+exactly, or clicking a bucket would show a different set of jobs than
+the count that was just displayed. Left `computeRevisitRateByCause`
+untouched: it's about historical root causes, not "problems open right
+now," and doesn't share the "open" framing this fix is specifically
+about.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean. New tests in `metrics.test.ts`: an issue whose job has closed is
+excluded from the bucket count even though the issue's own `status` is
+still `"open"`; an issue whose job is `null` (not resolved locally)
+still counts, since only a confirmed `"closed"` excludes it. 379
+passed, same 2 pre-existing Supabase-dependent failures as every
+addendum in this sandbox, no regressions.
+
+No migration, no deploy-order dependency — pure app-code fix.

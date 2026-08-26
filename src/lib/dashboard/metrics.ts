@@ -24,6 +24,8 @@ export type DashboardIssue = {
   status: string | null;
   revisit_job_id: string | null;
   created_at: string | null;
+  /** Null only if the parent job itself was deleted out from under the issue. */
+  job: { status: string } | null;
 };
 
 export type Engineer = { id: string; name: string };
@@ -123,12 +125,22 @@ const AGE_BUCKETS = [
   { label: "30+ days", maxDays: Infinity },
 ];
 
+/**
+ * "Open" here means the same thing the standalone Issues page uses (see
+ * office/issues/page.tsx's own comment): nothing in this app ever moves an
+ * issue's own `status` column away from "open", so an issue whose job has
+ * since closed is filtered out by the job's status instead, not the
+ * issue's. Without this, a closed job's issues counted here forever —
+ * this chart's "open issues" and the Issues page's "open issues" list must
+ * agree on what "open" means.
+ */
 export function computeOpenIssuesByAge(issues: DashboardIssue[], nowIso: string): IssueAgeBucket[] {
   const now = new Date(nowIso).getTime();
   const buckets = AGE_BUCKETS.map((b) => ({ label: b.label, count: 0 }));
 
   for (const issue of issues) {
     if (issue.status !== "open" || !issue.created_at) continue;
+    if (issue.job?.status === "closed") continue;
     const ageDays = (now - new Date(issue.created_at).getTime()) / (1000 * 60 * 60 * 24);
     const bucketIndex = AGE_BUCKETS.findIndex((b) => ageDays <= b.maxDays);
     buckets[bucketIndex === -1 ? buckets.length - 1 : bucketIndex].count++;

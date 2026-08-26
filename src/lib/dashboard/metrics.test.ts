@@ -30,6 +30,7 @@ function issue(overrides: Partial<DashboardIssue>): DashboardIssue {
     status: "open",
     revisit_job_id: null,
     created_at: new Date().toISOString(),
+    job: { status: "in_progress" },
     ...overrides,
   };
 }
@@ -192,6 +193,34 @@ describe("computeOpenIssuesByAge", () => {
     const issues = [issue({ status: "open", created_at: "2026-01-01T00:00:00.000Z" })];
     const buckets = computeOpenIssuesByAge(issues, now);
     expect(buckets.find((b) => b.label === "30+ days")?.count).toBe(1);
+  });
+
+  it("excludes an issue whose job has since closed, even though the issue's own status is still 'open'", () => {
+    // Nothing in this app ever moves an issue's own status column away from
+    // "open" (see the function's own doc comment), so this is the only
+    // signal that actually distinguishes a still-open problem from one
+    // whose job was closed out — the exact case that was undercounting
+    // "closed" and overcounting "open issues" on the real dashboard.
+    const issues = [
+      issue({ status: "open", created_at: "2026-08-08T00:00:00.000Z", job: { status: "closed" } }),
+      issue({ status: "open", created_at: "2026-08-08T00:00:00.000Z", job: { status: "in_progress" } }),
+    ];
+    expect(computeOpenIssuesByAge(issues, now)).toEqual([
+      { label: "0–7 days", count: 1 },
+      { label: "8–14 days", count: 0 },
+      { label: "15–30 days", count: 0 },
+      { label: "30+ days", count: 0 },
+    ]);
+  });
+
+  it("still counts an issue whose job is missing locally (job: null) — only a confirmed 'closed' excludes it", () => {
+    const issues = [issue({ status: "open", created_at: "2026-08-08T00:00:00.000Z", job: null })];
+    expect(computeOpenIssuesByAge(issues, now)).toEqual([
+      { label: "0–7 days", count: 1 },
+      { label: "8–14 days", count: 0 },
+      { label: "15–30 days", count: 0 },
+      { label: "30+ days", count: 0 },
+    ]);
   });
 });
 

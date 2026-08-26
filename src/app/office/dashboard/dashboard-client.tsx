@@ -51,7 +51,7 @@ export function DashboardClient({
         .from("jobs")
         .select("id, status, parent_job_id, scheduled_start, actual_start, actual_end, assigned_to, status_events(to_status, occurred_at)")
         .neq("status", "draft"),
-      supabase.from("issues").select("job_id, category, status, revisit_job_id, created_at"),
+      supabase.from("issues").select("job_id, category, status, revisit_job_id, created_at, job:jobs!issues_job_id_fkey(status)"),
       supabase
         .from("jobs")
         .select(
@@ -270,6 +270,7 @@ function computeOpenIssuesByAgeIds(issues: DashboardIssue[], nowIso: string, lab
   return issues
     .filter((i) => {
       if (i.status !== "open" || !i.created_at) return false;
+      if (i.job?.status === "closed") return false;
       const ageDays = (now - new Date(i.created_at).getTime()) / (1000 * 60 * 60 * 24);
       return ageDays > minDays && ageDays <= maxDays;
     })
