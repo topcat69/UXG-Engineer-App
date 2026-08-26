@@ -23,7 +23,6 @@ export type CalendarJob = Pick<
   | "calendar_event_id"
   | "description"
   | "job_type"
-  | "priority"
   | "status"
 > & {
   assignedName: string | null;
@@ -110,7 +109,6 @@ export function buildEventPayload(job: CalendarJob, site: CalendarSite, deepLink
     `Site: ${site.name}`,
     `Assigned to: ${job.assignedName ?? "Unassigned"}`,
     `Job type: ${JOB_TYPE_LABELS[job.job_type as keyof typeof JOB_TYPE_LABELS] ?? humanize(job.job_type)}`,
-    job.priority ? `Priority: ${job.priority}` : null,
     job.description ? `Job description: ${job.description}` : null,
     job.jobInformation ? `Job information: ${job.jobInformation}` : null,
     job.slaRequirementDetail ? `SLA requirement: ${job.slaRequirementDetail}` : null,

@@ -46,7 +46,6 @@ describe("buildScheduledEmail", () => {
     scheduledEnd: "2026-08-21T11:00:00.000Z",
     engineerName: "Jamie Vance",
     jobType: "Install",
-    priority: "High",
     description: "Replace faulty LED panel",
     jobInformation: "Access via loading bay",
     slaRequirementDetail: "4 hour response",
@@ -68,7 +67,6 @@ describe("buildScheduledEmail", () => {
     expect(email.text).toContain("Riverside Retail Park");
     expect(email.text).toContain("12 Riverside Way, Leeds, LS1 4AB");
     expect(email.text).toContain("Install");
-    expect(email.text).toContain("High");
     expect(email.text).toContain("Replace faulty LED panel");
     expect(email.text).toContain("Access via loading bay");
     expect(email.text).toContain("4 hour response");
@@ -91,6 +89,11 @@ describe("buildScheduledEmail", () => {
   it("says nothing about attachments when there are none", () => {
     const email = buildScheduledEmail(base, []);
     expect(email.text).not.toContain("Attached:");
+  });
+
+  it("no longer mentions priority in the body — dropped as not relevant", () => {
+    const email = buildScheduledEmail(base, []);
+    expect(email.text).not.toContain("Priority:");
   });
 
   it("shows a single time-of-day range for a same-day job, a full date range for a multi-day one", () => {

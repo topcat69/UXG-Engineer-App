@@ -48,7 +48,6 @@ export type ScheduledEmailInput = {
   scheduledEnd: string | null;
   engineerName: string;
   jobType: string;
-  priority: string | null;
   description: string | null;
   jobInformation: string | null;
   slaRequirementDetail: string | null;
@@ -88,7 +87,6 @@ export function buildScheduledEmail(input: ScheduledEmailInput, attachedFilename
     input.clientName ? `Client: ${input.clientName}` : null,
     `Site: ${input.siteName} — ${input.siteAddress}`,
     `Job type: ${input.jobType}`,
-    input.priority ? `Priority: ${input.priority}` : null,
     input.description ? `Job description: ${input.description}` : null,
     input.jobInformation ? `Job information: ${input.jobInformation}` : null,
     input.slaRequirementDetail ? `SLA requirement: ${input.slaRequirementDetail}` : null,

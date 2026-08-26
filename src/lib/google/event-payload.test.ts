@@ -22,7 +22,6 @@ const job = {
   calendar_event_id: null,
   description: "Replace faulty player and re-test content playback.",
   job_type: "install",
-  priority: "P2",
   status: "scheduled" as const,
   assignedName: "Sam Carter",
   jobInformation: "Site manager expects us before 9am, park round the back.",
@@ -64,12 +63,12 @@ describe("buildEventPayload", () => {
     expect(payload.location).toBe("12 River Road, Leeds, LS1 4AB");
   });
 
-  it("includes site, assignee, job type/priority, description, job information, SLA, equipment, access notes, site contact, and a deep link", () => {
+  it("includes site, assignee, job type, description, job information, SLA, equipment, access notes, site contact, and a deep link", () => {
     const payload = buildEventPayload(job, site, "https://uxgengineering.example.com");
     expect(payload.description).toContain("Site: Riverside Retail Park");
     expect(payload.description).toContain("Assigned to: Sam Carter");
     expect(payload.description).toContain("Job type: Installation");
-    expect(payload.description).toContain("Priority: P2");
+    expect(payload.description).not.toContain("Priority:");
     expect(payload.description).toContain("Job description: Replace faulty player and re-test content playback.");
     expect(payload.description).toContain("Job information: Site manager expects us before 9am, park round the back.");
     expect(payload.description).toContain("SLA requirement: 4-hour response");
@@ -113,7 +112,7 @@ describe("buildEventPayload", () => {
       "https://x",
     );
     expect(payload.description).toBe(
-      "Site: Riverside Retail Park\nAssigned to: Unassigned\nJob type: Installation\nPriority: P2\nhttps://x/office/jobs/job-1",
+      "Site: Riverside Retail Park\nAssigned to: Unassigned\nJob type: Installation\nhttps://x/office/jobs/job-1",
     );
   });
 

@@ -4740,3 +4740,39 @@ as every addendum in this sandbox, no regressions.
 `supabase/migrations/20260127000000_provisional_status.sql` needs
 `supabase db push` before the next `docker compose … up -d --build app`,
 same order as every other migration-bearing addendum.
+
+## 2026-08-26 — Drop "Priority" from the scheduled email and calendar event
+
+"Can we drop this in calendar and email event as currently it's not
+relevant." `jobs.priority` has no picker anywhere in the New Job creation
+flow — it only ever gets set via the DB column default (`text default
+'P3'`), so every job's calendar event and "New Job Scheduled" email was
+showing an identical, meaningless "Priority: P3" line. Rather than fix
+the underlying gap (no priority-setting UI), the office asked to just
+stop surfacing it on these two specific surfaces, since it isn't
+currently a real signal there.
+
+Removed the `Priority: …` line from both builders — `buildEventPayload`
+(`lib/google/event-payload.ts`) and `buildScheduledEmail`
+(`lib/email/templates.ts`) — and dropped the now-unused `priority` field
+from their input types (`CalendarJob`'s `Pick<JobRow, …>`,
+`ScheduledEmailInput`) rather than keeping a field neither builder reads.
+Followed it through to both call sites that assembled those inputs:
+`sync-job-calendar.ts`'s Supabase select + `calendarJob` object, and
+`send-job-emails.ts`'s select + the object passed to `buildScheduledEmail`.
+
+Deliberately scoped to just these two places, per what was actually
+asked — `priority` still exists everywhere else it already showed up
+(job list table/filter, job detail page, Edit Job panel, CSV export):
+none of that changed, since none of it was named as "not relevant" here
+and priority genuinely is a real column on the job even if nothing sets
+it to anything but P3 yet.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean. Updated `event-payload.test.ts` (description no longer contains
+"Priority:", including the exact-string "omits missing optional lines"
+test), `sync-logic.test.ts` and `templates.test.ts` (dropped `priority`
+from their fixtures; templates.test.ts also gained an explicit "no
+longer mentions priority" assertion). 362 passed, same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions.
