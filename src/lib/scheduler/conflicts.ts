@@ -1,3 +1,5 @@
+import { formatDurationMinutes } from "@/lib/format/duration";
+
 export type ScheduledJob = {
   id: string;
   scheduledStart: string;
@@ -5,6 +7,11 @@ export type ScheduledJob = {
 };
 
 const DEFAULT_DURATION_MS = 2 * 60 * 60 * 1000;
+// A standard working day, per the office — same non-negotiable rule as
+// max_jobs_per_day below: this only ever produces a warning, never blocks
+// a schedule, since an engineer legitimately working overtime is a real
+// scenario the office still needs to be able to book.
+const WORKDAY_MINUTES = 8 * 60;
 
 function toRange(job: ScheduledJob): [number, number] {
   const start = new Date(job.scheduledStart).getTime();
@@ -40,6 +47,18 @@ export function detectConflicts(
   const totalThatDay = othersOnSameDayForEngineer.length + 1;
   if (totalThatDay > maxJobsPerDay) {
     warnings.push(`${totalThatDay} jobs that day exceeds the daily max of ${maxJobsPerDay}.`);
+  }
+
+  // Summed job durations, not the union of their time ranges — an overlap
+  // already gets its own warning above, so double-counting an overlapping
+  // hour here just means both warnings surface together, which is still
+  // an accurate picture of "this day has a lot on it."
+  const totalMinutes = [movingJob, ...othersOnSameDayForEngineer].reduce((sum, job) => {
+    const [jobStart, jobEnd] = toRange(job);
+    return sum + (jobEnd - jobStart) / 60_000;
+  }, 0);
+  if (totalMinutes >= WORKDAY_MINUTES) {
+    warnings.push(`${formatDurationMinutes(totalMinutes)} scheduled that day exceeds the 8h working day.`);
   }
 
   return warnings;

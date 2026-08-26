@@ -49,4 +49,24 @@ describe("detectConflicts", () => {
     );
     expect(warnings.some((w) => w.includes("Overlaps"))).toBe(true);
   });
+
+  it("flags when the day's total scheduled duration reaches 8 hours, even with no overlap and under the job-count max", () => {
+    const others = [
+      job("a", "2026-08-05T06:00:00Z", "2026-08-05T10:00:00Z"), // 4h
+    ];
+    const warnings = detectConflicts(job("moving", "2026-08-05T11:00:00Z", "2026-08-05T15:00:00Z"), others, 10); // +4h = 8h
+    expect(warnings.some((w) => w.includes("8h working day"))).toBe(true);
+  });
+
+  it("does not flag a day under 8 hours scheduled", () => {
+    const others = [job("a", "2026-08-05T06:00:00Z", "2026-08-05T09:00:00Z")]; // 3h
+    const warnings = detectConflicts(job("moving", "2026-08-05T10:00:00Z", "2026-08-05T13:00:00Z"), others, 10); // +3h = 6h
+    expect(warnings.some((w) => w.includes("working day"))).toBe(false);
+  });
+
+  it("never blocks — still returns the warning rather than an error or empty result — for a day well past 8 hours", () => {
+    const others = [job("a", "2026-08-05T06:00:00Z", "2026-08-05T12:00:00Z")]; // 6h
+    const warnings = detectConflicts(job("moving", "2026-08-05T13:00:00Z", "2026-08-05T18:00:00Z"), others, 10); // +5h = 11h
+    expect(warnings).toEqual(["11h scheduled that day exceeds the 8h working day."]);
+  });
 });

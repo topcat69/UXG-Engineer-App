@@ -4585,3 +4585,47 @@ own comment — Caddy (443) becomes the only front door.
 Verified: nothing in this addendum changed application code (pure
 diagnosis, run entirely against the live production Supabase project by
 the user), so no check suite re-run applies.
+
+## 2026-08-26 — Scheduler: flag when a day's total scheduled hours hit 8+
+
+"The working day for engineers is 8 hours... wouldn't want to not be able
+to schedule work if they're at 8hrs or more, as they may be working
+overtime, but nice to show/flag." Extended the scheduler's existing
+conflict-warning system — the office had asked about this before, and it
+turned out `detectConflicts` (`lib/scheduler/conflicts.ts`) already warns
+on a time overlap or exceeding an engineer's `max_jobs_per_day`, but both
+are already non-blocking "warnings, never prevention" per the original
+Phase 2 spec — the same contract, just missing the one measure (hours,
+not job count) actually being asked for here.
+
+Added a third check to the same function, same non-blocking contract:
+sums every job's scheduled duration for that engineer's day (the job
+being moved plus everything else already there) and warns once the total
+reaches 8 hours — `"${formatDurationMinutes(totalMinutes)} scheduled
+that day exceeds the 8h working day."` Reuses `formatDurationMinutes`
+(`lib/format/duration.ts`, built for the pause/resume work) for
+consistent "Xh Ym" formatting rather than a second formatter. Deliberately
+sums durations rather than computing the union of time ranges — an
+overlap already gets its own separate warning, so double-counting an
+overlapping hour here just means both warnings surface together, which is
+still an accurate "this day has a lot on it" signal, not a wrong one.
+
+No new call-site changes needed: both places that already call
+`detectConflicts` (`assignAndScheduleJob` in `office/jobs/[id]/actions.ts`,
+`rescheduleJob` in `office/scheduler/actions.ts`) already pass every job's
+full `scheduledStart`/`scheduledEnd` for the day, so they picked up the
+new warning automatically — same reason the existing overlap/job-count
+warnings needed no call-site changes when they were first built. The
+8-hour threshold is a fixed constant (`WORKDAY_MINUTES`), not per-engineer
+configurable like `max_jobs_per_day` already is — the office described
+this as a company-wide working day, not something that varies by person.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean — 356 passed (3 new: a day reaching exactly 8h across two jobs
+with no overlap and under the job-count max still warns, a day under 8h
+doesn't, and a day well past 8h returns exactly the expected warning
+text rather than blocking/erroring), same 2 pre-existing
+Supabase-dependent failures as every addendum in this sandbox, no
+regressions. Confirmed none of the five pre-existing `detectConflicts`
+tests' fixtures cross the new 8h threshold, so all five still pass
+unchanged against the new behaviour.
