@@ -2,16 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { localInputValueToIso, toLocalInputValue } from "@/lib/format/datetime-local";
 import { assignAndScheduleJob } from "./actions";
 
 type Engineer = { id: string; name: string };
-
-function toLocalInputValue(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 /**
  * Deliberately positioned as the last thing on the job detail page, below
@@ -51,7 +45,19 @@ export function AssignSchedulePanel({
 
   function handleSave() {
     startTransition(async () => {
-      const result = await assignAndScheduleJob(jobId, engineerId || null, scheduledLocal, scheduledEndLocal, provisional);
+      // Converted to a real UTC instant here, client-side, where the
+      // browser's actual local timezone applies — sending the raw
+      // datetime-local string across the Server Action boundary and
+      // parsing it server-side used the *server's* timezone instead,
+      // silently shifting the saved time (BST office, UTC server: a typed
+      // 10:00 was saved as 10:00 UTC, i.e. 11:00 BST once redisplayed).
+      const result = await assignAndScheduleJob(
+        jobId,
+        engineerId || null,
+        localInputValueToIso(scheduledLocal),
+        localInputValueToIso(scheduledEndLocal),
+        provisional,
+      );
       setMessage(result.ok ? (result.warning ?? null) : result.message);
       if (result.ok) setEditing(false);
     });

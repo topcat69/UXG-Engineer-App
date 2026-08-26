@@ -398,8 +398,12 @@ export type AssignScheduleResult = { ok: true; message: string; warning?: string
  * two operations the Scheduler tab's drag-and-drop does (see
  * rescheduleJob/bulkAssignJobs/bulkScheduleJobs in ../actions.ts), just
  * reachable without leaving the job. `scheduledStartLocal`/`scheduledEndLocal`
- * are datetime-local input values ("" for start clears/leaves the schedule
- * alone, engineerId null unassigns) so the office user isn't forced to
+ * are UTC instants (ISO, "Z"-suffixed) already converted client-side from
+ * the datetime-local inputs via localInputValueToIso — never pass the raw
+ * datetime-local string here, since parsing it in this server action would
+ * use the server's timezone instead of the office's (see
+ * lib/format/datetime-local.ts). "" for start clears/leaves the schedule
+ * alone, engineerId null unassigns, so the office user isn't forced to
  * touch both fields at once. `scheduledEndLocal` can be on a later
  * calendar date than the start — some jobs run across several on-site
  * days — so this deliberately takes an explicit end instant rather than a

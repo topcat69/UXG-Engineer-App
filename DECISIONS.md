@@ -4867,3 +4867,61 @@ addendum in this sandbox, no regressions.
 **Deploy note**: schema migration —
 `supabase/migrations/20260128000000_equipment_damage.sql` needs
 `supabase db push` before the next `docker compose … up -d --build app`.
+
+## 2026-08-26 — Fixed: scheduled time saved from Jobs was an hour off in Scheduler
+
+"I have a disparity in jobs and scheduler and assigning date/time. In
+jobs I'll assign a date and time and save that, but in scheduler it has
+added an hour to the job. Both of these elements have to align." Real
+bug, screenshots attached: Assign & Schedule panel showed "10:00–11:00"
+just saved; the same job's scheduler card showed "11:00–12:00" straight
+after.
+
+Root cause: the Assign & Schedule panel's and the jobs list's bulk-
+schedule bar's `<input type="datetime-local">` produce a timezone-less
+string ("2026-09-05T10:00" — no offset, per the HTML spec). Both were
+sending that raw string straight to a Server Action
+(`assignAndScheduleJob` / `bulkScheduleJobs`), which called `new
+Date(...)` on it — but that parse runs on the **server**, in the
+server's own timezone, not the browser's. This container has no `TZ`
+set, so it defaults to UTC; the office is on BST (UTC+1) in September.
+Typing "10:00" (meant as 10:00 BST = 09:00 UTC) got parsed as 10:00 UTC
+instead — stored an hour later than intended — and every place that
+later redisplays that stored value in the browser (correctly converting
+UTC to local BST) then showed 11:00. The display/redisplay logic was
+never wrong; the save path was quietly using the wrong timezone.
+
+Fixed by moving the timezone conversion to where it has to happen — the
+browser, before the value ever crosses the Server Action boundary. New
+`lib/format/datetime-local.ts`: `toLocalInputValue` (moved here
+unchanged from `assign-schedule-panel.tsx`, where it was previously the
+only copy) and a new inverse, `localInputValueToIso`, which builds a
+`Date` from the datetime-local string's own year/month/day/hour/minute
+components — `new Date(year, month-1, day, hour, minute)` always
+resolves those components in whatever timezone the calling code
+actually runs in, which for a client component is the real browser
+timezone — then returns `.toISOString()`, a "Z"-suffixed instant that
+parses identically no matter what timezone the server happens to be in.
+
+Both call sites now convert before calling their action:
+`assign-schedule-panel.tsx`'s `handleSave` and `jobs-table.tsx`'s
+`runSchedule`. `assignAndScheduleJob` and `bulkScheduleJobs` themselves
+needed no logic change — `new Date(x)` was already correct given an
+unambiguous input — just doc comments updated to say plainly that these
+parameters must already be UTC instants, not raw datetime-local values,
+so this doesn't quietly regress the next time a schedule field is
+added. Confirmed `rescheduleJob` (the scheduler board's drag-and-drop
+path) doesn't have this bug — it only shifts the *date* part of an
+existing `Date` object via `setFullYear`, never reparses a naive local
+string, so it's unaffected.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean. New `datetime-local.test.ts`: `toLocalInputValue`/
+`localInputValueToIso` round-trip to the exact same instant regardless
+of the test runner's own timezone (the property that was actually
+broken), plus edge cases (empty/unparseable input, midnight/zero-minute
+values). 372 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.
+
+No migration, no deploy-order dependency — pure app-code fix, live as
+soon as `docker compose … up -d --build app` runs.

@@ -84,6 +84,13 @@ export async function bulkAssignJobs(jobIds: string[], engineerId: string): Prom
   return { ok: true, message: `Assigned ${jobIds.length} job(s).` };
 }
 
+/**
+ * `scheduledStart` must already be a UTC instant (ISO, "Z"-suffixed),
+ * converted client-side from the datetime-local input via
+ * localInputValueToIso (see jobs-table.tsx) — never the raw datetime-local
+ * string, since parsing that here would use this server's timezone instead
+ * of the office's (see lib/format/datetime-local.ts).
+ */
 export async function bulkScheduleJobs(
   jobIds: string[],
   scheduledStart: string,
