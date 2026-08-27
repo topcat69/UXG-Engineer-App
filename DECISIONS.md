@@ -5069,3 +5069,20 @@ clean. 379 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
 
 No migration, no deploy-order dependency — pure app-code fix.
+
+## 2026-08-27 — Copyright line on the Dashboard
+
+"On the bottom of the dashboard page can you add a copyright mark with
+Tim Chester on behalf of UXGlobal." Added a small centered line at the
+foot of `dashboard-client.tsx`, below the last chart: `© {current year}
+Tim Chester on behalf of UX Global` — the year computed at render time
+rather than hardcoded, and "UX Global" (with the space) to match the
+company name's existing spelling elsewhere in the app (e.g. the
+completion PDF's "Allocated To" fallback in `completion-report.ts`).
+Scoped to the Dashboard specifically, as asked — no other office page.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean. 379 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.
+
+No migration, no deploy-order dependency — pure app-code fix.

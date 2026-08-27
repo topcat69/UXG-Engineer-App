@@ -251,6 +251,10 @@ export function DashboardClient({
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
+
+      <p className="text-muted-foreground pt-2 text-center text-xs">
+        © {new Date().getFullYear()} Tim Chester on behalf of UX Global
+      </p>
     </div>
   );
 }
