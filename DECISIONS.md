@@ -5341,3 +5341,34 @@ appeared once tests ran far enough to reach it:
   connectivity ever established.
 
 Verified: `pnpm typecheck` and `pnpm lint` clean.
+
+## Fix: all 10 Playwright specs finally green — one Vitest race left, now fixed
+
+Round 3's fixes got every Playwright E2E spec passing for the first
+time this session's CI has ever actually run them. The only remaining
+CI failure was in Vitest itself: `tests/rls.test.ts`'s "superadmin/
+manager reads all 60 seeded jobs" assertions got 61, not 60.
+
+Root cause: Vitest runs test *files* in parallel by default, and two
+files — `tests/rls.test.ts` and `tests/migration.test.ts` — both mutate
+the exact same live local Postgres instance with no isolation between
+them. `migration.test.ts` inserts one job as fixture data (cleaned up
+in its own `afterAll`), but nothing stops it running concurrently with
+`rls.test.ts`'s exact-count assertions — so occasionally that fixture
+job is inserted-but-not-yet-cleaned-up right when `rls.test.ts` counts
+rows, pushing 60 to 61. This was never visible in this sandbox, since
+both files fail immediately here (no Docker/Supabase at all) rather
+than actually racing — the "2 known pre-existing failures" baseline
+tracked all session was really "2 files that can't connect here," not
+a verified real-CI baseline. This is the first time real CI has run
+either file to completion.
+
+Fix: `fileParallelism: false` in `vitest.config.ts`. Every other test
+file is pure/unit and unaffected; only cross-file parallelism is off,
+so DB-mutating integration tests can no longer race each other.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm test` all clean locally
+— same 379 passed / 2 known pre-existing Supabase-dependent failures
+(no Docker here), just ~60s instead of ~25s from sequential file
+execution. The actual race fix can only be confirmed by real CI, watched
+live after this push.
