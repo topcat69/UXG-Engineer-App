@@ -5395,3 +5395,29 @@ the old `install_form`'s 6 photo slots — `photoSlotsFor("install")`
 to 3.
 
 Verified: `pnpm typecheck` and `pnpm lint` clean.
+
+## Fix: the "Reported to site manager" click itself never resolved
+
+Round 4's fix reached CI but the new `.locator("label", { hasText:
+"Reported to site manager" }).getByRole("button", { name: "Yes" })`
+click itself timed out at 90s on all four specs — a plain Playwright
+timeout (not a strict-mode multi-match error), meaning the locator
+matched nothing at all. Every other `label`-scoped lookup in these
+specs targets an `<input>` or `<select>` child and works fine; this is
+the first one scoped to a `<button>` child instead, and unlike those,
+it never resolved even once — no artifact upload is configured in
+`ci.yml`, so there's no trace/screenshot to inspect and confirm why.
+
+Rather than keep guessing blind through further CI round-trips, worked
+around it with a locator that doesn't depend on the label-scoping
+pattern at all: `page.getByRole("button", { name: "Yes", exact: true
+}).nth(1)`, using the DOM order confirmed directly from
+`job-workflow.tsx`'s `JobDetailsSection` — "Parking notified" is the
+first Yes/No pair (index 0), "Reported to site manager" the second
+(index 1), both before "Issues found?" and "Revisit required" further
+down. If this still doesn't resolve it, the next step would be adding
+an `actions/upload-artifact` step to `ci.yml` for `test-results/` so a
+real trace is available to inspect instead of guessing from source
+alone.
+
+Verified: `pnpm typecheck` and `pnpm lint` clean.

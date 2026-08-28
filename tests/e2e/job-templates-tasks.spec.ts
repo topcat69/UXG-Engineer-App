@@ -101,7 +101,7 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   await selectByLabel("Network", "Ethernet");
   await selectByLabel("Player boot test", "Pass");
   await selectByLabel("Content displaying", "Pass");
-  await fieldPage.locator("label", { hasText: "Reported to site manager" }).getByRole("button", { name: "Yes" }).click();
+  await fieldPage.getByRole("button", { name: "Yes", exact: true }).nth(1).click(); // 2nd Yes/No pair in DOM order: Parking notified (0), Reported to site manager (1)
   await selectByLabel("Equipment damage", "N/A");
 
   const photoBuffer = Buffer.from(TINY_PNG_BASE64, "base64");
