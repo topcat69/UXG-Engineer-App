@@ -5157,3 +5157,48 @@ clean. 379 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
 
 No migration, no deploy-order dependency — pure app-code fix.
+
+## Fix: CI on main has been failing since 2026-08-17, so auto-deploy never fired
+
+Discovered while chasing a "the job-type badges from the last fix aren't
+showing" report: `main` was 62 commits behind
+`claude/app-from-files-7pt1s6` — the branch this project actually develops
+on — with no open PR between them. Merged (fast-forward, no divergence)
+and pushed to unblock that, but the real question was why nothing had
+auto-deployed across 62 commits worth of pushes to `main`.
+
+`.github/workflows/deploy.yml` only fires on a `workflow_run` event when
+the `CI` workflow completes successfully on `main` — not on a raw push.
+Checking CI's run history on `main` showed every single run failing at
+the very first step (`pnpm/action-setup@v4`), going back to run #5
+(2026-08-17, commit 7458363 "Pin pnpm version; move build-script
+allowlist to its new home"). That commit added `"packageManager":
+"pnpm@10.33.0"` to `package.json` to fix a Docker build issue, but never
+removed `ci.yml`'s separate `version: 10` input to the same
+`pnpm/action-setup@v4` step — the action hard-errors ("Multiple versions
+of pnpm specified") when both are set, rather than preferring one. Every
+job step after it (typecheck/lint/test/build) was skipped as a result.
+
+So for over a week, every push to `main` looked like it should deploy and
+silently didn't — the VM has been running whatever was live as of that
+first breaking commit, not any of the fixes since. This was never caught
+by local verification in this sandbox since the check suite here runs
+`pnpm typecheck/lint/build/test` directly, never through
+`pnpm/action-setup@v4`.
+
+Fix: drop the redundant `version: 10` input from `ci.yml`'s
+`pnpm/action-setup@v4` step — the action already reads the pinned version
+from `package.json`'s `packageManager` field with no input needed.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean locally, same 379 passed / 2 known pre-existing Supabase-dependent
+failures. The actual fix (does CI go green on GitHub's runners) can only
+be confirmed once this is pushed and a real Actions run completes — not
+verifiable from this sandbox.
+
+**Deploy note**: once CI goes green on this push, `deploy.yml` should
+fire automatically for the first time in over a week. Still needed
+separately, since deploy only builds/restarts the app container and
+never touches the database: the ±30-day RLS window migration
+(`20260129000000_widen_engineer_job_window.sql`) still needs `supabase db
+push` (or the Dashboard SQL Editor fallback) applied by hand.
