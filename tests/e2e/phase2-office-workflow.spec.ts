@@ -36,6 +36,7 @@ test("manager imports sites, generates jobs, and bulk assigns/schedules them", a
 
   // Step 1: import 50 sites.
   await page.goto("/office/import");
+  await page.locator('select[name="clientId"]').selectOption({ label: "Acme Retail" });
   await page.setInputFiles('input[type="file"]', csvPath);
   await page.getByRole("button", { name: "Import" }).click();
   await expect(page.getByText("Imported 50 site(s).")).toBeVisible({ timeout: 15_000 });
@@ -73,7 +74,7 @@ test("manager imports sites, generates jobs, and bulk assigns/schedules them", a
   await expect(page.getByText(/selected/)).toBeVisible();
 
   const { data: engineer } = await admin.from("users").select("id").eq("email", "engineer@opoc.test").single();
-  await page.getByLabel("Assign to engineer").selectOption(engineer!.id);
+  await page.getByLabel("Assign to").selectOption(engineer!.id);
   await page.getByRole("button", { name: "Assign" }).click();
   await expect(page.getByText(/^Assigned \d+ job\(s\)\.$/)).toBeVisible({ timeout: 15_000 });
 

@@ -52,8 +52,10 @@ test("a failed check produces a blocking issue, a linked revisit job, and approv
   // --- Field: check in, deliberately fail the boot test, submit. ---
   await loginAs(page, "engineer@opoc.test");
   await page.getByText(tag).click();
+  await page.getByRole("button", { name: "Start Travelling" }).click();
+  await expect(page.getByRole("button", { name: /Check In/ })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: /Check In/ }).click();
-  await expect(page.getByText("in_progress")).toBeVisible();
+  await expect(page.getByText("In Progress")).toBeVisible();
 
   await page.locator("label", { hasText: "Player serial" }).locator("input").fill("PLR-P5-1");
   await page.locator("label", { hasText: "Screen serial" }).locator("input").fill("SCR-P5-1");

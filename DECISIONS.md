@@ -5202,3 +5202,56 @@ separately, since deploy only builds/restarts the app container and
 never touches the database: the ±30-day RLS window migration
 (`20260129000000_widen_engineer_job_window.sql`) still needs `supabase db
 push` (or the Dashboard SQL Editor fallback) applied by hand.
+
+## Fix: 6 of 10 Playwright E2E specs were stale, blocking the now-fixed CI
+
+Pushing the CI config fix above got past the broken pnpm setup step for
+the first time — and immediately hit a second, unrelated problem: 6 of
+10 Playwright specs failed. Since CI has been broken since 2026-08-17
+(see above), the E2E suite has never actually run against the real app
+in that entire window, and several UI-facing features shipped in it
+without their specs being updated to match — this sandbox has no Docker,
+so `pnpm test` here has only ever covered Vitest, never Playwright.
+
+Each failure traced to a real, identifiable app change the spec never
+followed:
+
+- `job-reports.spec.ts`, `phase3-offline-workflow.spec.ts`,
+  `phase5-issue-revisit-report.spec.ts`, `job-templates-tasks.spec.ts`:
+  all clicked "Check In" directly on a freshly-dispatched job. Since
+  the travel-start split (this session, `c273a591`), a dispatched job
+  only offers "Start Travelling" — "Check In & Start Work" only appears
+  once status is `travelling`. Fixed by clicking Start Travelling first
+  and waiting for Check In to appear. `phase3`'s exercises this while
+  genuinely offline (`context.setOffline(true)`) — startTravelling is
+  outbox-based like checkIn, so this still works offline — and its
+  final status_events assertion needed the resulting extra `travelling`
+  row added to the expected sequence.
+- Same four specs plus `job-templates-tasks.spec.ts` (twice): asserted
+  raw `getByText("in_progress")`. The humanize() capitalization sweep
+  (this session) applied to `job-workflow.tsx`'s own status badge too,
+  so the field app now displays "In Progress". Fixed to match.
+- `job-templates-tasks.spec.ts`: asserted `getByText("draft")` for a
+  duplicated job's status badge — same humanize() issue, now "Draft".
+- `roles-and-job-delete.spec.ts`: asserted the role `<select>`'s option
+  *text* as `["engineer","manager","superadmin"]` — same humanize()
+  issue again (the option's `value` stayed lowercase, only the label
+  capitalized), now `["Engineer","Manager","Superadmin"]` /
+  `["Engineer"]`.
+- `phase2-office-workflow.spec.ts`: the Import button never enabled.
+  The CSV importer now requires picking a Client first (this session's
+  Clients feature) — the spec never selected one. Fixed by selecting
+  the seeded "Acme Retail" client before uploading. Once past that, a
+  second latent issue surfaced: `getByLabel("Assign to engineer")` no
+  longer matches — the bulk-assign picker's aria-label was generalized
+  to "Assign to" when it started accepting managers too (this session).
+  Fixed to match.
+
+No application code changed here — every fix is test-only, correcting
+specs that fell behind real, intentional product changes made earlier
+in this session while CI was silently broken and unable to catch it.
+
+Verified: `pnpm typecheck` and `pnpm lint` clean. `pnpm test` (Vitest)
+unaffected — these are Playwright specs, not run in this sandbox
+(no Docker). The real verification is the next CI run on GitHub's
+runners, watched live after this push.

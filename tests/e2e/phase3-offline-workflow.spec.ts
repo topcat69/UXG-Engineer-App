@@ -61,8 +61,10 @@ test("engineer completes a job entirely offline, survives a reload mid-form, and
   await context.setOffline(true);
 
   await page.getByText(tag).click();
+  await page.getByRole("button", { name: "Start Travelling" }).click();
+  await expect(page.getByRole("button", { name: /Check In/ })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: /Check In/ }).click();
-  await expect(page.getByText("in_progress")).toBeVisible();
+  await expect(page.getByText("In Progress")).toBeVisible();
 
   // Fill part of the form, then wait for the 15s autosave to land in Dexie.
   await page.locator("label", { hasText: "Player serial" }).locator("input").fill("PLR-OFFLINE-1");
@@ -164,5 +166,5 @@ test("engineer completes a job entirely offline, survives a reload mid-form, and
     .select("from_status, to_status")
     .eq("job_id", jobId)
     .order("occurred_at");
-  expect(events?.map((e) => e.to_status)).toEqual(["in_progress", "submitted"]);
+  expect(events?.map((e) => e.to_status)).toEqual(["travelling", "in_progress", "submitted"]);
 });

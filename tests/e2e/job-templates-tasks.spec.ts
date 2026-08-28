@@ -70,7 +70,7 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   });
   const duplicateUrl = page.url();
   expect(duplicateUrl).not.toContain(jobId);
-  await expect(page.getByText("draft", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Draft", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Verify screen mount")).toBeVisible();
   await expect(page.getByText("Photograph cable run")).toBeVisible();
   const duplicateCheckboxes = page.locator('input[type="checkbox"]');
@@ -83,8 +83,10 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   const fieldPage = await page.context().newPage();
   await loginAs(fieldPage, "engineer@opoc.test");
   await fieldPage.getByText(tag).click();
+  await fieldPage.getByRole("button", { name: "Start Travelling" }).click();
+  await expect(fieldPage.getByRole("button", { name: /Check In/ })).toBeVisible({ timeout: 10_000 });
   await fieldPage.getByRole("button", { name: /Check In/ }).click();
-  await expect(fieldPage.getByText("in_progress")).toBeVisible({ timeout: 15_000 });
+  await expect(fieldPage.getByText("In Progress")).toBeVisible({ timeout: 15_000 });
 
   const taskCheckboxes = fieldPage.locator('ul:has-text("Verify screen mount") input[type="checkbox"]');
   await expect(taskCheckboxes).toHaveCount(2);
@@ -128,7 +130,7 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   // Submit with tasks still unticked: blocked, job stays in_progress.
   await fieldPage.getByRole("button", { name: /Check Out & Submit/ }).click();
   await expect(fieldPage.getByText("2 tasks are not yet checked off.")).toBeVisible();
-  await expect(fieldPage.getByText("in_progress")).toBeVisible();
+  await expect(fieldPage.getByText("In Progress")).toBeVisible();
 
   // Tick both tasks, then submit succeeds. Ticking is an async Dexie write
   // (toggleTask) whose useLiveQuery-driven `checked` update lands a tick
