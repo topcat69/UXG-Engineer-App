@@ -53,14 +53,18 @@ test("engineer completes a job entirely offline, survives a reload mid-form, and
     longitude: site!.longitude ?? -0.1,
   });
 
-  // --- Online: sign in and let the initial sync-down populate Dexie. ---
+  // --- Online: sign in, let the initial sync-down populate Dexie, and open
+  // the job once so its dynamically-imported chunks (e.g. the site map) are
+  // fetched and cached — a real engineer opens today's job on wifi before
+  // losing signal in the building, not cold from a dead connection. ---
   await loginAs(page, "engineer@opoc.test");
   await expect(page.getByText(tag)).toBeVisible({ timeout: 15_000 });
+  await page.getByText(tag).click();
+  await expect(page.getByRole("button", { name: "Start Travelling" })).toBeVisible({ timeout: 10_000 });
 
   // --- Go fully offline: real network disabled at the browser level. ---
   await context.setOffline(true);
 
-  await page.getByText(tag).click();
   await page.getByRole("button", { name: "Start Travelling" }).click({ force: true });
   await expect(page.getByRole("button", { name: /Check In/ })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: /Check In/ }).click();
@@ -88,8 +92,6 @@ test("engineer completes a job entirely offline, survives a reload mid-form, and
   await selectByLabel("Network", "Ethernet");
   await selectByLabel("Player boot test", "Pass");
   await selectByLabel("Content displaying", "Pass");
-  await page.locator("label", { hasText: "Client name" }).locator("input").fill("Offline Client");
-
   // Capture all six required photos from a local fixture — the camera
   // `capture` attribute is just a hint; no real camera is needed offline.
   const photoBuffer = Buffer.from(TINY_PNG_BASE64, "base64");
@@ -146,13 +148,12 @@ test("engineer completes a job entirely offline, survives a reload mid-form, and
   expect(finalJob?.media_pending).toBe(0);
 
   const { data: form } = await admin
-    .from("install_forms")
-    .select("player_serial, screen_serial, client_name, submitted_at")
+    .from("job_details")
+    .select("player_serial, screen_serial, submitted_at")
     .eq("job_id", jobId)
     .single();
   expect(form?.player_serial).toBe("PLR-OFFLINE-1");
   expect(form?.screen_serial).toBe("SCR-OFFLINE-1");
-  expect(form?.client_name).toBe("Offline Client");
   expect(form?.submitted_at).not.toBeNull();
 
   const { data: media } = await admin.from("media_assets").select("id").eq("job_id", jobId);

@@ -67,7 +67,6 @@ test("a failed check produces a blocking issue, a linked revisit job, and approv
   await selectByLabel("Network", "Ethernet");
   await selectByLabel("Player boot test", "Fail"); // the deliberate failure this whole test is about
   await selectByLabel("Content displaying", "Pass");
-  await page.locator("label", { hasText: "Client name" }).locator("input").fill("P5 Test Client");
 
   const photoBuffer = Buffer.from(TINY_PNG_BASE64, "base64");
   const fileInputs = page.locator('input[type="file"]');
