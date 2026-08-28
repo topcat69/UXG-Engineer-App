@@ -97,6 +97,19 @@ test("manager pulls a job's PDF and zip report from /office/reports", async ({ p
   await page.getByRole("button", { name: /Check Out & Submit/ }).click();
   await expect(page.getByText("This job is submitted.")).toBeVisible({ timeout: 10_000 });
 
+  // "This job is submitted." only confirms the local outbox write landed —
+  // the actual server sync is still async. Updating status to "closed" here
+  // before that sync completes races it: the outbox's own delayed
+  // job_patch/status_event write can land afterward and silently overwrite
+  // our "closed" back to "submitted". Wait for the server to actually show
+  // "submitted" first, so our own update is guaranteed to apply last.
+  await expect
+    .poll(
+      async () => (await admin.from("jobs").select("status").eq("id", jobId).single()).data?.status,
+      { timeout: 15_000, message: "waiting for the field submit to reach the server before closing the job" },
+    )
+    .toBe("submitted");
+
   // The Reports page only lists closed/cancelled jobs (a report only makes
   // sense once a job is actually finished) — moved straight to "closed"
   // rather than going through full QA approval, since this test is about
