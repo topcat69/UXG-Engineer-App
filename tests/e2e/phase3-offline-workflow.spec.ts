@@ -92,12 +92,16 @@ test("engineer completes a job entirely offline, survives a reload mid-form, and
   await selectByLabel("Network", "Ethernet");
   await selectByLabel("Player boot test", "Pass");
   await selectByLabel("Content displaying", "Pass");
-  // Capture all six required photos from a local fixture — the camera
-  // `capture` attribute is just a hint; no real camera is needed offline.
+  await page.locator("label", { hasText: "Reported to site manager" }).getByRole("button", { name: "Yes" }).click();
+  await selectByLabel("Equipment damage", "N/A");
+  // Capture all required photos from a local fixture — the camera `capture`
+  // attribute is just a hint; no real camera is needed offline. install-type
+  // jobs (job_details, per photoSlotsFor in job-form.ts) need 3, not the old
+  // install_form's 6.
   const photoBuffer = Buffer.from(TINY_PNG_BASE64, "base64");
   const fileInputs = page.locator('input[type="file"]');
   const slotCount = await fileInputs.count();
-  expect(slotCount).toBe(6);
+  expect(slotCount).toBe(3);
   for (let i = 0; i < slotCount; i++) {
     await fileInputs.nth(i).setInputFiles({ name: `photo-${i}.png`, mimeType: "image/png", buffer: photoBuffer });
   }
@@ -157,7 +161,7 @@ test("engineer completes a job entirely offline, survives a reload mid-form, and
   expect(form?.submitted_at).not.toBeNull();
 
   const { data: media } = await admin.from("media_assets").select("id").eq("job_id", jobId);
-  expect(media).toHaveLength(6);
+  expect(media).toHaveLength(3);
 
   const { data: signatures } = await admin.from("signatures").select("id").eq("job_id", jobId);
   expect(signatures).toHaveLength(1);

@@ -5372,3 +5372,26 @@ Verified: `pnpm typecheck`, `pnpm lint`, `pnpm test` all clean locally
 (no Docker here), just ~60s instead of ~25s from sequential file
 execution. The actual race fix can only be confirmed by real CI, watched
 live after this push.
+
+## Fix: two more required job_details fields none of the E2E specs ever answered
+
+The Vitest race fix worked — CI's `pnpm test` step is fully green now.
+That let 4 Playwright specs (job-reports, job-templates-tasks, phase3,
+phase5) run far enough to hit their real final blocker: submit
+silently never completed. `validateJobDetails` (job-form.ts) requires
+`reported_to_site_manager` (a Yes/No toggle, defaults to `false`,
+i.e. "unanswered" and "No" are indistinguishable to the validator) and
+`equipment_damage` (a select, defaults to `""`) for every
+`showsIssuesSection` job type — both added by features shipped earlier
+this session (site-manager reporting, equipment damage), neither ever
+answered by these specs since they predate both. Fixed by clicking
+"Yes" on Reported to site manager and selecting "N/A" for Equipment
+damage in all four specs' form-filling sequences.
+
+Separately, `phase3-offline-workflow.spec.ts` still hardcoded
+`expect(slotCount).toBe(6)` and `expect(media).toHaveLength(6)` from
+the old `install_form`'s 6 photo slots — `photoSlotsFor("install")`
+(job-form.ts) returns exactly 3 for job_details-mode jobs. Fixed both
+to 3.
+
+Verified: `pnpm typecheck` and `pnpm lint` clean.

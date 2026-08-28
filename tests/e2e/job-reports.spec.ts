@@ -65,6 +65,8 @@ test("manager pulls a job's PDF and zip report from /office/reports", async ({ p
   await selectByLabel("Network", "Ethernet");
   await selectByLabel("Player boot test", "Pass");
   await selectByLabel("Content displaying", "Pass");
+  await page.locator("label", { hasText: "Reported to site manager" }).getByRole("button", { name: "Yes" }).click();
+  await selectByLabel("Equipment damage", "N/A");
 
   const photoBuffer = Buffer.from(TINY_PNG_BASE64, "base64");
   const fileInputs = page.locator('input[type="file"]');

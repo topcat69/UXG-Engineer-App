@@ -101,6 +101,8 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   await selectByLabel("Network", "Ethernet");
   await selectByLabel("Player boot test", "Pass");
   await selectByLabel("Content displaying", "Pass");
+  await fieldPage.locator("label", { hasText: "Reported to site manager" }).getByRole("button", { name: "Yes" }).click();
+  await selectByLabel("Equipment damage", "N/A");
 
   const photoBuffer = Buffer.from(TINY_PNG_BASE64, "base64");
   const fileInputs = fieldPage.locator('input[type="file"]');
