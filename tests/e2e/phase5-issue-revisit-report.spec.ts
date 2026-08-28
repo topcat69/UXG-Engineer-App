@@ -69,6 +69,7 @@ test("a failed check produces a blocking issue, a linked revisit job, and approv
   await selectByLabel("Content displaying", "Pass");
   await page.locator('button:text-is("Yes")').nth(1).click(); // 2nd Yes/No pair in DOM order: Parking notified (0), Reported to site manager (1)
   await selectByLabel("Equipment damage", "N/A");
+  await page.locator('button:text-is("No")').nth(3).click(); // Revisit required: No (4th No button in DOM order: Parking notified, Reported to site manager, Issues found, Revisit required)
 
   const photoBuffer = Buffer.from(TINY_PNG_BASE64, "base64");
   const fileInputs = page.locator('input[type="file"]');

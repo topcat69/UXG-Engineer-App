@@ -103,6 +103,7 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   await selectByLabel("Content displaying", "Pass");
   await fieldPage.locator('button:text-is("Yes")').nth(1).click(); // 2nd Yes/No pair in DOM order: Parking notified (0), Reported to site manager (1)
   await selectByLabel("Equipment damage", "N/A");
+  await fieldPage.locator('button:text-is("No")').nth(3).click(); // Revisit required: No (4th No button in DOM order: Parking notified, Reported to site manager, Issues found, Revisit required)
 
   const photoBuffer = Buffer.from(TINY_PNG_BASE64, "base64");
   const fileInputs = fieldPage.locator('input[type="file"]');

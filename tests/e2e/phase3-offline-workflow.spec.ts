@@ -94,6 +94,7 @@ test("engineer completes a job entirely offline, survives a reload mid-form, and
   await selectByLabel("Content displaying", "Pass");
   await page.locator('button:text-is("Yes")').nth(1).click(); // 2nd Yes/No pair in DOM order: Parking notified (0), Reported to site manager (1)
   await selectByLabel("Equipment damage", "N/A");
+  await page.locator('button:text-is("No")').nth(3).click(); // Revisit required: No (4th No button in DOM order: Parking notified, Reported to site manager, Issues found, Revisit required)
   // Capture all required photos from a local fixture — the camera `capture`
   // attribute is just a hint; no real camera is needed offline. install-type
   // jobs (job_details, per photoSlotsFor in job-form.ts) need 3, not the old

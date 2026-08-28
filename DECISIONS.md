@@ -5447,3 +5447,26 @@ Two changes this round:
   one interaction.
 
 Verified: `pnpm typecheck` and `pnpm lint` clean.
+
+## Fix: role-free selector confirmed correct; one more required field found
+
+The `button:text-is("Yes")` swap worked — all four specs got past the
+"Reported to site manager" click for the first time (confirming the
+underlying issue was specifically about `getByRole`'s accessible-name
+resolution for these buttons, not element existence or scoping — worth
+noting for future E2E work on this app's Yes/No toggles). They now
+fail one step later, all four at the same place: "This job is
+submitted." never appears after clicking Check Out & Submit.
+
+`validateJobDetails` also requires `revisit_required` (a third
+tri-state Yes/No field, `showsRevisitRequired` — true for install/sla)
+that none of these specs ever answered, same story as
+`reported_to_site_manager`/`equipment_damage` in earlier rounds. Fixed
+by clicking "No" via the same role-free pattern, at the 4th "No"
+button in DOM order (Parking notified, Reported to site manager,
+Issues found, Revisit required). phase5-issue-revisit-report.spec.ts's
+own revisit-job assertions are unaffected — that test's "revisit job"
+comes from the auto-revisit webhook on a blocking issue, an entirely
+separate mechanism from this manual form field.
+
+Verified: `pnpm typecheck` and `pnpm lint` clean.
