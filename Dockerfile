@@ -41,6 +41,9 @@ ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
 # a too-high value here lets the build starve the *live* container's
 # next-server process too, not just fail the build itself.
 ENV NODE_OPTIONS="--max-old-space-size=1536"
+# Consumed by next.config.ts to skip the build's TypeScript-checking pass —
+# see the comment there for why, and DECISIONS.md's deploy addendum.
+ENV DOCKER_BUILD=1
 RUN pnpm build
 
 # --- runner: just the standalone server output, no source or devDependencies ---
