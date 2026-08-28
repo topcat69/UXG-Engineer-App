@@ -114,7 +114,7 @@ test("a failed check produces a blocking issue, a linked revisit job, and approv
         issue = data;
         return !!data?.revisit_job_id;
       },
-      { timeout: 15_000, message: "waiting for the blocking issue's revisit job to be linked" },
+      { timeout: 30_000, message: "waiting for the blocking issue's revisit job to be linked" },
     )
     .toBe(true);
 

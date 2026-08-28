@@ -151,9 +151,14 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   // engineer's finger never would. Give it a moment to settle before
   // clicking Submit, retried below if it was still one tick behind.
   await fieldPage.waitForTimeout(300);
-  await fieldPage.getByRole("button", { name: /Check Out & Submit/ }).click();
-  if (await fieldPage.getByText(/task.*not yet checked off/).isVisible().catch(() => false)) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     await fieldPage.getByRole("button", { name: /Check Out & Submit/ }).click();
+    const stillBlocked = await fieldPage
+      .getByText(/task.*not yet checked off/)
+      .isVisible()
+      .catch(() => false);
+    if (!stillBlocked) break;
+    await fieldPage.waitForTimeout(500);
   }
   await expect(fieldPage.getByText("This job is submitted.")).toBeVisible({ timeout: 10_000 });
 

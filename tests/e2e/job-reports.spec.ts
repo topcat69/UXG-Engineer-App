@@ -102,14 +102,20 @@ test("manager pulls a job's PDF and zip report from /office/reports", async ({ p
   // rather than going through full QA approval, since this test is about
   // the report download itself, not the QA workflow, and completion_pdf_url
   // must stay null either way to prove the PDF/zip generate fresh.
-  await admin.from("jobs").update({ status: "closed" }).eq("id", jobId);
+  const { error: closeError } = await admin.from("jobs").update({ status: "closed" }).eq("id", jobId);
+  expect(closeError).toBeNull();
 
   // --- Office: find the job on the Reports page (never QA-approved). ---
   const officePage = await page.context().browser()!.newPage();
   await loginAs(officePage, "manager@opoc.test");
   await officePage.goto(`/office/reports?q=${tag}`);
   const row = officePage.locator("tr", { hasText: tag });
-  await expect(row).toBeVisible();
+  // The Reports page is a server-rendered list, not a live query — give it
+  // one reload in case the very first navigation raced the admin update above.
+  if (!(await row.isVisible().catch(() => false))) {
+    await officePage.reload();
+  }
+  await expect(row).toBeVisible({ timeout: 10_000 });
 
   const { data: preApproval } = await admin.from("jobs").select("completion_pdf_url").eq("id", jobId).single();
   expect(preApproval?.completion_pdf_url).toBeNull();

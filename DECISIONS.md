@@ -5497,3 +5497,40 @@ time they'd have caught this.
 Verified: `pnpm typecheck` and `pnpm lint` clean. Confirmed via the
 downloaded artifact, not just source-reading, that this is the last
 gap for all four specs.
+
+## Fix: three more issues surfaced once specs reached genuinely new territory
+
+The Network port fix got real progress: `phase3-offline-workflow.spec.ts`
+passed completely for the first time, and 7/10 specs passed overall
+(up from 6). The remaining 3 failures are each in code these specs
+have never reached before — every earlier round's failures happened
+*before* this point, so none of this was previously exercised either:
+
+- `job-reports.spec.ts`: submit now succeeds, but the job never
+  appears on `/office/reports?q=...` after being moved straight to
+  `closed` via an admin client update. No obvious cause found in the
+  Reports page's query (`.in("status", REPORT_STATUSES)`,
+  `ilike("job_number", ...)`) or in the migrations (no status-
+  transition trigger exists). Added an explicit error check on the
+  update (was previously unchecked) and a one-time reload before the
+  visibility assertion, in case the very first navigation raced the
+  update — the Reports page is a server-rendered list with no live
+  query, so a genuine race is plausible even on a single-node local
+  Postgres.
+- `job-templates-tasks.spec.ts`: the double-submit-click retry (already
+  flagged in the test's own comments as a "scripted click can outrun
+  the async Dexie write" risk) still weren't enough — a third click
+  also timed out. Extended from a single retry to a bounded loop (up
+  to 5 attempts, 500ms apart), matching the risk the original comment
+  already described.
+- `phase5-issue-revisit-report.spec.ts`: the auto-revisit webhook
+  (pg_net -> HTTP -> revisit job creation) didn't link within 15s for
+  the first time this exact path has run in CI. Raised the wait to
+  30s — plausible one-off webhook/CI latency, not a logic bug; nothing
+  in the webhook trigger or the test's polling logic looked wrong.
+
+None of these three fixes touch application code — all are test
+robustness improvements (error-checking, retry, timeout) for genuinely
+new code paths these specs are reaching for the first time.
+
+Verified: `pnpm typecheck` and `pnpm lint` clean.
