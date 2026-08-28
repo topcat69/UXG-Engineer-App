@@ -92,7 +92,7 @@ test("engineer completes a job entirely offline, survives a reload mid-form, and
   await selectByLabel("Network", "Ethernet");
   await selectByLabel("Player boot test", "Pass");
   await selectByLabel("Content displaying", "Pass");
-  await page.getByRole("button", { name: "Yes", exact: true }).nth(1).click(); // 2nd Yes/No pair in DOM order: Parking notified (0), Reported to site manager (1)
+  await page.locator('button:text-is("Yes")').nth(1).click(); // 2nd Yes/No pair in DOM order: Parking notified (0), Reported to site manager (1)
   await selectByLabel("Equipment damage", "N/A");
   // Capture all required photos from a local fixture — the camera `capture`
   // attribute is just a hint; no real camera is needed offline. install-type

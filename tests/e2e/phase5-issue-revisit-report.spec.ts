@@ -67,7 +67,7 @@ test("a failed check produces a blocking issue, a linked revisit job, and approv
   await selectByLabel("Network", "Ethernet");
   await selectByLabel("Player boot test", "Fail"); // the deliberate failure this whole test is about
   await selectByLabel("Content displaying", "Pass");
-  await page.getByRole("button", { name: "Yes", exact: true }).nth(1).click(); // 2nd Yes/No pair in DOM order: Parking notified (0), Reported to site manager (1)
+  await page.locator('button:text-is("Yes")').nth(1).click(); // 2nd Yes/No pair in DOM order: Parking notified (0), Reported to site manager (1)
   await selectByLabel("Equipment damage", "N/A");
 
   const photoBuffer = Buffer.from(TINY_PNG_BASE64, "base64");

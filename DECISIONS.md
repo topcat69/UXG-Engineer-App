@@ -5421,3 +5421,29 @@ real trace is available to inspect instead of guessing from source
 alone.
 
 Verified: `pnpm typecheck` and `pnpm lint` clean.
+
+## Fix: try a role-free selector for the Yes button, and stop guessing blind
+
+Round 5's positional `getByRole("button", { name: "Yes", exact: true
+}).nth(1)` failed identically to round 4's label-scoped version — same
+90s timeout, same "waiting for locator" with nothing ever resolving.
+Two structurally different `getByRole`-based strategies failing the
+same way, combined with the AV fields section (DOM-order *after*
+Parking/Reported-to-site-manager) rendering and working fine in the
+same run, rules out both "wrong scoping" and "section doesn't render"
+— something about how these two specific buttons expose (or don't
+expose) an accessible name/role is the likely culprit, not their
+existence.
+
+Two changes this round:
+- Swapped to a role-free selector — `page.locator('button:text-is("Yes")').nth(1)`
+  — matching by literal tag name and exact text content, sidestepping
+  ARIA role/accessible-name computation entirely.
+- Added an `actions/upload-artifact` step to `ci.yml` (on failure only,
+  7-day retention) uploading `test-results/`, so if this guess is also
+  wrong, the next round can download the actual Playwright trace and
+  read the real DOM/accessibility tree instead of reasoning from source
+  alone — this has been the fifth consecutive blind round-trip on this
+  one interaction.
+
+Verified: `pnpm typecheck` and `pnpm lint` clean.
