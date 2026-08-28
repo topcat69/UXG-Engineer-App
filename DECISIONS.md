@@ -5086,3 +5086,51 @@ clean. 379 passed, same 2 pre-existing Supabase-dependent failures as
 every addendum in this sandbox, no regressions.
 
 No migration, no deploy-order dependency — pure app-code fix.
+
+## 2026-08-28 — Widened the engineer job-visibility window to ±30 days
+
+"Is there a date limit of what jobs the field app can see? I have a job
+scheduled for 28/9 but not visible." Confirmed: yes, a real one, and not
+just a display filter — `jobs_select`'s RLS policy
+(`20260103000000_rls.sql`) only let an engineer see their own jobs with
+`scheduled_start` between 30 days in the past and **14 days** in the
+future. A job scheduled 28 Sept (~32 days out from today) fell outside
+that forward window entirely, so it was invisible in the field app —
+not a bug in the sense of broken code, but the window no longer matches
+how far ahead the office actually schedules work.
+
+Asked the user how far forward it should reach; picked 30 days, matching
+the existing look-back for a simple, symmetric ±30-day window. New
+migration (`20260129000000_widen_engineer_job_window.sql`) drops and
+recreates `jobs_select` with `now() + interval '30 days'` in place of
+`'14 days'` — RLS policies can't be altered in place, only replaced.
+Kept the original migration untouched, per this project's append-only
+convention; also wrote the new policy's admin/manager branch using
+`'superadmin'` directly (the current role label) rather than the
+original's now-stale `'admin'`, matching how every policy written since
+the role rename already does this.
+
+This one policy change is sufficient — every other table an engineer
+can read through (`install_forms`, `job_details`, `job_tasks`, etc.)
+scopes its own RLS via an `exists (select 1 from jobs where …)`
+subquery, which is itself subject to `jobs`' own RLS when run as the
+querying role — so the wider window propagates automatically without
+touching those policies. `sync-down.ts`'s doc comment (which cited the
+old "30-day/14-day" split) and `seed.sql`'s "+14 day window" comment on
+the deliberately-out-of-window seeded jobs (still 45 days out — safely
+outside ±30 days too, no seed values needed changing) were updated to
+match.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean. Updated `tests/rls.test.ts`'s RLS-proving test (Supabase-backed,
+one of this sandbox's 2 known-skipped failures, but kept logically
+correct for when it runs for real): the "outside window" cutoff used to
+prove the engineer still can't see the 45-days-out seeded jobs moved
+from `+14` to `+30` days, description and comments updated to match. 379
+passed, same 2 pre-existing Supabase-dependent failures as every
+addendum in this sandbox, no regressions.
+
+**Deploy note**: schema migration —
+`supabase/migrations/20260129000000_widen_engineer_job_window.sql`
+needs `supabase db push` before the next
+`docker compose … up -d --build app`.

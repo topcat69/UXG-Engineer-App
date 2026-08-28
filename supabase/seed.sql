@@ -118,7 +118,7 @@ begin
         else engineer_id                       -- assigned but out of window below
       end,
       case
-        when i % 3 = 2 then now() + interval '45 days'  -- outside the +14 day window
+        when i % 3 = 2 then now() + interval '45 days'  -- outside the +30 day window
         else now() - (i || ' hours')::interval
       end,
       now() + interval '2 hours'

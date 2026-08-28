@@ -4,9 +4,11 @@ import type { Database } from "@/lib/supabase/database.types";
 import { adminClient, clientForUser } from "./helpers/rls-test-client";
 
 // Proves the RLS policies in supabase/migrations/20260103000000_rls.sql
-// against a real local Postgres + GoTrue instance (no mocks), using the
-// exact 3-role seed from supabase/seed.sql: 60 jobs split 20/20/20 across
-// {assigned to engineer + in the 30-day/14-day window},
+// (jobs_select widened to a symmetric ±30 days by
+// 20260129000000_widen_engineer_job_window.sql) against a real local
+// Postgres + GoTrue instance (no mocks), using the exact 3-role seed from
+// supabase/seed.sql: 60 jobs split 20/20/20 across
+// {assigned to engineer + in the ±30-day window},
 // {assigned to engineer + outside the window}, {unassigned}.
 
 let admin: SupabaseClient<Database>;
@@ -102,7 +104,7 @@ describe("jobs: engineer", () => {
     expect(data).toHaveLength(0);
   });
 
-  it("cannot read their own jobs scheduled outside the +14 day window (deliberately failing check)", async () => {
+  it("cannot read their own jobs scheduled outside the +30 day window (deliberately failing check)", async () => {
     // Seed assigns 20 jobs to the engineer 45 days in the future — outside
     // the window. If the date filter were ever dropped from the policy,
     // the engineer's total visible job count would jump from 20 to 40.
@@ -110,7 +112,7 @@ describe("jobs: engineer", () => {
       .from("jobs")
       .select("id")
       .eq("assigned_to", engineerId)
-      .gt("scheduled_start", new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString());
+      .gt("scheduled_start", new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
     expect(outsideWindow!.length).toBeGreaterThan(0);
 
     const { data: visible } = await engineerUser

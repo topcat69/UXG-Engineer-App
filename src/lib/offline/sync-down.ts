@@ -16,8 +16,9 @@ export function jobIdsSafeToOverwrite(fetchedJobIds: string[], pendingJobIds: Re
 export type SyncDownResult = { jobCount: number; siteCount: number };
 
 /**
- * Pulls this engineer's assigned jobs (RLS already scopes these to the
- * 30-day/14-day window), their sites, and their forms into Dexie. Jobs and
+ * Pulls this engineer's assigned jobs (RLS already scopes these to a
+ * ±30-day window — see 20260129000000_widen_engineer_job_window.sql),
+ * their sites, and their forms into Dexie. Jobs and
  * sites are server-authoritative and always overwritten; install/survey
  * forms are only overwritten for jobs with no pending outbox operation, so
  * a sync-down never clobbers an in-progress offline form edit.
