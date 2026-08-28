@@ -35,8 +35,12 @@ ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
 # on a memory-constrained VM that default sits well under what's actually
 # available once swap is added, and the build's TypeScript-checking pass
 # (a separate worker process) hits it. Raise it explicitly so the build
-# can actually use the swap instead of hitting a self-imposed ceiling.
-ENV NODE_OPTIONS="--max-old-space-size=4096"
+# can use swap instead of hitting a self-imposed ceiling — but stay well
+# under the VM's real total capacity (1.9GB RAM + swap): this ceiling
+# applies per-process, and the type-check step spawns its own worker, so
+# a too-high value here lets the build starve the *live* container's
+# next-server process too, not just fail the build itself.
+ENV NODE_OPTIONS="--max-old-space-size=1536"
 RUN pnpm build
 
 # --- runner: just the standalone server output, no source or devDependencies ---
