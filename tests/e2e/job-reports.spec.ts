@@ -63,6 +63,7 @@ test("manager pulls a job's PDF and zip report from /office/reports", async ({ p
   await selectByLabel("Mount type", "Wall");
   await selectByLabel("Power source", "Existing socket");
   await selectByLabel("Network", "Ethernet");
+  await page.locator("label", { hasText: "Network port" }).locator("input").fill("Port 1"); // required whenever Network is Ethernet, per showNetworkPort in job-form.ts
   await selectByLabel("Player boot test", "Pass");
   await selectByLabel("Content displaying", "Pass");
   await page.locator('button:text-is("Yes")').nth(1).click(); // 2nd Yes/No pair in DOM order: Parking notified (0), Reported to site manager (1)

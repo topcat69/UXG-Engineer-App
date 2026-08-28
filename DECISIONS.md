@@ -5470,3 +5470,30 @@ comes from the auto-revisit webhook on a blocking issue, an entirely
 separate mechanism from this manual form field.
 
 Verified: `pnpm typecheck` and `pnpm lint` clean.
+
+## Fix: the actual final blocker, found via the uploaded artifact instead of another guess
+
+Round 7's `revisit_required` fix still didn't clear the block — same
+"This job is submitted." never appearing, on all four specs. Rather
+than guess an eighth time, downloaded the `playwright-results` artifact
+uploaded by round 6's CI change and read the failure's accessibility
+snapshot (`error-context.md`) directly. It named the exact blocker in
+plain text: `"Can't submit yet: Network port is required."` — all four
+specs select Network = "Ethernet", and `showNetworkPort` (job-form.ts)
+requires a network port value whenever that's selected, but none ever
+filled it in. Confirmed via all four specs' own snapshots that this
+was the *only* remaining item on each "Can't submit yet" list, not one
+of several. Fixed by filling "Network port" right after selecting
+Ethernet, in all four specs.
+
+This is the field-app form's fourth conditionally-required field this
+session's specs never accounted for (after `reported_to_site_manager`,
+`equipment_damage`, `revisit_required`) — all four are recent additions
+(site-manager reporting, equipment damage, and the underlying
+install_form → job_details migration itself) that predate these specs
+ever being run against the real app, since CI was broken the whole
+time they'd have caught this.
+
+Verified: `pnpm typecheck` and `pnpm lint` clean. Confirmed via the
+downloaded artifact, not just source-reading, that this is the last
+gap for all four specs.
