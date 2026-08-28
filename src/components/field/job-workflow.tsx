@@ -40,6 +40,7 @@ import {
 } from "@/lib/forms/install-form";
 import {
   EMPTY_JOB_DETAILS,
+  JOB_TYPE_LABELS,
   jobDetailsRowToValues,
   photoSlotsFor,
   showIssueDetail as showIssueDetailJobDetails,
@@ -369,6 +370,7 @@ export function JobWorkflow({
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-semibold">{job.job_number}</h1>
+          <Badge variant="outline">{JOB_TYPE_LABELS[job.job_type as keyof typeof JOB_TYPE_LABELS] ?? humanize(job.job_type)}</Badge>
           <Badge variant="secondary">{humanize(job.status)}</Badge>
         </div>
         <p className="text-muted-foreground text-sm">{client ? `${client.name} — ${site?.name}` : site?.name}</p>

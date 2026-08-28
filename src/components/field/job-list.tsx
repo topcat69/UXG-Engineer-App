@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/offline/db";
 import { humanize } from "@/lib/format/text";
 import { isInEngineerQueue } from "@/lib/jobs/engineer-queue";
+import { JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 
 export function JobList({
   currentUserId,
@@ -51,7 +52,12 @@ export function JobList({
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{job.job_number}</span>
-                  <Badge variant="secondary">{humanize(job.status)}</Badge>
+                  <div className="flex items-center gap-1">
+                    <Badge variant="outline">
+                      {JOB_TYPE_LABELS[job.job_type as keyof typeof JOB_TYPE_LABELS] ?? humanize(job.job_type)}
+                    </Badge>
+                    <Badge variant="secondary">{humanize(job.status)}</Badge>
+                  </div>
                 </div>
                 <p className="text-muted-foreground text-sm">
                   {client ? `${client.name} — ${site?.name ?? "Unknown site"}` : (site?.name ?? "Unknown site")}

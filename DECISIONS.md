@@ -5134,3 +5134,26 @@ addendum in this sandbox, no regressions.
 `supabase/migrations/20260129000000_widen_engineer_job_window.sql`
 needs `supabase db push` before the next
 `docker compose … up -d --build app`.
+
+## 2026-08-28 — Field app: show job type on My Jobs and the job screen
+
+"Also on the field app, for each job, can you include the type of job
+i.e. installation, delivery etc." Neither `job-list.tsx`'s "My Jobs"
+list nor `job-workflow.tsx`'s job-detail header showed `job_type` at
+all — an engineer had no way to tell an install from a delivery without
+opening the job and reading further in. Both already had `job.job_type`
+available locally (it's just a plain column on the synced `jobs` row),
+so this is a display-only change, no schema/sync work needed.
+
+Added an outline-variant `Badge` — labelled via the same
+`JOB_TYPE_LABELS[job.job_type] ?? humanize(job.job_type)` fallback
+pattern already used everywhere else a job type gets shown (the
+scheduled email, the office job list, etc.) — next to the existing
+status badge in both places: on each row of the My Jobs list, and in
+the job screen's header alongside the job number.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test` all
+clean. 379 passed, same 2 pre-existing Supabase-dependent failures as
+every addendum in this sandbox, no regressions.
+
+No migration, no deploy-order dependency — pure app-code fix.
