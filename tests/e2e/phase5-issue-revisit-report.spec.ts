@@ -52,7 +52,7 @@ test("a failed check produces a blocking issue, a linked revisit job, and approv
   // --- Field: check in, deliberately fail the boot test, submit. ---
   await loginAs(page, "engineer@opoc.test");
   await page.getByText(tag).click();
-  await page.getByRole("button", { name: "Start Travelling" }).click();
+  await page.getByRole("button", { name: "Start Travelling" }).click({ force: true });
   await expect(page.getByRole("button", { name: /Check In/ })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: /Check In/ }).click();
   await expect(page.getByText("In Progress")).toBeVisible();
@@ -65,8 +65,8 @@ test("a failed check produces a blocking issue, a linked revisit job, and approv
   await selectByLabel("Mount type", "Wall");
   await selectByLabel("Power source", "Existing socket");
   await selectByLabel("Network", "Ethernet");
-  await selectByLabel("Player boot test", "fail"); // the deliberate failure this whole test is about
-  await selectByLabel("Content displaying", "pass");
+  await selectByLabel("Player boot test", "Fail"); // the deliberate failure this whole test is about
+  await selectByLabel("Content displaying", "Pass");
   await page.locator("label", { hasText: "Client name" }).locator("input").fill("P5 Test Client");
 
   const photoBuffer = Buffer.from(TINY_PNG_BASE64, "base64");

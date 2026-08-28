@@ -73,7 +73,7 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   await expect(page.getByText("Draft", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Verify screen mount")).toBeVisible();
   await expect(page.getByText("Photograph cable run")).toBeVisible();
-  const duplicateCheckboxes = page.locator('input[type="checkbox"]');
+  const duplicateCheckboxes = page.locator('section:has(h2:text("Tasks")) input[type="checkbox"]');
   await expect(duplicateCheckboxes.first()).not.toBeChecked();
 
   // --- Field: check in, and the same checklist blocks submit until ticked. ---
@@ -83,7 +83,7 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   const fieldPage = await page.context().newPage();
   await loginAs(fieldPage, "engineer@opoc.test");
   await fieldPage.getByText(tag).click();
-  await fieldPage.getByRole("button", { name: "Start Travelling" }).click();
+  await fieldPage.getByRole("button", { name: "Start Travelling" }).click({ force: true });
   await expect(fieldPage.getByRole("button", { name: /Check In/ })).toBeVisible({ timeout: 10_000 });
   await fieldPage.getByRole("button", { name: /Check In/ }).click();
   await expect(fieldPage.getByText("In Progress")).toBeVisible({ timeout: 15_000 });
@@ -99,8 +99,8 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   await selectByLabel("Mount type", "Wall");
   await selectByLabel("Power source", "Existing socket");
   await selectByLabel("Network", "Ethernet");
-  await selectByLabel("Player boot test", "pass");
-  await selectByLabel("Content displaying", "pass");
+  await selectByLabel("Player boot test", "Pass");
+  await selectByLabel("Content displaying", "Pass");
   await fieldPage.locator("label", { hasText: "Client name" }).locator("input").fill("Tasks Test Client");
 
   const photoBuffer = Buffer.from(TINY_PNG_BASE64, "base64");

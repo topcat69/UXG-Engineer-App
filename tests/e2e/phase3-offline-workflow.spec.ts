@@ -61,7 +61,7 @@ test("engineer completes a job entirely offline, survives a reload mid-form, and
   await context.setOffline(true);
 
   await page.getByText(tag).click();
-  await page.getByRole("button", { name: "Start Travelling" }).click();
+  await page.getByRole("button", { name: "Start Travelling" }).click({ force: true });
   await expect(page.getByRole("button", { name: /Check In/ })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: /Check In/ }).click();
   await expect(page.getByText("In Progress")).toBeVisible();
@@ -86,8 +86,8 @@ test("engineer completes a job entirely offline, survives a reload mid-form, and
   await selectByLabel("Mount type", "Wall");
   await selectByLabel("Power source", "Existing socket");
   await selectByLabel("Network", "Ethernet");
-  await selectByLabel("Player boot test", "pass");
-  await selectByLabel("Content displaying", "pass");
+  await selectByLabel("Player boot test", "Pass");
+  await selectByLabel("Content displaying", "Pass");
   await page.locator("label", { hasText: "Client name" }).locator("input").fill("Offline Client");
 
   // Capture all six required photos from a local fixture — the camera

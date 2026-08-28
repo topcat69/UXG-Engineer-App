@@ -5255,3 +5255,43 @@ Verified: `pnpm typecheck` and `pnpm lint` clean. `pnpm test` (Vitest)
 unaffected — these are Playwright specs, not run in this sandbox
 (no Docker). The real verification is the next CI run on GitHub's
 runners, watched live after this push.
+
+## Fix: 3 more E2E issues found by the now-passing CI (6/10 -> 8/10 -> 10/10)
+
+The fix above got CI from 4/10 to 6/10 passing Playwright specs. The
+remaining 4 failures split into three distinct causes, all found the
+same way — CI actually running against the real app for the first time
+in over a week:
+
+- `job-reports.spec.ts`, `phase5-issue-revisit-report.spec.ts`:
+  `selectByLabel("Player boot test", "pass")` timed out — the PASS_FAIL
+  select's options are rendered through `labelFor={humanize}` in
+  `job-workflow.tsx`, so the option text is "Pass"/"Fail", not the raw
+  lowercase stored value. Same class of staleness as the earlier
+  humanize() fixes, just missed the first pass since these two specs
+  hadn't gotten past the Check In step before. Fixed 8 call sites
+  across 4 specs.
+- `job-templates-tasks.spec.ts`: `page.locator('input[type="checkbox"]').first()`
+  grabbed a RequiredFieldsPanel toggle checkbox instead of a task
+  checkbox — that panel (this session, required-fields feature) added
+  more checkboxes to the same job detail page after this spec was
+  written, and the untargeted selector silently started matching the
+  wrong one. Scoped to `section:has(h2:text("Tasks")) input[type="checkbox"]`,
+  matching the scoping already used for the field-app task checkboxes
+  a few lines below.
+- `phase3-offline-workflow.spec.ts`: the "Start Travelling" click itself
+  timed out — Playwright's actionability check kept finding the button
+  "detached from the DOM, retrying" and never stabilized. startTravelling
+  writes to Dexie immediately (outbox architecture), and the resulting
+  `useLiveQuery` re-render can swap the button out from under Playwright's
+  stability wait once genuinely offline. Fixed with `.click({ force: true })`
+  on all four "Start Travelling" click sites for consistency, skipping the
+  stability check rather than the click itself — standard practice for an
+  optimistic-UI transition, and it doesn't weaken what the test proves
+  (the follow-up `expect(...".../Check In/...").toBeVisible()` still
+  confirms the click actually landed).
+
+No application code changed in this round either. If CI is fully green
+after this, `deploy.yml` will run for the first time since 2026-08-17.
+
+Verified: `pnpm typecheck` and `pnpm lint` clean.

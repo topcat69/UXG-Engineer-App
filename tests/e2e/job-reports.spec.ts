@@ -50,7 +50,7 @@ test("manager pulls a job's PDF and zip report from /office/reports", async ({ p
   // --- Field: check in, fill the form, capture a photo and signature, submit clean. ---
   await loginAs(page, "engineer@opoc.test");
   await page.getByText(tag).click();
-  await page.getByRole("button", { name: "Start Travelling" }).click();
+  await page.getByRole("button", { name: "Start Travelling" }).click({ force: true });
   await expect(page.getByRole("button", { name: /Check In/ })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: /Check In/ }).click();
   await expect(page.getByText("In Progress")).toBeVisible();
@@ -63,8 +63,8 @@ test("manager pulls a job's PDF and zip report from /office/reports", async ({ p
   await selectByLabel("Mount type", "Wall");
   await selectByLabel("Power source", "Existing socket");
   await selectByLabel("Network", "Ethernet");
-  await selectByLabel("Player boot test", "pass");
-  await selectByLabel("Content displaying", "pass");
+  await selectByLabel("Player boot test", "Pass");
+  await selectByLabel("Content displaying", "Pass");
   await page.locator("label", { hasText: "Client name" }).locator("input").fill("Report Test Client");
 
   const photoBuffer = Buffer.from(TINY_PNG_BASE64, "base64");
