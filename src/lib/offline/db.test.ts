@@ -29,6 +29,7 @@ describe("offline db", () => {
       travel_start_lng: null,
       geofence_variance_m: null,
       description: null,
+      quickbooks_no: null,
       parent_job_id: null,
       source_issue_id: null,
       qa_status: "pending",

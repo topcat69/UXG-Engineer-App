@@ -562,6 +562,7 @@ export type Database = {
           project_id: string | null
           qa_notes: string | null
           qa_status: Database["public"]["Enums"]["qa_status"] | null
+          quickbooks_no: string | null
           scheduled_end: string | null
           scheduled_start: string | null
           site_id: string
@@ -593,6 +594,7 @@ export type Database = {
           project_id?: string | null
           qa_notes?: string | null
           qa_status?: Database["public"]["Enums"]["qa_status"] | null
+          quickbooks_no?: string | null
           scheduled_end?: string | null
           scheduled_start?: string | null
           site_id: string
@@ -624,6 +626,7 @@ export type Database = {
           project_id?: string | null
           qa_notes?: string | null
           qa_status?: Database["public"]["Enums"]["qa_status"] | null
+          quickbooks_no?: string | null
           scheduled_end?: string | null
           scheduled_start?: string | null
           site_id?: string

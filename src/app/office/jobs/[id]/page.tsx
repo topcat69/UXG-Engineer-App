@@ -153,6 +153,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             jobType={job.job_type}
             priority={job.priority}
             description={job.description}
+            quickbooksNo={job.quickbooks_no}
             projects={projects ?? []}
             clients={clients ?? []}
             sites={allSites ?? []}

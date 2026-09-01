@@ -18,8 +18,9 @@ import type { ActionResult } from "../actions";
 
 /**
  * Edits the core static fields a job was created with — project, site,
- * job type, priority, description. Same validation as createJob (project/
- * site/job type all required); priority/description are free-form and
+ * job type, priority, description, QuickBooks No. (the purchase order
+ * reference). Same validation as createJob (project/site/job type all
+ * required); priority/description/quickbooks_no are free-form and
  * optional. No status gating — deliberately not blocked once a job is
  * past draft, since restricting that is a design call beyond what was
  * asked for and would just get in an office user's way if they need to
@@ -27,7 +28,14 @@ import type { ActionResult } from "../actions";
  */
 export async function updateJob(
   jobId: string,
-  input: { project_id: string; site_id: string; job_type: string; priority: string; description: string },
+  input: {
+    project_id: string;
+    site_id: string;
+    job_type: string;
+    priority: string;
+    description: string;
+    quickbooks_no: string;
+  },
 ): Promise<ActionResult> {
   if (!input.project_id) return { ok: false, message: "Select a project." };
   if (!input.site_id) return { ok: false, message: "Select a site." };
@@ -42,6 +50,7 @@ export async function updateJob(
       job_type: input.job_type,
       priority: input.priority.trim() || "P3",
       description: input.description.trim() || null,
+      quickbooks_no: input.quickbooks_no.trim() || null,
     })
     .eq("id", jobId);
   if (error) return { ok: false, message: error.message };

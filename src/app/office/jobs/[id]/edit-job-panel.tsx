@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { humanize } from "@/lib/format/text";
 import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
@@ -29,6 +30,7 @@ export function EditJobPanel({
   jobType,
   priority,
   description,
+  quickbooksNo,
   projects,
   clients,
   sites,
@@ -43,6 +45,7 @@ export function EditJobPanel({
   jobType: string;
   priority: string | null;
   description: string | null;
+  quickbooksNo: string | null;
   projects: { id: string; name: string }[];
   clients: { id: string; name: string }[];
   sites: { id: string; name: string; client_id: string }[];
@@ -55,6 +58,7 @@ export function EditJobPanel({
   const [editJobType, setEditJobType] = useState(jobType);
   const [editPriority, setEditPriority] = useState(priority ?? "P3");
   const [editDescription, setEditDescription] = useState(description ?? "");
+  const [editQuickbooksNo, setEditQuickbooksNo] = useState(quickbooksNo ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -68,6 +72,7 @@ export function EditJobPanel({
         job_type: editJobType,
         priority: editPriority,
         description: editDescription,
+        quickbooks_no: editQuickbooksNo,
       });
       if (result.ok) {
         setEditing(false);
@@ -94,7 +99,8 @@ export function EditJobPanel({
               {clientName}
             </Link>
           </>
-        )}{" "}
+        )}
+        {quickbooksNo && <> · QuickBooks No. {quickbooksNo}</>}{" "}
         <button type="button" onClick={() => setEditing(true)} className="text-xs underline">
           Edit
         </button>
@@ -185,6 +191,15 @@ export function EditJobPanel({
               </option>
             ))}
           </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-muted-foreground text-xs">QuickBooks No.</label>
+          <Input
+            value={editQuickbooksNo}
+            onChange={(e) => setEditQuickbooksNo(e.target.value)}
+            className="h-9 w-40"
+            placeholder="PO number"
+          />
         </div>
       </div>
       <div className="flex flex-col gap-1">
