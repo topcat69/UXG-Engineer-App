@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { nextJobNumber } from "./job-number";
 import { maxJobSequenceForYear } from "./next-job-number";
+import { cloneEquipmentForJob, cloneJobDetailsForRevisit } from "./clone-job-details";
 
 type AnySupabaseClient = SupabaseClient<Database>;
 
@@ -21,7 +22,14 @@ export type CreateRevisitResult = { revisitId: string } | { error: string };
  * per spec — the one place this happens, used by both QA rejection
  * (office-initiated) and the blocks_completion issue webhook
  * (field-or-office-initiated), so a revisit looks and behaves identically
- * regardless of what triggered it.
+ * regardless of what triggered it. Also carries over the parent's
+ * office-prep/equipment job_details fields and its job_equipment list (see
+ * clone-job-details.ts for exactly what does and doesn't copy, and why) —
+ * same site, so RAMS/site plan/serials etc. almost certainly still hold,
+ * and the engineer shouldn't have to re-enter them. Best-effort past the
+ * point the revisit job itself is created: a failure here still returns
+ * an error (so the caller can flag it), but doesn't roll back the job,
+ * matching duplicateJob's existing task-copy behaviour.
  */
 export async function createRevisitJob(
   supabase: AnySupabaseClient,
@@ -44,6 +52,24 @@ export async function createRevisitJob(
     .select("id")
     .single();
   if (error) return { error: error.message };
+
+  const { data: parentDetails } = await supabase.from("job_details").select("*").eq("job_id", parent.id).maybeSingle();
+  if (parentDetails) {
+    const { error: detailsError } = await supabase
+      .from("job_details")
+      .insert({ job_id: revisit.id, ...cloneJobDetailsForRevisit(parentDetails) });
+    if (detailsError) return { error: detailsError.message };
+  }
+
+  const { data: parentEquipment } = await supabase
+    .from("job_equipment")
+    .select("model, serial, position")
+    .eq("job_id", parent.id)
+    .order("position");
+  if (parentEquipment && parentEquipment.length > 0) {
+    const { error: equipmentError } = await supabase.from("job_equipment").insert(cloneEquipmentForJob(parentEquipment, revisit.id));
+    if (equipmentError) return { error: equipmentError.message };
+  }
 
   await supabase.from("status_events").insert({
     job_id: revisit.id,
