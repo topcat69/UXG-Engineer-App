@@ -8,6 +8,8 @@ describe("parseJobListFilters", () => {
       jobType: "",
       projectId: "",
       assignedTo: "",
+      clientId: "",
+      siteId: "",
       q: "",
       ids: [],
       active: false,
@@ -32,6 +34,12 @@ describe("parseJobListFilters", () => {
   it("takes the first value when a param repeats", () => {
     expect(parseJobListFilters({ status: ["scheduled", "closed"] }).status).toBe("scheduled");
   });
+
+  it("parses client_id and site_id", () => {
+    const filters = parseJobListFilters({ client_id: "client-1", site_id: "site-1" });
+    expect(filters.clientId).toBe("client-1");
+    expect(filters.siteId).toBe("site-1");
+  });
 });
 
 describe("hasAnyFilter", () => {
@@ -43,5 +51,7 @@ describe("hasAnyFilter", () => {
     expect(hasAnyFilter(parseJobListFilters({ q: "OPOC" }))).toBe(true);
     expect(hasAnyFilter(parseJobListFilters({ active: "true" }))).toBe(true);
     expect(hasAnyFilter(parseJobListFilters({ ids: "a" }))).toBe(true);
+    expect(hasAnyFilter(parseJobListFilters({ client_id: "c1" }))).toBe(true);
+    expect(hasAnyFilter(parseJobListFilters({ site_id: "s1" }))).toBe(true);
   });
 });

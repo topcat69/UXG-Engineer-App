@@ -13,6 +13,8 @@ export type JobListFilters = {
   jobType: string;
   projectId: string;
   assignedTo: string;
+  clientId: string;
+  siteId: string;
   q: string;
   /** Dashboard drill-through: an exact set of job ids, computed client-side from data the dashboard already has in memory (see metrics.ts) — the only way to filter precisely on things like "which jobs a specific revisit-cause category produced" without a bespoke join query per chart. */
   ids: string[];
@@ -30,6 +32,8 @@ export function parseJobListFilters(searchParams: JobListSearchParams): JobListF
     jobType: param(searchParams, "job_type"),
     projectId: param(searchParams, "project_id"),
     assignedTo: param(searchParams, "assigned_to"),
+    clientId: param(searchParams, "client_id"),
+    siteId: param(searchParams, "site_id"),
     q: param(searchParams, "q"),
     ids: idsParam ? idsParam.split(",").filter(Boolean) : [],
     active: param(searchParams, "active") === "true",
@@ -43,6 +47,8 @@ export function hasAnyFilter(filters: JobListFilters): boolean {
     filters.jobType ||
     filters.projectId ||
     filters.assignedTo ||
+    filters.clientId ||
+    filters.siteId ||
     filters.q ||
     filters.ids.length > 0 ||
     filters.active ||
@@ -56,6 +62,13 @@ export function hasAnyFilter(filters: JobListFilters): boolean {
 // instantiations after `.select()`; the return type callers actually use
 // is whatever they passed in, narrowed by TypeScript's control flow at the
 // call site, not by this function's signature.
+//
+// filters.clientId is deliberately NOT applied here: jobs has no client_id
+// column (only site_id, and a site belongs to a client), so filtering by
+// client means resolving that client's site ids first — a real query this
+// function can't run, being a synchronous chain-builder. Callers that want
+// it resolve those site ids themselves and fold them into filters.siteId
+// (or a client-side `.in("site_id", ...)`) before/after calling this.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function applyJobListFilters<T extends { eq: any; is: any; ilike: any; in: any; not: any }>(
   query: T,
@@ -65,6 +78,7 @@ export function applyJobListFilters<T extends { eq: any; is: any; ilike: any; in
   if (filters.status) q = q.eq("status", filters.status as Database["public"]["Enums"]["job_status"]);
   if (filters.jobType) q = q.eq("job_type", filters.jobType);
   if (filters.projectId) q = q.eq("project_id", filters.projectId);
+  if (filters.siteId) q = q.eq("site_id", filters.siteId);
   if (filters.assignedTo === "unassigned") q = q.is("assigned_to", null);
   else if (filters.assignedTo) q = q.eq("assigned_to", filters.assignedTo);
   if (filters.q) q = q.ilike("job_number", `%${filters.q}%`);

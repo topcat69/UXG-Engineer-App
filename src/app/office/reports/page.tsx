@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { applyJobListFilters, hasAnyFilter, parseJobListFilters, type JobListSearchParams } from "@/lib/jobs/list-query";
+import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 import { humanize } from "@/lib/format/text";
 
 const PAGE_SIZE = 50;
@@ -22,23 +23,32 @@ function param(searchParams: JobListSearchParams, key: string): string {
 }
 
 /**
- * Only closed (completed) or cancelled jobs are listed — a report only
- * makes sense for a job that's actually finished, one way or another (see
- * REPORT_STATUSES above). Within that, a report is still "as applicable":
- * missing form answers, photos, or signatures just make for a shorter
- * PDF/zip (see generateCompletionReport), not a reason to exclude the job.
- * Downloads hit /api/jobs/[id]/report/{pdf,zip}, which generate fresh on
- * every request rather than reusing jobs.completion_pdf_url (that field
- * only exists post-approval and can go stale) — see that route's comment.
+ * Only closed (completed), cancelled, or revisit (QA-rejected) jobs are
+ * listed — a report only makes sense for a job that's actually finished,
+ * one way or another (see REPORT_STATUSES above). Within that, a report is
+ * still "as applicable": missing form answers, photos, or signatures just
+ * make for a shorter PDF/zip (see generateCompletionReport), not a reason
+ * to exclude the job. Downloads hit /api/jobs/[id]/report/{pdf,zip}, which
+ * generate fresh on every request rather than reusing jobs.completion_pdf_url
+ * (that field only exists post-approval and can go stale) — see that
+ * route's comment.
  */
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<JobListSearchParams> }) {
   const sp = await searchParams;
   const filters = parseJobListFilters(sp);
-  const { status, q } = filters;
+  const { status, jobType, projectId, assignedTo, clientId, siteId, q } = filters;
   const page = Math.max(1, Number(param(sp, "page")) || 1);
 
   const supabase = await createClient();
-  const query = applyJobListFilters(
+
+  // clientId isn't a jobs column (only site_id is — a site belongs to a
+  // client), so it's resolved to that client's site ids here and folded in
+  // as an extra .in("site_id", ...) alongside whatever applyJobListFilters
+  // already applied (including a specific siteId, if also set — the two
+  // combine as a normal AND, same as any other pair of filters).
+  const clientSiteIds = clientId ? (await supabase.from("sites").select("id").eq("client_id", clientId)).data?.map((s) => s.id) ?? [] : null;
+
+  let query = applyJobListFilters(
     supabase
       .from("jobs")
       .select(
@@ -50,7 +60,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
     filters,
   );
-  const { data: jobs, count, error } = await query;
+  if (clientSiteIds) query = query.in("site_id", clientSiteIds.length > 0 ? clientSiteIds : ["00000000-0000-0000-0000-000000000000"]);
+
+  const [{ data: jobs, count, error }, { data: projects }, { data: engineers }, { data: clients }, { data: sites }] =
+    await Promise.all([
+      query,
+      supabase.from("projects").select("id, name").order("name"),
+      supabase.from("users").select("id, name").in("role", ["engineer", "manager"]).eq("active", true).order("name"),
+      supabase.from("clients").select("id, name").order("name"),
+      supabase.from("sites").select("id, name, client_id").order("name"),
+    ]);
+
   if (error) {
     return <p className="text-destructive">Failed to load jobs: {error.message}</p>;
   }
@@ -92,6 +112,97 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             {REPORT_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {humanize(s)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground" htmlFor="job_type">
+            Job type
+          </label>
+          <select
+            id="job_type"
+            name="job_type"
+            defaultValue={jobType}
+            className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
+          >
+            <option value="">All</option>
+            {JOB_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {JOB_TYPE_LABELS[t]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground" htmlFor="client_id">
+            Client
+          </label>
+          <select
+            id="client_id"
+            name="client_id"
+            defaultValue={clientId}
+            className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
+          >
+            <option value="">All</option>
+            {(clients ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground" htmlFor="site_id">
+            Site
+          </label>
+          <select
+            id="site_id"
+            name="site_id"
+            defaultValue={siteId}
+            className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
+          >
+            <option value="">All</option>
+            {(sites ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground" htmlFor="project_id">
+            Project
+          </label>
+          <select
+            id="project_id"
+            name="project_id"
+            defaultValue={projectId}
+            className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
+          >
+            <option value="">All</option>
+            {(projects ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground" htmlFor="assigned_to">
+            Assigned to
+          </label>
+          <select
+            id="assigned_to"
+            name="assigned_to"
+            defaultValue={assignedTo}
+            className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
+          >
+            <option value="">Anyone</option>
+            <option value="unassigned">Unassigned</option>
+            {(engineers ?? []).map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}
               </option>
             ))}
           </select>
