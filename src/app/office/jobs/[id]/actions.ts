@@ -272,16 +272,22 @@ export async function deleteJobTask(taskId: string, jobId: string): Promise<Acti
  * existing 'media' bucket / jobs/{job_id}/{filename} path convention (see
  * media-capture.ts) rather than a new bucket — same storage policies apply.
  */
-const DOCUMENT_LABELS = { rams: "RAMS", site_plan: "Site plan", design_pack: "Design pack" } as const;
+const DOCUMENT_LABELS = {
+  rams: "RAMS",
+  site_plan: "Site plan",
+  design_pack: "Design pack",
+  parking_permit: "Parking permit",
+} as const;
 const DOCUMENT_PATCH_KEYS = {
   rams: "rams_storage_path",
   site_plan: "site_plan_storage_path",
   design_pack: "design_pack_storage_path",
+  parking_permit: "parking_permit_storage_path",
 } as const;
 
 export async function uploadJobDocument(
   jobId: string,
-  kind: "rams" | "site_plan" | "design_pack",
+  kind: "rams" | "site_plan" | "design_pack" | "parking_permit",
   formData: FormData,
 ): Promise<ActionResult> {
   const file = formData.get("file");

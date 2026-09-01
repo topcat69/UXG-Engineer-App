@@ -182,6 +182,7 @@ export function JobWorkflow({
       rams_storage_path: detailsRow?.rams_storage_path ?? null,
       site_plan_storage_path: detailsRow?.site_plan_storage_path ?? null,
       design_pack_storage_path: detailsRow?.design_pack_storage_path ?? null,
+      parking_permit_storage_path: detailsRow?.parking_permit_storage_path ?? null,
       sla_requirement_detail: detailsRow?.sla_requirement_detail ?? null,
       job_information: detailsRow?.job_information ?? null,
       parking_notified: detailsValues.parking_notified,
@@ -752,6 +753,9 @@ function JobDetailsSection({
       <Field label="Parking considerations / restrictions">
         <Textarea value={values.parking_notes} onChange={(e) => setValues((v) => ({ ...v, parking_notes: e.target.value }))} />
       </Field>
+      <p className="text-sm">
+        Parking permit: {detailsRow?.parking_permit_storage_path ? "Attached — view in office system" : "Not attached"}
+      </p>
 
       <Field label="Reported to site manager">
         <YesNoButtons value={values.reported_to_site_manager} onChange={(v) => setValues((prev) => ({ ...prev, reported_to_site_manager: v }))} />

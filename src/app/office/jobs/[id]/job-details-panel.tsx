@@ -19,6 +19,7 @@ type JobDetailsData = {
   rams_storage_path: string | null;
   site_plan_storage_path: string | null;
   design_pack_storage_path: string | null;
+  parking_permit_storage_path: string | null;
   sla_requirement_detail: string | null;
   job_information: string | null;
   parking_notes: string | null;
@@ -58,11 +59,12 @@ export function JobDetailsPanel({
   const ramsInputRef = useRef<HTMLInputElement>(null);
   const sitePlanInputRef = useRef<HTMLInputElement>(null);
   const designPackInputRef = useRef<HTMLInputElement>(null);
+  const parkingPermitInputRef = useRef<HTMLInputElement>(null);
 
   if (!usesJobDetails(jobType)) return null;
   const type = jobType as JobDetailsType;
 
-  function handleUpload(kind: "rams" | "site_plan" | "design_pack", input: HTMLInputElement | null) {
+  function handleUpload(kind: "rams" | "site_plan" | "design_pack" | "parking_permit", input: HTMLInputElement | null) {
     const file = input?.files?.[0];
     if (!file) return;
     const formData = new FormData();
@@ -135,12 +137,30 @@ export function JobDetailsPanel({
         </Button>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <span className="text-muted-foreground text-xs">Parking considerations / restrictions</span>
-        <Textarea value={parkingNotes} onChange={(e) => setParkingNotes(e.target.value)} rows={2} />
-        <Button type="button" size="sm" disabled={isPending} onClick={handleSaveParkingNotes} className="self-start">
-          Save
-        </Button>
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="flex flex-col gap-2">
+          <span className="text-muted-foreground text-xs">Parking considerations / restrictions</span>
+          <Textarea value={parkingNotes} onChange={(e) => setParkingNotes(e.target.value)} rows={2} />
+          <Button type="button" size="sm" disabled={isPending} onClick={handleSaveParkingNotes} className="self-start">
+            Save
+          </Button>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-muted-foreground text-xs">Parking permit</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm">{jobDetails?.parking_permit_storage_path ? "Attached" : "Not attached"}</span>
+            <input
+              ref={parkingPermitInputRef}
+              type="file"
+              accept="application/pdf,image/*"
+              className="hidden"
+              onChange={() => handleUpload("parking_permit", parkingPermitInputRef.current)}
+            />
+            <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => parkingPermitInputRef.current?.click()}>
+              Upload
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-2">

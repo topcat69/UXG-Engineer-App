@@ -282,6 +282,7 @@ export type Database = {
           network_type: string | null
           parking_notes: string | null
           parking_notified: boolean | null
+          parking_permit_storage_path: string | null
           player_boot_test: Database["public"]["Enums"]["pass_fail"] | null
           player_serial: string | null
           power_source: string | null
@@ -312,6 +313,7 @@ export type Database = {
           network_type?: string | null
           parking_notes?: string | null
           parking_notified?: boolean | null
+          parking_permit_storage_path?: string | null
           player_boot_test?: Database["public"]["Enums"]["pass_fail"] | null
           player_serial?: string | null
           power_source?: string | null
@@ -342,6 +344,7 @@ export type Database = {
           network_type?: string | null
           parking_notes?: string | null
           parking_notified?: boolean | null
+          parking_permit_storage_path?: string | null
           player_boot_test?: Database["public"]["Enums"]["pass_fail"] | null
           player_serial?: string | null
           power_source?: string | null
