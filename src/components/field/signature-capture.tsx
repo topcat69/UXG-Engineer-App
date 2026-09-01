@@ -22,6 +22,22 @@ export function SignatureCapture({
   const padRef = useRef<SignaturePadLib | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Who actually signs on site is often not the site's registered contact
+  // (a different manager, a receptionist, whoever's around) — clientName is
+  // just a starting point to save typing, not assumed correct. Title is
+  // free text (Site Manager, Duty Manager, ...), not the hardcoded "Client"
+  // this used to send regardless of who signed.
+  const [signerName, setSignerName] = useState(clientName);
+  const [signerTitle, setSignerTitle] = useState("");
+  const nameEditedRef = useRef(false);
+
+  // clientName can still be filling in after this component mounts — the
+  // legacy survey path's "Client name" field lives earlier in the same
+  // form and is typed into after the signature block has already rendered.
+  // Keep tracking it until the engineer actually edits Name themselves.
+  useEffect(() => {
+    if (!nameEditedRef.current) setSignerName(clientName);
+  }, [clientName]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -47,8 +63,8 @@ export function SignatureCapture({
       await enqueueSignature({
         jobId,
         blob,
-        signerName: clientName || "Client",
-        signerRole: "Client",
+        signerName: signerName.trim() || "Client",
+        signerRole: signerTitle.trim() || "Client",
         capturedBy,
       });
       pad.clear();
@@ -62,6 +78,29 @@ export function SignatureCapture({
 
   return (
     <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        <div className="flex flex-1 flex-col gap-1">
+          <label className="text-muted-foreground text-xs">Name</label>
+          <input
+            value={signerName}
+            onChange={(e) => {
+              nameEditedRef.current = true;
+              setSignerName(e.target.value);
+            }}
+            placeholder="Who's signing"
+            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+          />
+        </div>
+        <div className="flex flex-1 flex-col gap-1">
+          <label className="text-muted-foreground text-xs">Title</label>
+          <input
+            value={signerTitle}
+            onChange={(e) => setSignerTitle(e.target.value)}
+            placeholder="e.g. Site Manager"
+            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+          />
+        </div>
+      </div>
       <canvas
         ref={canvasRef}
         className="h-40 w-full rounded-md border bg-white"
