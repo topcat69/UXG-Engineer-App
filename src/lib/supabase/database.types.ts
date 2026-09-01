@@ -747,6 +747,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          client_id: string | null
           created_at: string | null
           end_date: string | null
           id: string
@@ -755,6 +756,7 @@ export type Database = {
           status: string | null
         }
         Insert: {
+          client_id?: string | null
           created_at?: string | null
           end_date?: string | null
           id?: string
@@ -763,6 +765,7 @@ export type Database = {
           status?: string | null
         }
         Update: {
+          client_id?: string | null
           created_at?: string | null
           end_date?: string | null
           id?: string
@@ -770,7 +773,15 @@ export type Database = {
           start_date?: string | null
           status?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       share_links: {
         Row: {

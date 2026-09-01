@@ -32,7 +32,6 @@ export function EditJobPanel({
   description,
   quickbooksNo,
   projects,
-  clients,
   sites,
 }: {
   jobId: string;
@@ -46,14 +45,12 @@ export function EditJobPanel({
   priority: string | null;
   description: string | null;
   quickbooksNo: string | null;
-  projects: { id: string; name: string }[];
-  clients: { id: string; name: string }[];
+  projects: { id: string; name: string; client_id: string | null }[];
   sites: { id: string; name: string; client_id: string }[];
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [editProjectId, setEditProjectId] = useState(projectId ?? "");
-  const [editClientId, setEditClientId] = useState(clientId ?? "");
   const [editSiteId, setEditSiteId] = useState(siteId);
   const [editJobType, setEditJobType] = useState(jobType);
   const [editPriority, setEditPriority] = useState(priority ?? "P3");
@@ -62,7 +59,11 @@ export function EditJobPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const clientSites = useMemo(() => sites.filter((s) => s.client_id === editClientId), [sites, editClientId]);
+  const editSelectedProject = projects.find((p) => p.id === editProjectId);
+  const projectSites = useMemo(
+    () => (editSelectedProject?.client_id ? sites.filter((s) => s.client_id === editSelectedProject.client_id) : []),
+    [sites, editSelectedProject],
+  );
 
   function handleSave() {
     startTransition(async () => {
@@ -116,7 +117,10 @@ export function EditJobPanel({
           <label className="text-muted-foreground text-xs">Project</label>
           <select
             value={editProjectId}
-            onChange={(e) => setEditProjectId(e.target.value)}
+            onChange={(e) => {
+              setEditProjectId(e.target.value);
+              setEditSiteId("");
+            }}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           >
             <option value="">Select…</option>
@@ -128,38 +132,20 @@ export function EditJobPanel({
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-muted-foreground text-xs">Client</label>
-          <select
-            value={editClientId}
-            onChange={(e) => {
-              setEditClientId(e.target.value);
-              setEditSiteId("");
-            }}
-            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-          >
-            <option value="">Select…</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
           <label className="text-muted-foreground text-xs">Site</label>
           <select
             value={editSiteId}
             onChange={(e) => setEditSiteId(e.target.value)}
-            disabled={!editClientId}
+            disabled={!editSelectedProject?.client_id}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           >
-            <option value="">{editClientId ? "Select…" : "Pick a client first"}</option>
-            {clientSites.map((s) => (
+            <option value="">{editSelectedProject?.client_id ? "Select…" : "Pick a project first"}</option>
+            {projectSites.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
             ))}
-            {!clientSites.some((s) => s.id === editSiteId) && editSiteId && (
+            {!projectSites.some((s) => s.id === editSiteId) && editSiteId && (
               <option value={editSiteId}>{siteName}</option>
             )}
           </select>
@@ -219,6 +205,11 @@ export function EditJobPanel({
           Cancel
         </Button>
       </div>
+      {editProjectId && !editSelectedProject?.client_id && (
+        <p className="text-muted-foreground text-sm">
+          This project has no client assigned yet — set one on the Projects page first.
+        </p>
+      )}
       {message && <p className="text-destructive text-sm">{message}</p>}
     </div>
   );

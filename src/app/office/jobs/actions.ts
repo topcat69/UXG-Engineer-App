@@ -44,6 +44,18 @@ export async function createJob(projectId: string, siteId: string, jobType: stri
   if (!jobType) return { ok: false, message: "Select a job type." };
 
   const supabase = await createClient();
+
+  // The New Job form derives its site list from the chosen project's
+  // client, so this can't happen from the UI — but nothing at the DB level
+  // ties a site to a project, so it's still worth guarding server-side.
+  const [{ data: project }, { data: site }] = await Promise.all([
+    supabase.from("projects").select("client_id").eq("id", projectId).single(),
+    supabase.from("sites").select("client_id").eq("id", siteId).single(),
+  ]);
+  if (project?.client_id && site?.client_id && project.client_id !== site.client_id) {
+    return { ok: false, message: "That site doesn't belong to this project's client." };
+  }
+
   const year = new Date().getFullYear();
   const maxSeq = await maxJobSequenceForYear(supabase, year);
 

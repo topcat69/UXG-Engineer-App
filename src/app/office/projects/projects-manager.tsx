@@ -12,12 +12,15 @@ const STATUSES = ["active", "on_hold", "completed"];
 export function ProjectsManager({
   projects: initialProjects,
   jobCounts,
+  clients,
 }: {
   projects: ProjectRow[];
   jobCounts: Record<string, number>;
+  clients: { id: string; name: string }[];
 }) {
   const [projects, setProjects] = useState(initialProjects);
   const [name, setName] = useState("");
+  const [clientId, setClientId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [status, setStatus] = useState("active");
@@ -26,13 +29,19 @@ export function ProjectsManager({
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editClientId, setEditClientId] = useState("");
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
   const [editStatus, setEditStatus] = useState("active");
 
+  function clientName(id: string | null) {
+    return clients.find((c) => c.id === id)?.name ?? "—";
+  }
+
   function handleStartEdit(p: ProjectRow) {
     setEditingId(p.id);
     setEditName(p.name);
+    setEditClientId(p.client_id ?? "");
     setEditStartDate(p.start_date ?? "");
     setEditEndDate(p.end_date ?? "");
     setEditStatus(p.status ?? "active");
@@ -49,6 +58,7 @@ export function ProjectsManager({
     startTransition(async () => {
       const result = await updateProject(id, {
         name: editName,
+        client_id: editClientId,
         start_date: editStartDate,
         end_date: editEndDate,
         status: editStatus,
@@ -64,10 +74,11 @@ export function ProjectsManager({
 
   function handleCreate() {
     startTransition(async () => {
-      const result = await createProject({ name, start_date: startDate, end_date: endDate, status });
+      const result = await createProject({ name, client_id: clientId, start_date: startDate, end_date: endDate, status });
       if (result.ok) {
         setProjects((prev) => [result.project, ...prev]);
         setName("");
+        setClientId("");
         setStartDate("");
         setEndDate("");
         setStatus("active");
@@ -84,6 +95,7 @@ export function ProjectsManager({
         <thead>
           <tr className="border-b text-left">
             <th className="py-2 font-medium">Name</th>
+            <th className="py-2 font-medium">Client</th>
             <th className="py-2 font-medium">Status</th>
             <th className="py-2 font-medium">Dates</th>
             <th className="py-2 font-medium">Jobs</th>
@@ -97,6 +109,15 @@ export function ProjectsManager({
                 <Link href={`/office/jobs?project_id=${p.id}`} className="hover:underline">
                   {p.name}
                 </Link>
+              </td>
+              <td className="py-2 text-muted-foreground">
+                {p.client_id ? (
+                  <Link href={`/office/clients/${p.client_id}`} className="hover:underline">
+                    {clientName(p.client_id)}
+                  </Link>
+                ) : (
+                  "—"
+                )}
               </td>
               <td className="py-2">
                 <Badge variant="secondary">{humanize(p.status ?? "")}</Badge>
@@ -118,7 +139,7 @@ export function ProjectsManager({
           ))}
           {projects.length === 0 && (
             <tr>
-              <td colSpan={5} className="text-muted-foreground py-4 text-center">
+              <td colSpan={6} className="text-muted-foreground py-4 text-center">
                 No projects yet.
               </td>
             </tr>
@@ -137,6 +158,21 @@ export function ProjectsManager({
                 onChange={(e) => setEditName(e.target.value)}
                 className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
               />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-muted-foreground text-xs">Client</label>
+              <select
+                value={editClientId}
+                onChange={(e) => setEditClientId(e.target.value)}
+                className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+              >
+                <option value="">Select…</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-muted-foreground text-xs">Start date</label>
@@ -170,7 +206,7 @@ export function ProjectsManager({
                 ))}
               </select>
             </div>
-            <Button type="button" disabled={isPending || !editName.trim()} onClick={handleSaveEdit}>
+            <Button type="button" disabled={isPending || !editName.trim() || !editClientId} onClick={handleSaveEdit}>
               Save
             </Button>
             <Button type="button" variant="outline" disabled={isPending} onClick={handleCancelEdit}>
@@ -191,6 +227,21 @@ export function ProjectsManager({
               placeholder="e.g. Jobs 2026"
               className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
             />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-muted-foreground text-xs">Client</label>
+            <select
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+            >
+              <option value="">Select…</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-muted-foreground text-xs">Start date</label>
@@ -224,7 +275,7 @@ export function ProjectsManager({
               ))}
             </select>
           </div>
-          <Button type="button" onClick={handleCreate} disabled={isPending || !name.trim()}>
+          <Button type="button" onClick={handleCreate} disabled={isPending || !name.trim() || !clientId}>
             Add project
           </Button>
         </div>

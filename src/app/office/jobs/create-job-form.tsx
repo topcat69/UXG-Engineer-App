@@ -1,30 +1,31 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 import { createJob } from "./actions";
 
 export function CreateJobForm({
   projects,
-  clients,
   sites,
 }: {
-  projects: { id: string; name: string }[];
-  clients: { id: string; name: string }[];
+  projects: { id: string; name: string; client_id: string | null }[];
   sites: { id: string; name: string; client_id: string }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [projectId, setProjectId] = useState("");
-  const [clientId, setClientId] = useState("");
   const [siteId, setSiteId] = useState("");
   const [jobType, setJobType] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const clientSites = useMemo(() => sites.filter((s) => s.client_id === clientId), [sites, clientId]);
+  const selectedProject = projects.find((p) => p.id === projectId);
+  const projectSites = useMemo(
+    () => (selectedProject?.client_id ? sites.filter((s) => s.client_id === selectedProject.client_id) : []),
+    [sites, selectedProject],
+  );
 
   function handleCreate() {
     startTransition(async () => {
@@ -52,7 +53,10 @@ export function CreateJobForm({
           <label className="text-muted-foreground text-xs">Project</label>
           <select
             value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
+            onChange={(e) => {
+              setProjectId(e.target.value);
+              setSiteId("");
+            }}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           >
             <option value="">Select…</option>
@@ -64,33 +68,15 @@ export function CreateJobForm({
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-muted-foreground text-xs">Client</label>
-          <select
-            value={clientId}
-            onChange={(e) => {
-              setClientId(e.target.value);
-              setSiteId("");
-            }}
-            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-          >
-            <option value="">Select…</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
           <label className="text-muted-foreground text-xs">Site</label>
           <select
             value={siteId}
             onChange={(e) => setSiteId(e.target.value)}
-            disabled={!clientId}
+            disabled={!selectedProject?.client_id}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           >
-            <option value="">{clientId ? "Select…" : "Pick a client first"}</option>
-            {clientSites.map((s) => (
+            <option value="">{selectedProject?.client_id ? "Select…" : "Pick a project first"}</option>
+            {projectSites.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
@@ -124,7 +110,12 @@ export function CreateJobForm({
           Cancel
         </Button>
       </div>
-      {clientId && clientSites.length === 0 && (
+      {projectId && !selectedProject?.client_id && (
+        <p className="text-muted-foreground text-sm">
+          This project has no client assigned yet — set one on the Projects page first.
+        </p>
+      )}
+      {selectedProject?.client_id && projectSites.length === 0 && (
         <p className="text-muted-foreground text-sm">
           This client has no sites yet — add one from its Clients page first.
         </p>

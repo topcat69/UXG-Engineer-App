@@ -42,6 +42,18 @@ export async function updateJob(
   if (!input.job_type) return { ok: false, message: "Select a job type." };
 
   const supabase = await createClient();
+
+  // Same guard as createJob — the edit form's site list is derived from
+  // the chosen project's client, so this shouldn't happen from the UI, but
+  // nothing at the DB level ties a site to a project.
+  const [{ data: project }, { data: site }] = await Promise.all([
+    supabase.from("projects").select("client_id").eq("id", input.project_id).single(),
+    supabase.from("sites").select("client_id").eq("id", input.site_id).single(),
+  ]);
+  if (project?.client_id && site?.client_id && project.client_id !== site.client_id) {
+    return { ok: false, message: "That site doesn't belong to this project's client." };
+  }
+
   const { error } = await supabase
     .from("jobs")
     .update({

@@ -38,7 +38,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: templates },
     { data: engineers },
     { data: projects },
-    { data: clients },
     { data: allSites },
   ] = await Promise.all([
     supabase
@@ -64,8 +63,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("job_tasks").select("id, label, is_done").eq("job_id", id).order("position"),
     supabase.from("job_templates").select("id, name").order("name"),
     supabase.from("users").select("id, name").in("role", ["engineer", "manager"]).eq("active", true).order("name"),
-    supabase.from("projects").select("id, name").order("name"),
-    supabase.from("clients").select("id, name").order("name"),
+    supabase.from("projects").select("id, name, client_id").order("name"),
     supabase.from("sites").select("id, name, client_id").order("name"),
   ]);
 
@@ -155,7 +153,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             description={job.description}
             quickbooksNo={job.quickbooks_no}
             projects={projects ?? []}
-            clients={clients ?? []}
             sites={allSites ?? []}
           />
         </div>

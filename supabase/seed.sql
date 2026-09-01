@@ -64,13 +64,12 @@ begin
     (engineer_id, 'engineer@opoc.test', 'Eve Engineer', 'engineer', true)
   on conflict (id) do update set name = excluded.name, role = excluded.role, active = excluded.active;
 
-  -- 1 client, 1 project (independent of each other -- a project can span
-  -- many clients' jobs, so it never references client_id directly; a job's
-  -- client comes via its site instead, see 20260116000000_clients.sql)
+  -- 1 client, 1 project (a project belongs to exactly one client -- see
+  -- 20260204000000_project_client.sql)
   insert into clients (id, name) values (client_id, 'Acme Retail');
 
-  insert into projects (id, name, start_date, status)
-  values (project_id, 'Signage Rollout — Phase 1', current_date - 60, 'active');
+  insert into projects (id, name, client_id, start_date, status)
+  values (project_id, 'Signage Rollout — Phase 1', client_id, current_date - 60, 'active');
 
   -- 40 sites
   with ins as (

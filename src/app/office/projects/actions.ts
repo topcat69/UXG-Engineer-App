@@ -9,18 +9,21 @@ export type CreateProjectResult = { ok: true; project: ProjectRow } | { ok: fals
 
 export async function createProject(input: {
   name: string;
+  client_id: string;
   start_date?: string;
   end_date?: string;
   status?: string;
 }): Promise<CreateProjectResult> {
   const name = input.name.trim();
   if (!name) return { ok: false, message: "Name is required." };
+  if (!input.client_id) return { ok: false, message: "Select a client." };
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
     .insert({
       name,
+      client_id: input.client_id,
       start_date: input.start_date || undefined,
       end_date: input.end_date || undefined,
       status: input.status || undefined,
@@ -46,16 +49,18 @@ export type UpdateProjectResult = { ok: true; project: ProjectRow } | { ok: fals
  */
 export async function updateProject(
   id: string,
-  input: { name: string; start_date?: string; end_date?: string; status: string },
+  input: { name: string; client_id: string; start_date?: string; end_date?: string; status: string },
 ): Promise<UpdateProjectResult> {
   const name = input.name.trim();
   if (!name) return { ok: false, message: "Name is required." };
+  if (!input.client_id) return { ok: false, message: "Select a client." };
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
     .update({
       name,
+      client_id: input.client_id,
       start_date: input.start_date || null,
       end_date: input.end_date || null,
       status: input.status,

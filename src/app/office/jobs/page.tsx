@@ -51,12 +51,11 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     filters,
   );
 
-  const [{ data: jobs, count, error }, { data: projects }, { data: engineers }, { data: clients }, { data: sites }] =
+  const [{ data: jobs, count, error }, { data: projects }, { data: engineers }, { data: sites }] =
     await Promise.all([
       query,
-      supabase.from("projects").select("id, name").order("name"),
+      supabase.from("projects").select("id, name, client_id").order("name"),
       supabase.from("users").select("id, name").in("role", ["engineer", "manager"]).eq("active", true).order("name"),
-      supabase.from("clients").select("id, name").order("name"),
       supabase.from("sites").select("id, name, client_id").order("name"),
     ]);
 
@@ -84,7 +83,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         </div>
       </div>
 
-      <CreateJobForm projects={projects ?? []} clients={clients ?? []} sites={sites ?? []} />
+      <CreateJobForm projects={projects ?? []} sites={sites ?? []} />
 
       <form className="flex flex-wrap items-end gap-2" method="get">
         <div className="flex flex-col gap-1">
