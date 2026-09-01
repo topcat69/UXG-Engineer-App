@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ProjectsManager } from "./projects-manager";
 
@@ -20,7 +21,12 @@ export default async function ProjectsPage() {
         <h1 className="text-xl font-semibold">Projects</h1>
         <p className="text-muted-foreground text-sm">
           A container for organising one client&apos;s jobs (e.g. by year) — every project belongs
-          to exactly one client. Sites stay reusable across all of that client&apos;s projects.
+          to exactly one client. Sites stay reusable across all of that client&apos;s projects. To
+          add a new project, go to the client&apos;s{" "}
+          <Link href="/office/clients" className="underline">
+            Clients page
+          </Link>{" "}
+          first — edit an existing project&apos;s name, dates, status, or client here.
         </p>
       </div>
       <ProjectsManager projects={projects ?? []} jobCounts={Object.fromEntries(jobCounts)} clients={clients ?? []} />

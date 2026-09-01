@@ -28,7 +28,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             "No contact details on file."}
         </p>
       </div>
-      <ClientProjects projects={projects ?? []} />
+      <ClientProjects clientId={client.id} projects={projects ?? []} />
       <ClientSites clientId={client.id} sites={sites ?? []} />
     </div>
   );

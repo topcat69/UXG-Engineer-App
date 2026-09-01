@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { humanize } from "@/lib/format/text";
-import { createProject, updateProject, type ProjectRow } from "./actions";
+import { updateProject, type ProjectRow } from "./actions";
 
 const STATUSES = ["active", "on_hold", "completed"];
 
@@ -19,11 +19,6 @@ export function ProjectsManager({
   clients: { id: string; name: string }[];
 }) {
   const [projects, setProjects] = useState(initialProjects);
-  const [name, setName] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [status, setStatus] = useState("active");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -66,23 +61,6 @@ export function ProjectsManager({
       if (result.ok) {
         setProjects((prev) => prev.map((p) => (p.id === id ? result.project : p)));
         setEditingId(null);
-      } else {
-        setMessage(result.message);
-      }
-    });
-  }
-
-  function handleCreate() {
-    startTransition(async () => {
-      const result = await createProject({ name, client_id: clientId, start_date: startDate, end_date: endDate, status });
-      if (result.ok) {
-        setProjects((prev) => [result.project, ...prev]);
-        setName("");
-        setClientId("");
-        setStartDate("");
-        setEndDate("");
-        setStatus("active");
-        setMessage(`${result.project.name} added.`);
       } else {
         setMessage(result.message);
       }
@@ -140,7 +118,7 @@ export function ProjectsManager({
           {projects.length === 0 && (
             <tr>
               <td colSpan={6} className="text-muted-foreground py-4 text-center">
-                No projects yet.
+                No projects yet. Add one from a client&apos;s page.
               </td>
             </tr>
           )}
@@ -215,72 +193,7 @@ export function ProjectsManager({
           </div>
         </section>
       )}
-
-      <section className="flex flex-col gap-3 border-t pt-4">
-        <h2 className="font-medium">Add a project</h2>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="flex flex-col gap-1">
-            <label className="text-muted-foreground text-xs">Name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Jobs 2026"
-              className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-muted-foreground text-xs">Client</label>
-            <select
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-            >
-              <option value="">Select…</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-muted-foreground text-xs">Start date</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-muted-foreground text-xs">End date</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-muted-foreground text-xs">Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-            >
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {humanize(s)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Button type="button" onClick={handleCreate} disabled={isPending || !name.trim() || !clientId}>
-            Add project
-          </Button>
-        </div>
-        {message && <p className="text-muted-foreground text-sm">{message}</p>}
-      </section>
+      {message && <p className="text-destructive text-sm">{message}</p>}
     </div>
   );
 }

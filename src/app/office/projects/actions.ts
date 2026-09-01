@@ -33,6 +33,7 @@ export async function createProject(input: {
   if (error) return { ok: false, message: error.message };
 
   revalidatePath("/office/projects");
+  revalidatePath(`/office/clients/${input.client_id}`);
   return { ok: true, project: data };
 }
 
@@ -71,5 +72,6 @@ export async function updateProject(
   if (error) return { ok: false, message: error.message };
 
   revalidatePath("/office/projects");
+  revalidatePath(`/office/clients/${input.client_id}`);
   return { ok: true, project: data };
 }
