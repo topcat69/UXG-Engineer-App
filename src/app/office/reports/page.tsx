@@ -8,12 +8,13 @@ import { humanize } from "@/lib/format/text";
 
 const PAGE_SIZE = 50;
 // Reports only makes sense for a job that's actually finished, one way or
-// another — "closed" (completed, approved through QA) or "cancelled". A job
+// another — "closed" (completed, approved through QA), "cancelled", or
+// "revisit" (QA-rejected, redone on a new linked job — see rejectJob). A job
 // still in progress has no meaningful report to produce yet. Narrower than
 // the full job_status enum on purpose: might need to open this back up to
 // every status later (per the feature request that raised this), at which
 // point this becomes a filter option rather than a hard restriction.
-const REPORT_STATUSES: Database["public"]["Enums"]["job_status"][] = ["closed", "cancelled"];
+const REPORT_STATUSES: Database["public"]["Enums"]["job_status"][] = ["closed", "cancelled", "revisit"];
 
 function param(searchParams: JobListSearchParams, key: string): string {
   const value = searchParams[key];
