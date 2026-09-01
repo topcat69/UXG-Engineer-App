@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
 import { humanize } from "@/lib/format/text";
+import { JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 import { QaRow } from "./qa-row";
 
 export default async function QaQueuePage() {
@@ -9,7 +10,7 @@ export default async function QaQueuePage() {
   const { data: jobs, error } = await supabase
     .from("jobs")
     .select(
-      "id, job_number, job_type, status, site:sites(name), project:projects(name), assigned:users!jobs_assigned_to_fkey(name), install_forms(issues_found, player_boot_test, content_displaying)",
+      "id, job_number, job_type, status, site:sites(name, client:clients(name)), project:projects(name), assigned:users!jobs_assigned_to_fkey(name), install_forms(issues_found, player_boot_test, content_displaying)",
     )
     .in("status", ["submitted", "under_review"])
     .order("created_at", { ascending: true });
@@ -42,7 +43,9 @@ export default async function QaQueuePage() {
                   {hasFailure && <Badge variant="destructive">Flagged</Badge>}
                 </div>
                 <span className="text-muted-foreground text-sm">
-                  {job.site?.name} · {job.project?.name} · {job.assigned?.name ?? "Unassigned"}
+                  {job.site?.client?.name ?? "—"} · {job.site?.name} · {job.project?.name} ·{" "}
+                  {JOB_TYPE_LABELS[job.job_type as keyof typeof JOB_TYPE_LABELS] ?? humanize(job.job_type)} ·{" "}
+                  {job.assigned?.name ?? "Unassigned"}
                 </span>
               </div>
               <QaRow jobId={job.id} />
