@@ -18,6 +18,7 @@ import {
 type JobDetailsData = {
   rams_storage_path: string | null;
   site_plan_storage_path: string | null;
+  design_pack_storage_path: string | null;
   sla_requirement_detail: string | null;
   job_information: string | null;
   parking_notes: string | null;
@@ -56,11 +57,12 @@ export function JobDetailsPanel({
   const [isPending, startTransition] = useTransition();
   const ramsInputRef = useRef<HTMLInputElement>(null);
   const sitePlanInputRef = useRef<HTMLInputElement>(null);
+  const designPackInputRef = useRef<HTMLInputElement>(null);
 
   if (!usesJobDetails(jobType)) return null;
   const type = jobType as JobDetailsType;
 
-  function handleUpload(kind: "rams" | "site_plan", input: HTMLInputElement | null) {
+  function handleUpload(kind: "rams" | "site_plan" | "design_pack", input: HTMLInputElement | null) {
     const file = input?.files?.[0];
     if (!file) return;
     const formData = new FormData();
@@ -187,6 +189,17 @@ export function JobDetailsPanel({
             </div>
           </div>
         )}
+
+        <div className="flex flex-col gap-1">
+          <span className="text-muted-foreground text-xs">Design pack</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm">{jobDetails?.design_pack_storage_path ? "Attached" : "Not attached"}</span>
+            <input ref={designPackInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={() => handleUpload("design_pack", designPackInputRef.current)} />
+            <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => designPackInputRef.current?.click()}>
+              Upload
+            </Button>
+          </div>
+        </div>
       </div>
 
       {showsSlaRequirement(type) && (

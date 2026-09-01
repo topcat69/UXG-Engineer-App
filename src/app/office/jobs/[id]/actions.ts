@@ -272,9 +272,16 @@ export async function deleteJobTask(taskId: string, jobId: string): Promise<Acti
  * existing 'media' bucket / jobs/{job_id}/{filename} path convention (see
  * media-capture.ts) rather than a new bucket — same storage policies apply.
  */
+const DOCUMENT_LABELS = { rams: "RAMS", site_plan: "Site plan", design_pack: "Design pack" } as const;
+const DOCUMENT_PATCH_KEYS = {
+  rams: "rams_storage_path",
+  site_plan: "site_plan_storage_path",
+  design_pack: "design_pack_storage_path",
+} as const;
+
 export async function uploadJobDocument(
   jobId: string,
-  kind: "rams" | "site_plan",
+  kind: "rams" | "site_plan" | "design_pack",
   formData: FormData,
 ): Promise<ActionResult> {
   const file = formData.get("file");
@@ -289,12 +296,12 @@ export async function uploadJobDocument(
   });
   if (uploadError) return { ok: false, message: uploadError.message };
 
-  const patch = kind === "rams" ? { rams_storage_path: storagePath } : { site_plan_storage_path: storagePath };
+  const patch = { [DOCUMENT_PATCH_KEYS[kind]]: storagePath };
   const { error } = await supabase.from("job_details").upsert({ job_id: jobId, ...patch }, { onConflict: "job_id" });
   if (error) return { ok: false, message: error.message };
 
   revalidatePath(`/office/jobs/${jobId}`);
-  return { ok: true, message: `${kind === "rams" ? "RAMS" : "Site plan"} uploaded.` };
+  return { ok: true, message: `${DOCUMENT_LABELS[kind]} uploaded.` };
 }
 
 export async function updateSlaRequirement(jobId: string, detail: string): Promise<ActionResult> {

@@ -269,6 +269,7 @@ export type Database = {
         Row: {
           content_displaying: Database["public"]["Enums"]["pass_fail"] | null
           created_at: string | null
+          design_pack_storage_path: string | null
           engineer_notes: string | null
           equipment_damage: Database["public"]["Enums"]["equipment_damage_status"] | null
           id: string
@@ -298,6 +299,7 @@ export type Database = {
         Insert: {
           content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
           created_at?: string | null
+          design_pack_storage_path?: string | null
           engineer_notes?: string | null
           equipment_damage?: Database["public"]["Enums"]["equipment_damage_status"] | null
           id?: string
@@ -327,6 +329,7 @@ export type Database = {
         Update: {
           content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
           created_at?: string | null
+          design_pack_storage_path?: string | null
           engineer_notes?: string | null
           equipment_damage?: Database["public"]["Enums"]["equipment_damage_status"] | null
           id?: string

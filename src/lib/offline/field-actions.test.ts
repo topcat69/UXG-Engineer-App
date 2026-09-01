@@ -53,6 +53,7 @@ function jobDetailsRow(overrides: Partial<JobDetailsRow> = {}): JobDetailsRow {
     content_displaying: null,
     rams_storage_path: null,
     site_plan_storage_path: null,
+    design_pack_storage_path: null,
     sla_requirement_detail: null,
     job_information: null,
     parking_notes: null,
