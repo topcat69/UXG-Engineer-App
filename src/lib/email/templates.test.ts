@@ -102,7 +102,7 @@ describe("buildScheduledEmail", () => {
     expect(email.text).not.toContain("Priority:");
   });
 
-  it("shows a single time-of-day range for a same-day job, a full date range for a multi-day one", () => {
+  it("shows a single date for a same-day job, a date range for a multi-day one", () => {
     const sameDay = buildScheduledEmail(base, []);
     expect(sameDay.text).not.toContain(" to ");
 

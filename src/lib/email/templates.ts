@@ -18,7 +18,7 @@ export type AssignedEmailInput = {
 
 export function buildAssignedEmail(input: AssignedEmailInput): EmailContent {
   const when = input.scheduledStart
-    ? new Date(input.scheduledStart).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })
+    ? new Date(input.scheduledStart).toLocaleDateString("en-GB", { dateStyle: "full" })
     : null;
   const { html, text } = wrap([
     `Hi ${input.engineerName},`,
@@ -60,8 +60,8 @@ export type ScheduledEmailInput = {
   deepLink: string;
 };
 
-function formatFullDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" });
+function formatFullDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { dateStyle: "full" });
 }
 
 /**
@@ -75,8 +75,8 @@ function formatFullDateTime(iso: string): string {
 export function buildScheduledEmail(input: ScheduledEmailInput, attachedFilenames: string[]): EmailContent {
   const when =
     input.scheduledEnd && input.scheduledEnd.slice(0, 10) !== input.scheduledStart.slice(0, 10)
-      ? `${formatFullDateTime(input.scheduledStart)} to ${formatFullDateTime(input.scheduledEnd)}`
-      : formatFullDateTime(input.scheduledStart);
+      ? `${formatFullDate(input.scheduledStart)} to ${formatFullDate(input.scheduledEnd)}`
+      : formatFullDate(input.scheduledStart);
 
   const equipmentLine =
     input.equipment.length > 0
@@ -118,7 +118,7 @@ export type DayBeforeEmailInput = {
 };
 
 export function buildDayBeforeEmail(input: DayBeforeEmailInput): EmailContent {
-  const when = new Date(input.scheduledStart).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" });
+  const when = new Date(input.scheduledStart).toLocaleDateString("en-GB", { dateStyle: "full" });
   const { html, text } = wrap([
     `Hi ${input.engineerName},`,
     `Reminder: job ${input.jobNumber} at ${input.siteName} is scheduled for tomorrow, ${when}.`,
@@ -140,7 +140,7 @@ export type CancelledEmailInput = {
 
 export function buildCancelledEmail(input: CancelledEmailInput): EmailContent {
   const when = input.scheduledStart
-    ? new Date(input.scheduledStart).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })
+    ? new Date(input.scheduledStart).toLocaleDateString("en-GB", { dateStyle: "full" })
     : null;
   const { html, text } = wrap([
     `Hi ${input.engineerName},`,
