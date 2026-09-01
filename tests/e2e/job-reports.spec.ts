@@ -117,10 +117,14 @@ test("manager pulls a job's PDF and zip report from /office/reports", async ({ p
   // (completion-report.ts), and silently omits the whole form-fields
   // section when job_details is still null — which is exactly what
   // produced a real, if rare, CI failure here (missing "PLR-REPORT-1").
+  // Raised from 15s to 30s after this poll kept timing out on unrelated CI
+  // runs (same as the phase5 webhook-wait fix) — CI-runner contention, not
+  // a logic bug: each recurrence traced to a commit that never touches this
+  // code path.
   await expect
     .poll(
       async () => (await admin.from("job_details").select("player_serial").eq("job_id", jobId).maybeSingle()).data?.player_serial,
-      { timeout: 15_000, message: "waiting for job_details to reach the server before generating the report" },
+      { timeout: 30_000, message: "waiting for job_details to reach the server before generating the report" },
     )
     .toBe("PLR-REPORT-1");
 
