@@ -11,12 +11,20 @@ export type DrainResult = { succeeded: number; failed: number };
  * supabase/migrations/20260117000000_job_details.sql,
  * 20260103000000_rls.sql, and 20260203000000_revisit_status_rls.sql) — once
  * a job reaches one of these statuses, RLS permanently forbids the assigned
- * engineer from writing to its install_forms/job_details row. A leftover
- * draft-upsert op targeting a job already this far along can never succeed
- * no matter how many times it's retried, which was a real bug: a stale
- * draft op left queued from just before submission kept retrying forever
- * after the job's own status_event landed, even though the submit itself
- * (a separate, later op) had already synced the final data successfully.
+ * engineer from writing to its install_forms/job_details row, so retrying a
+ * write that's already failed for one of these jobs would just fail forever.
+ *
+ * Used in applyOperation's install_form_upsert/job_details_upsert cases only
+ * *after* an upsert attempt has actually failed — never pre-emptively.
+ * submitJob/submitJobDetails set the job's local status to "submitted" in
+ * the very same Dexie transaction that queues that op (see field-actions.ts),
+ * so checking status before attempting the write would treat every job's
+ * own final, legitimate submit write as already stale and silently drop it
+ * without it ever reaching the server — a real bug this used to have,
+ * caught by job-reports.spec.ts intermittently: whether it "worked" came
+ * down to whether the 15s field-app autosave happened to have already
+ * synced the same data earlier by coincidence, not anything about the
+ * submit write itself.
  */
 const FORM_WRITE_LOCKED_STATUSES = new Set(["submitted", "under_review", "approved", "closed", "revisit"]);
 
@@ -120,12 +128,24 @@ async function applyOperation(supabase: ReturnType<typeof createClient>, op: Out
       return;
     }
     case "install_form_upsert": {
-      if (op.row.job_id && isFormWriteLocked((await db.jobs.get(op.row.job_id))?.status)) {
-        console.info(`Dropping stale install_form_upsert for job ${op.row.job_id} — already past submission`);
-        return;
-      }
       const { error } = await supabase.from("install_forms").upsert(op.row);
-      if (error) throw error;
+      if (error) {
+        // Only drop-as-stale (don't retry) once the write has actually
+        // failed AND the job has moved past submission — not pre-emptively.
+        // submitJob sets the job's local status to "submitted" in the same
+        // Dexie transaction that queues this very op (see field-actions.ts),
+        // so checking status before even attempting the write would treat
+        // every job's own final, legitimate submit write as already stale
+        // and silently drop it without ever reaching the server — that was
+        // a real bug (see isFormWriteLocked's doc comment for the scenario
+        // this guard is actually meant to catch: a genuinely superseded
+        // draft, not the final write itself).
+        if (op.row.job_id && isFormWriteLocked((await db.jobs.get(op.row.job_id))?.status)) {
+          console.info(`Dropping stale install_form_upsert for job ${op.row.job_id} — already past submission`);
+          return;
+        }
+        throw error;
+      }
       return;
     }
     case "survey_form_upsert": {
@@ -134,12 +154,17 @@ async function applyOperation(supabase: ReturnType<typeof createClient>, op: Out
       return;
     }
     case "job_details_upsert": {
-      if (op.row.job_id && isFormWriteLocked((await db.jobs.get(op.row.job_id))?.status)) {
-        console.info(`Dropping stale job_details_upsert for job ${op.row.job_id} — already past submission`);
-        return;
-      }
       const { error } = await supabase.from("job_details").upsert(op.row);
-      if (error) throw error;
+      if (error) {
+        // See the matching comment on install_form_upsert above — same fix,
+        // same underlying bug (submitJobDetails sets local status the same
+        // way).
+        if (op.row.job_id && isFormWriteLocked((await db.jobs.get(op.row.job_id))?.status)) {
+          console.info(`Dropping stale job_details_upsert for job ${op.row.job_id} — already past submission`);
+          return;
+        }
+        throw error;
+      }
       return;
     }
     case "signature_insert": {
