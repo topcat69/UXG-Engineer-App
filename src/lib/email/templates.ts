@@ -165,7 +165,7 @@ export type SubmittedEmailInput = {
 export function buildSubmittedEmail(input: SubmittedEmailInput): EmailContent {
   const { html, text } = wrap([
     `Hi ${input.managerName},`,
-    `${input.engineerName} has submitted job ${input.jobNumber} at ${input.siteName}. It's now in your QA queue.`,
+    `${input.engineerName} has submitted job ${input.jobNumber} at ${input.siteName}. It's now in your job review queue.`,
     `Review it: ${input.deepLink}`,
   ]);
   return { subject: `${input.jobNumber} — ${input.siteName} — submitted for QA`, html, text };

@@ -14,12 +14,12 @@ export default async function QaQueuePage() {
     .in("status", ["submitted", "under_review"])
     .order("created_at", { ascending: true });
 
-  if (error) return <p className="text-destructive">Failed to load QA queue: {error.message}</p>;
+  if (error) return <p className="text-destructive">Failed to load job review queue: {error.message}</p>;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">QA Queue</h1>
+        <h1 className="text-xl font-semibold">Job Review</h1>
         <span className="text-muted-foreground text-sm">{jobs?.length ?? 0} awaiting review</span>
       </div>
 

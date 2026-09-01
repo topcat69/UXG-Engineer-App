@@ -71,8 +71,8 @@ export async function rejectJob(jobId: string, reason: string): Promise<ActionRe
   if (!job) return { ok: false, message: "Job not found." };
 
   // status moves to "draft" too, not just qa_status — otherwise the job
-  // never leaves the QA queue (which lists submitted/under_review) and
-  // sits there forever looking like it's still awaiting review.
+  // never leaves the job review queue (which lists submitted/under_review)
+  // and sits there forever looking like it's still awaiting review.
   const { error: rejectError } = await supabase
     .from("jobs")
     .update({ status: "draft", qa_status: "rejected", qa_notes: reason })
