@@ -22,7 +22,9 @@ with project_client_counts as (
   group by j.project_id, s.client_id
 ),
 unambiguous as (
-  select project_id, min(client_id) as client_id
+  -- min()/max() don't exist for uuid in Postgres; array_agg(...)[1] picks
+  -- the (only, per the having clause below) client_id for each project.
+  select project_id, (array_agg(client_id))[1] as client_id
   from project_client_counts
   group by project_id
   having count(*) = 1
