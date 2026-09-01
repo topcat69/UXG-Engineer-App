@@ -61,7 +61,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Reports</h1>
+        <h1 className="text-xl font-semibold">Completed Jobs</h1>
         <span className="text-muted-foreground text-sm">{total} jobs</span>
       </div>
 
