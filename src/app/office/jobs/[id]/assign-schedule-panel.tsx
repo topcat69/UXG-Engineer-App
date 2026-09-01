@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { localInputValueToIso, toLocalInputValue } from "@/lib/format/datetime-local";
+import { localDateInputValueToIso, toLocalDateInputValue } from "@/lib/format/datetime-local";
 import { assignAndScheduleJob } from "./actions";
 
 type Engineer = { id: string; name: string };
@@ -37,8 +37,8 @@ export function AssignSchedulePanel({
 }) {
   const [editing, setEditing] = useState(false);
   const [engineerId, setEngineerId] = useState(assignedTo ?? "");
-  const [scheduledLocal, setScheduledLocal] = useState(toLocalInputValue(scheduledStart));
-  const [scheduledEndLocal, setScheduledEndLocal] = useState(toLocalInputValue(scheduledEnd));
+  const [scheduledLocal, setScheduledLocal] = useState(toLocalDateInputValue(scheduledStart));
+  const [scheduledEndLocal, setScheduledEndLocal] = useState(toLocalDateInputValue(scheduledEnd));
   const [provisional, setProvisional] = useState(isProvisional);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -54,8 +54,8 @@ export function AssignSchedulePanel({
       const result = await assignAndScheduleJob(
         jobId,
         engineerId || null,
-        localInputValueToIso(scheduledLocal),
-        localInputValueToIso(scheduledEndLocal),
+        localDateInputValueToIso(scheduledLocal),
+        localDateInputValueToIso(scheduledEndLocal),
         provisional,
       );
       setMessage(result.ok ? (result.warning ?? null) : result.message);
@@ -66,13 +66,13 @@ export function AssignSchedulePanel({
   if (!editing) {
     const endLabel =
       scheduledStart && scheduledEnd && scheduledStart.slice(0, 10) !== scheduledEnd.slice(0, 10)
-        ? ` → ${new Date(scheduledEnd).toLocaleString()}`
+        ? ` → ${new Date(scheduledEnd).toLocaleDateString()}`
         : "";
     return (
       <div className="text-sm">
         <p>Assigned: {assignedName ?? "Unassigned"}</p>
         <p className="text-muted-foreground">
-          {scheduledStart ? new Date(scheduledStart).toLocaleString() : "Not scheduled"}
+          {scheduledStart ? new Date(scheduledStart).toLocaleDateString() : "Not scheduled"}
           {endLabel}
         </p>
         {isProvisional && <p className="font-medium text-pink-600">Provisional — not yet confirmed</p>}
@@ -103,7 +103,7 @@ export function AssignSchedulePanel({
       <div className="flex flex-col items-start gap-1">
         <label className="text-muted-foreground text-xs">Scheduled start</label>
         <input
-          type="datetime-local"
+          type="date"
           value={scheduledLocal}
           onChange={(e) => setScheduledLocal(e.target.value)}
           className="border-input h-8 rounded-md border bg-transparent px-2 text-sm"
@@ -112,7 +112,7 @@ export function AssignSchedulePanel({
       <div className="flex flex-col items-start gap-1">
         <label className="text-muted-foreground text-xs">Scheduled end</label>
         <input
-          type="datetime-local"
+          type="date"
           value={scheduledEndLocal}
           onChange={(e) => setScheduledEndLocal(e.target.value)}
           className="border-input h-8 rounded-md border bg-transparent px-2 text-sm"

@@ -78,7 +78,7 @@ test("manager imports sites, generates jobs, and bulk assigns/schedules them", a
   await page.getByRole("button", { name: "Assign" }).click();
   await expect(page.getByText(/^Assigned \d+ job\(s\)\.$/)).toBeVisible({ timeout: 15_000 });
 
-  await page.getByLabel("Scheduled start").fill("2026-09-01T09:00");
+  await page.getByLabel("Scheduled start").fill("2026-09-01");
   await page.getByRole("button", { name: "Schedule" }).click();
   await expect(page.getByText(/^Scheduled \d+ job\(s\)\.$/)).toBeVisible({ timeout: 15_000 });
 

@@ -421,8 +421,12 @@ export type AssignScheduleResult = { ok: true; message: string; warning?: string
  * rescheduleJob/bulkAssignJobs/bulkScheduleJobs in ../actions.ts), just
  * reachable without leaving the job. `scheduledStartLocal`/`scheduledEndLocal`
  * are UTC instants (ISO, "Z"-suffixed) already converted client-side from
- * the datetime-local inputs via localInputValueToIso — never pass the raw
- * datetime-local string here, since parsing it in this server action would
+ * the panel's date-only inputs via localDateInputValueToIso, anchored at a
+ * fixed time of day (9am) — the office only ever needs to say which day a
+ * job is due, never a time; the real start is whatever the engineer
+ * actually does in the field (actual_travel_start/actual_start), which
+ * this has no bearing on. Converting client-side (not passing the raw date
+ * string here) still matters, since parsing it in this server action would
  * use the server's timezone instead of the office's (see
  * lib/format/datetime-local.ts). "" for start clears/leaves the schedule
  * alone, engineerId null unassigns, so the office user isn't forced to

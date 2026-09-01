@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 import { humanize } from "@/lib/format/text";
-import { localInputValueToIso } from "@/lib/format/datetime-local";
+import { localDateInputValueToIso } from "@/lib/format/datetime-local";
 import { bulkAssignJobs, bulkScheduleJobs } from "./actions";
 
 export type JobRow = {
@@ -71,11 +71,10 @@ export function JobsTable({ jobs, engineers }: { jobs: JobRow[]; engineers: { id
     if (!scheduleAt) return;
     startTransition(async () => {
       // Converted to a UTC instant here, client-side (browser-local
-      // timezone), rather than sending the raw datetime-local string for
-      // the server to parse in its own timezone — see the matching
-      // comment in assign-schedule-panel.tsx for why that silently shifted
-      // saved times by the server/browser offset.
-      const result = await bulkScheduleJobs(selectedIds, localInputValueToIso(scheduleAt), durationHours);
+      // timezone), anchored at a fixed time of day (9am) — the office only
+      // needs to say which day, not a time; see the matching comment on
+      // assignAndScheduleJob in [id]/actions.ts.
+      const result = await bulkScheduleJobs(selectedIds, localDateInputValueToIso(scheduleAt), durationHours);
       setMessage(result.message);
       router.refresh();
     });
@@ -109,7 +108,7 @@ export function JobsTable({ jobs, engineers }: { jobs: JobRow[]; engineers: { id
           <div className="flex items-center gap-2">
             <input
               aria-label="Scheduled start"
-              type="datetime-local"
+              type="date"
               value={scheduleAt}
               onChange={(e) => setScheduleAt(e.target.value)}
               className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"

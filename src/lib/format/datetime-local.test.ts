@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { localInputValueToIso, toLocalInputValue } from "./datetime-local";
+import { localDateInputValueToIso, localInputValueToIso, toLocalDateInputValue, toLocalInputValue } from "./datetime-local";
 
 describe("toLocalInputValue", () => {
   it("returns an empty string for null", () => {
@@ -45,5 +45,53 @@ describe("toLocalInputValue / localInputValueToIso round-trip", () => {
   it("round-trips a value with zero minutes and midnight hour cleanly", () => {
     const original = "2026-01-01T00:00:00.000Z";
     expect(new Date(localInputValueToIso(toLocalInputValue(original))).getTime()).toBe(new Date(original).getTime());
+  });
+});
+
+describe("toLocalDateInputValue", () => {
+  it("returns an empty string for null", () => {
+    expect(toLocalDateInputValue(null)).toBe("");
+  });
+
+  it("produces a value matching the date input format, with no time component", () => {
+    expect(toLocalDateInputValue("2026-09-05T09:00:00.000Z")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("localDateInputValueToIso", () => {
+  it("returns an empty string for an empty value", () => {
+    expect(localDateInputValueToIso("")).toBe("");
+  });
+
+  it("returns an empty string for an unparseable value", () => {
+    expect(localDateInputValueToIso("not-a-date")).toBe("");
+  });
+
+  it("anchors the instant at 9am local by default", () => {
+    const iso = localDateInputValueToIso("2026-09-05");
+    const d = new Date(iso);
+    expect(d.getHours()).toBe(9);
+    expect(d.getMinutes()).toBe(0);
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(8);
+    expect(d.getDate()).toBe(5);
+  });
+
+  it("accepts a custom anchor hour", () => {
+    const iso = localDateInputValueToIso("2026-09-05", 14);
+    expect(new Date(iso).getHours()).toBe(14);
+  });
+});
+
+describe("toLocalDateInputValue / localDateInputValueToIso round-trip", () => {
+  it("recovers the same calendar day after going through a date input, regardless of the original time of day", () => {
+    // Unlike the datetime-local pair, this one is deliberately lossy on
+    // time of day — that's the whole point (the office picks a day, not a
+    // time) — so the property under test is just "same day in, same day
+    // out," not "same instant."
+    const original = "2026-09-05T23:37:00.000Z";
+    const localValue = toLocalDateInputValue(original);
+    const roundTripped = localDateInputValueToIso(localValue);
+    expect(toLocalDateInputValue(roundTripped)).toBe(localValue);
   });
 });
