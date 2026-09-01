@@ -110,6 +110,20 @@ test("manager pulls a job's PDF and zip report from /office/reports", async ({ p
     )
     .toBe("submitted");
 
+  // job_details is a separate outbox write from the jobs.status patch above
+  // — the two aren't guaranteed to land in the same order or together, so
+  // "status is submitted" doesn't mean job_details (player_serial etc.) has
+  // synced yet. The on-demand report generates fresh from a live query
+  // (completion-report.ts), and silently omits the whole form-fields
+  // section when job_details is still null — which is exactly what
+  // produced a real, if rare, CI failure here (missing "PLR-REPORT-1").
+  await expect
+    .poll(
+      async () => (await admin.from("job_details").select("player_serial").eq("job_id", jobId).maybeSingle()).data?.player_serial,
+      { timeout: 15_000, message: "waiting for job_details to reach the server before generating the report" },
+    )
+    .toBe("PLR-REPORT-1");
+
   // The Reports page only lists closed/cancelled jobs (a report only makes
   // sense once a job is actually finished) — moved straight to "closed"
   // rather than going through full QA approval, since this test is about
