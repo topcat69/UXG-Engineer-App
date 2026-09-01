@@ -23,6 +23,7 @@ const JOB_STATUSES: Database["public"]["Enums"]["job_status"][] = [
   "closed",
   "on_hold",
   "cancelled",
+  "revisit",
 ];
 
 function param(searchParams: JobListSearchParams, key: string): string {

@@ -4,12 +4,14 @@
 // scheduled_start, and this app auto-transitions status away from draft
 // the moment one gets set — see assignAndScheduleJob/rescheduleJob/
 // bulkScheduleJobs), and once a job is checked out (status "submitted"
-// and every status after — under_review/approved/closed) or cancelled,
-// it's no longer something an engineer needs to act on either. Deliberately
-// not reusing dashboard/metrics.ts's ACTIVE_STATUSES here: that set
-// excludes "on_hold", which should still show up in an engineer's queue
-// (it's a paused job they're still assigned to, not a finished one).
-const QUEUE_EXIT_STATUSES = new Set(["draft", "submitted", "under_review", "approved", "closed", "cancelled"]);
+// and every status after — under_review/approved/closed), cancelled, or
+// QA-rejected into a revisit ("revisit" — see qa/actions.ts's rejectJob),
+// it's no longer something an engineer needs to act on either: the redo
+// happens on the new linked job, not this one. Deliberately not reusing
+// dashboard/metrics.ts's ACTIVE_STATUSES here: that set excludes
+// "on_hold", which should still show up in an engineer's queue (it's a
+// paused job they're still assigned to, not a finished one).
+const QUEUE_EXIT_STATUSES = new Set(["draft", "submitted", "under_review", "approved", "closed", "cancelled", "revisit"]);
 
 export function isInEngineerQueue(status: string): boolean {
   return !QUEUE_EXIT_STATUSES.has(status);

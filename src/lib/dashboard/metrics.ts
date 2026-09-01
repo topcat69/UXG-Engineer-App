@@ -77,7 +77,12 @@ export function computeCompletedVsScheduled(jobs: DashboardJob[]): { completed: 
   return {
     completed: jobs.filter((j) => j.status === "closed").length,
     scheduled: jobs.filter(
-      (j) => j.scheduled_start !== null && j.status !== "draft" && j.status !== "cancelled" && j.status !== "closed",
+      (j) =>
+        j.scheduled_start !== null &&
+        j.status !== "draft" &&
+        j.status !== "cancelled" &&
+        j.status !== "closed" &&
+        j.status !== "revisit",
     ).length,
   };
 }

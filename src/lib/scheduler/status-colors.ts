@@ -6,7 +6,7 @@
 // apart from a plain "scheduled" card, which the map's coarser
 // on_site/completed/other split doesn't need to.
 
-export type StatusColorBucket = "draft" | "provisional" | "upcoming" | "active" | "review" | "done" | "hold" | "cancelled";
+export type StatusColorBucket = "draft" | "provisional" | "upcoming" | "active" | "review" | "done" | "hold" | "cancelled" | "revisit";
 
 const STATUS_BUCKETS: Record<string, StatusColorBucket> = {
   draft: "draft",
@@ -23,6 +23,7 @@ const STATUS_BUCKETS: Record<string, StatusColorBucket> = {
   closed: "done",
   on_hold: "hold",
   cancelled: "cancelled",
+  revisit: "revisit",
 };
 
 /** Falls back to "upcoming" for any status not explicitly listed — a scheduled-looking card is the safest default for an unrecognised value, rather than defaulting to an alarming color. */
@@ -40,6 +41,7 @@ export const STATUS_COLOR_CLASSES: Record<StatusColorBucket, string> = {
   done: "bg-green-50 border-l-green-500",
   hold: "bg-yellow-50 border-l-yellow-500",
   cancelled: "bg-red-50 border-l-red-500",
+  revisit: "bg-indigo-50 border-l-indigo-500",
 };
 
 /**
@@ -59,4 +61,5 @@ export const STATUS_SWATCH_CLASSES: Record<StatusColorBucket, string> = {
   done: "bg-green-500",
   hold: "bg-yellow-500",
   cancelled: "bg-red-500",
+  revisit: "bg-indigo-500",
 };

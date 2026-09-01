@@ -8,17 +8,17 @@ export type DrainResult = { succeeded: number; failed: number };
 /**
  * Mirrors the job_details_insert/update and install_forms_insert/update RLS
  * policies' engineer condition exactly (see
- * supabase/migrations/20260117000000_job_details.sql and
- * 20260103000000_rls.sql) — once a job reaches one of these statuses, RLS
- * permanently forbids the assigned engineer from writing to its
- * install_forms/job_details row. A leftover draft-upsert op targeting a job
- * already this far along can never succeed no matter how many times it's
- * retried, which was a real bug: a stale draft op left queued from just
- * before submission kept retrying forever after the job's own status_event
- * landed, even though the submit itself (a separate, later op) had already
- * synced the final data successfully.
+ * supabase/migrations/20260117000000_job_details.sql,
+ * 20260103000000_rls.sql, and 20260203000000_revisit_status_rls.sql) — once
+ * a job reaches one of these statuses, RLS permanently forbids the assigned
+ * engineer from writing to its install_forms/job_details row. A leftover
+ * draft-upsert op targeting a job already this far along can never succeed
+ * no matter how many times it's retried, which was a real bug: a stale
+ * draft op left queued from just before submission kept retrying forever
+ * after the job's own status_event landed, even though the submit itself
+ * (a separate, later op) had already synced the final data successfully.
  */
-const FORM_WRITE_LOCKED_STATUSES = new Set(["submitted", "under_review", "approved", "closed"]);
+const FORM_WRITE_LOCKED_STATUSES = new Set(["submitted", "under_review", "approved", "closed", "revisit"]);
 
 /** Pure so this can be unit tested without touching Dexie or Supabase. */
 export function isFormWriteLocked(jobStatus: string | undefined): boolean {

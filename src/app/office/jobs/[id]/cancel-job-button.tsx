@@ -10,7 +10,7 @@ export function CancelJobButton({ jobId, status }: { jobId: string; status: stri
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  if (status === "cancelled" || status === "closed") return null;
+  if (status === "cancelled" || status === "closed" || status === "revisit") return null;
 
   if (!confirming) {
     return (

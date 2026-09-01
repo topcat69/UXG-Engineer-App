@@ -26,4 +26,8 @@ describe("isInEngineerQueue", () => {
   it("drops cancelled jobs", () => {
     expect(isInEngineerQueue("cancelled")).toBe(false);
   });
+
+  it("drops a job QA has rejected into a revisit — the redo happens on the new linked job instead", () => {
+    expect(isInEngineerQueue("revisit")).toBe(false);
+  });
 });

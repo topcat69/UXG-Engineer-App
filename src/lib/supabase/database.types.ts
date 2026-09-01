@@ -1096,6 +1096,7 @@ export type Database = {
         | "closed"
         | "on_hold"
         | "cancelled"
+        | "revisit"
       pass_fail: "pass" | "fail" | "na"
       qa_status: "pending" | "approved" | "rejected"
       user_role: "superadmin" | "manager" | "engineer"
@@ -1245,6 +1246,7 @@ export const Constants = {
         "closed",
         "on_hold",
         "cancelled",
+        "revisit",
       ],
       pass_fail: ["pass", "fail", "na"],
       qa_status: ["pending", "approved", "rejected"],

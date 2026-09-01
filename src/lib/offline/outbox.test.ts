@@ -84,6 +84,7 @@ describe("isFormWriteLocked", () => {
     expect(isFormWriteLocked("under_review")).toBe(true);
     expect(isFormWriteLocked("approved")).toBe(true);
     expect(isFormWriteLocked("closed")).toBe(true);
+    expect(isFormWriteLocked("revisit")).toBe(true);
   });
 
   it("is not locked for any status the engineer can still edit through", () => {

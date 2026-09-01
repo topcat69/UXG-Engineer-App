@@ -33,6 +33,10 @@ describe("statusColorBucket", () => {
     expect(statusColorBucket("draft")).toBe("draft");
   });
 
+  it("buckets a QA-rejected revisit original distinctly from a plain closed job", () => {
+    expect(statusColorBucket("revisit")).toBe("revisit");
+  });
+
   it("buckets provisional as its own category", () => {
     expect(statusColorBucket("provisional")).toBe("provisional");
   });
@@ -42,7 +46,7 @@ describe("statusColorBucket", () => {
   });
 
   it("has a color class and a swatch class defined for every bucket", () => {
-    const buckets: StatusColorBucket[] = ["draft", "provisional", "upcoming", "active", "review", "done", "hold", "cancelled"];
+    const buckets: StatusColorBucket[] = ["draft", "provisional", "upcoming", "active", "review", "done", "hold", "cancelled", "revisit"];
     for (const bucket of buckets) {
       expect(STATUS_COLOR_CLASSES[bucket]).toBeTruthy();
       expect(STATUS_SWATCH_CLASSES[bucket]).toBeTruthy();

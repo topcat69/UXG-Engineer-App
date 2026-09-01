@@ -70,19 +70,22 @@ export async function rejectJob(jobId: string, reason: string): Promise<ActionRe
     .single();
   if (!job) return { ok: false, message: "Job not found." };
 
-  // status moves to "draft" too, not just qa_status — otherwise the job
-  // never leaves the job review queue (which lists submitted/under_review)
-  // and sits there forever looking like it's still awaiting review.
+  // status moves to "revisit" too, not just qa_status — the redo happens on
+  // a brand new linked job (below), so the original is genuinely done, not
+  // back in play. Distinct from "closed": it reads as "closed, but because
+  // it got redone" rather than "closed, approved" — and it drops out of
+  // the job review queue (which lists submitted/under_review) and the
+  // engineer's own queue the same way closed/cancelled jobs do.
   const { error: rejectError } = await supabase
     .from("jobs")
-    .update({ status: "draft", qa_status: "rejected", qa_notes: reason })
+    .update({ status: "revisit", qa_status: "rejected", qa_notes: reason })
     .eq("id", jobId);
   if (rejectError) return { ok: false, message: rejectError.message };
 
   await supabase.from("status_events").insert({
     job_id: jobId,
     from_status: job.status,
-    to_status: "draft",
+    to_status: "revisit",
     user_id: user.id,
     reason: `QA rejected: ${reason}`,
   });
@@ -102,5 +105,5 @@ export async function rejectJob(jobId: string, reason: string): Promise<ActionRe
   revalidatePath("/office/qa");
   revalidatePath("/office/jobs");
   revalidatePath(`/office/jobs/${jobId}`);
-  return { ok: true, message: "Rejected and returned to draft. Revisit created." };
+  return { ok: true, message: "Rejected and closed as a revisit. New revisit job created." };
 }

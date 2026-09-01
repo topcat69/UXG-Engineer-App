@@ -91,6 +91,11 @@ describe("computeCompletedVsScheduled", () => {
     expect(computeCompletedVsScheduled(jobs)).toEqual({ completed: 1, scheduled: 0 });
   });
 
+  it("does not count a QA-rejected revisit original as scheduled either, for the same reason", () => {
+    const jobs = [job({ status: "revisit", scheduled_start: "2026-08-10T09:00:00Z" })];
+    expect(computeCompletedVsScheduled(jobs)).toEqual({ completed: 0, scheduled: 0 });
+  });
+
   it("moving a job from scheduled to closed shifts the counts in opposite directions", () => {
     const scheduledJob = job({ id: "a", status: "scheduled", scheduled_start: "2026-08-10T09:00:00Z" });
     const before = computeCompletedVsScheduled([scheduledJob]);
