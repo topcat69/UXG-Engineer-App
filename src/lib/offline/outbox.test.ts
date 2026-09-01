@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MediaQueueItem, OutboxOperation } from "./db";
-import { isFormWriteLocked, summarizeOutbox } from "./outbox";
+import { isFormWriteLocked, jobIdForOp, summarizeOutbox } from "./outbox";
 
 function op(overrides: Partial<OutboxOperation> = {}): OutboxOperation {
   return {
@@ -97,5 +97,32 @@ describe("isFormWriteLocked", () => {
 
   it("is not locked when the job's status is unknown (not found locally)", () => {
     expect(isFormWriteLocked(undefined)).toBe(false);
+  });
+});
+
+describe("jobIdForOp", () => {
+  it("reads jobId directly off ops that carry it as a top-level field", () => {
+    expect(jobIdForOp(op({ type: "job_patch", jobId: "job-1", patch: {} }))).toBe("job-1");
+    expect(
+      jobIdForOp(op({ type: "status_event", jobId: "job-2", fromStatus: null, toStatus: "submitted", occurredAt: "2026-08-05T09:00:00Z" })),
+    ).toBe("job-2");
+    expect(jobIdForOp(op({ type: "task_toggle", jobId: "job-3", taskId: "task-1", isDone: true, doneAt: null, doneBy: null }))).toBe(
+      "job-3",
+    );
+    expect(jobIdForOp(op({ type: "media_pending_delta", jobId: "job-4", delta: 1 }))).toBe("job-4");
+    expect(
+      jobIdForOp(op({ type: "media_delete", jobId: "job-5", mediaId: "media-1", kind: "photo", storagePath: "jobs/job-5/photo.jpg" })),
+    ).toBe("job-5");
+  });
+
+  it("reads job_id out of the row for ops shaped as a table upsert", () => {
+    expect(jobIdForOp(op({ type: "job_details_upsert", row: { job_id: "job-6" } as never }))).toBe("job-6");
+    expect(jobIdForOp(op({ type: "install_form_upsert", row: { job_id: "job-7" } as never }))).toBe("job-7");
+    expect(jobIdForOp(op({ type: "signature_insert", row: { job_id: "job-8" } as never }))).toBe("job-8");
+    expect(jobIdForOp(op({ type: "issue_insert", row: { job_id: "job-9" } as never }))).toBe("job-9");
+  });
+
+  it("returns null for a row-shaped op whose row has no job_id (should never happen, but shouldn't crash the ordering guard)", () => {
+    expect(jobIdForOp(op({ type: "job_details_upsert", row: { job_id: null } as never }))).toBeNull();
   });
 });

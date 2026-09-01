@@ -25,20 +25,67 @@ export function isFormWriteLocked(jobStatus: string | undefined): boolean {
   return !!jobStatus && FORM_WRITE_LOCKED_STATUSES.has(jobStatus);
 }
 
-/** Replays every pending outbox operation once, in the order it was queued. */
+/**
+ * Which job an op belongs to, for the same-job ordering guard below. Pure
+ * so it's unit testable without touching Dexie or Supabase.
+ */
+export function jobIdForOp(op: OutboxOperation): string | null {
+  switch (op.type) {
+    case "status_event":
+    case "job_patch":
+    case "task_toggle":
+    case "media_pending_delta":
+    case "media_delete":
+      return op.jobId;
+    case "install_form_upsert":
+    case "survey_form_upsert":
+    case "job_details_upsert":
+    case "signature_insert":
+    case "issue_insert":
+      return op.row.job_id;
+  }
+}
+
+/**
+ * Replays every pending outbox operation once, in the order it was queued.
+ *
+ * Ops for the same job can be causally dependent on each other in that
+ * createdAt order — e.g. submit's job_details/install_forms upsert is
+ * timestamped just before its status_event, specifically so it lands
+ * before the status flips to "submitted" and RLS locks the form row (see
+ * batchTimestamps in field-actions.ts). But createdAt order alone doesn't
+ * enforce that: each op here is applied and errors independently, so
+ * without this guard a transient failure on the form write wouldn't stop
+ * the loop — the later status_event would still go on to succeed right
+ * after it, on the very next iteration. That silently produces a job that
+ * reads "submitted" on the server with its form data still missing, for
+ * as long as it takes the next retry (the 30s foreground timer, or the
+ * next visibility/online event) to pick the failed op back up — a real
+ * gap, not just a slow one, since nothing else here was waiting on it.
+ * Once any op for a job fails, every later op for that same job is
+ * skipped for the rest of this pass (left queued, untouched, to be tried
+ * again next drain in the same order) rather than risking exactly that.
+ */
 export async function drainOutbox(): Promise<DrainResult> {
   const supabase = createClient();
   const ops = await db.outbox.orderBy("createdAt").toArray();
   let succeeded = 0;
   let failed = 0;
+  const blockedJobIds = new Set<string>();
 
   for (const op of ops) {
+    const jobId = jobIdForOp(op);
+    if (jobId && blockedJobIds.has(jobId)) {
+      failed++;
+      continue;
+    }
     try {
       await applyOperation(supabase, op);
       await db.outbox.delete(op.id);
       succeeded++;
     } catch (error) {
       failed++;
+      if (jobId) blockedJobIds.add(jobId);
       await db.outbox.update(op.id, {
         attempts: op.attempts + 1,
         lastAttemptAt: new Date().toISOString(),

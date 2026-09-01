@@ -22,7 +22,7 @@ function adminClient() {
 }
 
 test("manager pulls a job's PDF and zip report from /office/reports", async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const admin = adminClient();
   const tag = `E2E-REPORT-${Date.now()}`;
 
@@ -103,28 +103,32 @@ test("manager pulls a job's PDF and zip report from /office/reports", async ({ p
   // job_patch/status_event write can land afterward and silently overwrite
   // our "closed" back to "submitted". Wait for the server to actually show
   // "submitted" first, so our own update is guaranteed to apply last.
+  //
+  // drainOutbox() now guarantees this job's job_details_upsert can never be
+  // observed *behind* its status_event (see the ordering guard in
+  // src/lib/offline/outbox.ts) — a failed job_details write blocks that
+  // job's status_event too, rather than letting it through underneath. That
+  // fixed a real gap (a job could briefly read "submitted" with its form
+  // data still missing after a transient sync failure), but it also means
+  // this poll can now occasionally need a full retry cycle itself, not just
+  // the job_details poll below — widened accordingly.
   await expect
     .poll(
       async () => (await admin.from("jobs").select("status").eq("id", jobId).single()).data?.status,
-      { timeout: 15_000, message: "waiting for the field submit to reach the server before closing the job" },
+      { timeout: 35_000, message: "waiting for the field submit to reach the server before closing the job" },
     )
     .toBe("submitted");
 
-  // job_details is a separate outbox write from the jobs.status patch above
-  // — the two aren't guaranteed to land in the same order or together, so
-  // "status is submitted" doesn't mean job_details (player_serial etc.) has
-  // synced yet. The on-demand report generates fresh from a live query
-  // (completion-report.ts), and silently omits the whole form-fields
-  // section when job_details is still null — which is exactly what
-  // produced a real, if rare, CI failure here (missing "PLR-REPORT-1").
-  // Raised from 15s to 30s after this poll kept timing out on unrelated CI
-  // runs (same as the phase5 webhook-wait fix) — CI-runner contention, not
-  // a logic bug: each recurrence traced to a commit that never touches this
-  // code path.
+  // Since the ordering guard above means status_event can't land ahead of
+  // this job's job_details_upsert any more, this should now resolve
+  // essentially immediately once the poll above does — kept as a distinct,
+  // explicit assertion (not folded into the one above) so a regression in
+  // that guarantee still fails loudly and specifically here, exactly as it
+  // did before the fix.
   await expect
     .poll(
       async () => (await admin.from("job_details").select("player_serial").eq("job_id", jobId).maybeSingle()).data?.player_serial,
-      { timeout: 30_000, message: "waiting for job_details to reach the server before generating the report" },
+      { timeout: 35_000, message: "waiting for job_details to reach the server before generating the report" },
     )
     .toBe("PLR-REPORT-1");
 
