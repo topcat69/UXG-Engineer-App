@@ -36,6 +36,14 @@ export default async function OfficeLayout({ children }: { children: React.React
           </nav>
         </div>
         <div className="flex items-center gap-3 text-sm">
+          <form action="/office/search" method="get">
+            <input
+              type="search"
+              name="q"
+              placeholder="Search clients, jobs, sites, projects…"
+              className="border-input h-9 w-64 rounded-md border bg-transparent px-3 text-sm"
+            />
+          </form>
           <span className="text-muted-foreground">
             {user.name} · {humanize(user.role)}
           </span>
