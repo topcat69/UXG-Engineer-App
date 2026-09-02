@@ -20,16 +20,18 @@ COPY . .
 # NEXT_PUBLIC_* vars are inlined into the client bundle at build time, not
 # read at container startup — unlike every other env var this app uses
 # (Supabase service role key, Resend, Monday.com, ...), which stay in
-# .env.production and are only ever read at runtime. These four are the
+# .env.production and are only ever read at runtime. These five are the
 # full set referenced anywhere under src/.
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_SENTRY_DSN
+ARG NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
     NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY \
     NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
-    NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
+    NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN \
+    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=$NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
 # V8 sizes its default heap ceiling off detected physical RAM, not swap —
 # on a memory-constrained VM that default sits well under what's actually

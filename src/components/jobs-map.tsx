@@ -1,17 +1,15 @@
 "use client";
 
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-import { useEffect } from "react";
-import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import { useEffect, useState } from "react";
+import { APIProvider, Map, Marker, InfoWindow, useMap } from "@vis.gl/react-google-maps";
 import Link from "next/link";
 import { humanize } from "@/lib/format/text";
 import type { JobMapMarker, MapCategory } from "@/lib/dashboard/map-markers";
 
-// Distinct colored dots per category rather than Leaflet's single default
-// pin icon — the whole point of a "where are the jobs" map is reading
-// status at a glance without opening every popup. Bright/saturated so
-// dots stay legible against busy OSM tiles at a glance.
+// Distinct colored dots per category rather than one default pin — the
+// whole point of a "where are the jobs" map is reading status at a glance
+// without opening every marker. Same hex values as dashboard-client.tsx's
+// legend, and previously jobs-map.tsx's Leaflet divIcon colors.
 const CATEGORY_COLORS: Record<MapCategory, string> = {
   on_site: "#FF7A00",
   scheduled: "#2563eb",
@@ -19,64 +17,96 @@ const CATEGORY_COLORS: Record<MapCategory, string> = {
   provisional: "#db2777",
 };
 
-function iconFor(category: MapCategory): L.DivIcon {
-  return L.divIcon({
-    className: "",
-    html: `<span style="display:block;width:16px;height:16px;border-radius:9999px;background:${CATEGORY_COLORS[category]};border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.7)"></span>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-  });
+function iconFor(category: MapCategory): google.maps.Symbol {
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    scale: 8,
+    fillColor: CATEGORY_COLORS[category],
+    fillOpacity: 1,
+    strokeColor: "#ffffff",
+    strokeWeight: 2,
+  };
 }
 
 /** Fits the view to every marker on mount and whenever the marker set changes — a live-updating map is only actually useful if new/moved jobs stay in frame without a manual re-pan. */
-function FitBounds({ points }: { points: [number, number][] }) {
+function FitBounds({ points }: { points: google.maps.LatLngLiteral[] }) {
   const map = useMap();
   useEffect(() => {
-    if (points.length === 0) return;
+    if (!map || points.length === 0) return;
     if (points.length === 1) {
-      map.setView(points[0]!, 13);
-    } else {
-      map.fitBounds(points, { padding: [30, 30] });
+      map.setCenter(points[0]!);
+      map.setZoom(13);
+      return;
     }
+    const bounds = new google.maps.LatLngBounds();
+    points.forEach((p) => bounds.extend(p));
+    map.fitBounds(bounds, 30);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, JSON.stringify(points)]);
   return null;
 }
 
-export default function JobsMap({ markers }: { markers: JobMapMarker[] }) {
-  const points: [number, number][] = markers.map((m) => [m.latitude, m.longitude]);
+function JobsMapInner({ markers }: { markers: JobMapMarker[] }) {
+  const [openMarkerId, setOpenMarkerId] = useState<string | null>(null);
+  const points = markers.map((m) => ({ lat: m.latitude, lng: m.longitude }));
   // UK-centred fallback view for the empty-state case (no jobs with site
   // coordinates yet) — this app's stated userbase, per DECISIONS.md.
-  const fallbackCenter: [number, number] = [54.5, -3];
+  const fallbackCenter = { lat: 54.5, lng: -3 };
+  const openMarker = markers.find((m) => m.id === openMarkerId) ?? null;
 
   return (
-    <MapContainer
-      center={points[0] ?? fallbackCenter}
-      zoom={6}
+    <Map
+      defaultCenter={points[0] ?? fallbackCenter}
+      defaultZoom={6}
       style={{ height: 420, width: "100%", borderRadius: "0.5rem" }}
-      scrollWheelZoom
+      gestureHandling="greedy"
+      disableDefaultUI={false}
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
       <FitBounds points={points} />
       {markers.map((m) => (
-        <Marker key={m.id} position={[m.latitude, m.longitude]} icon={iconFor(m.category)}>
-          <Popup>
-            <div className="flex flex-col gap-1 text-sm">
-              <Link href={`/office/jobs/${m.id}`} className="font-medium underline">
-                {m.jobNumber}
-              </Link>
-              <span>{m.siteName}</span>
-              <span className="text-muted-foreground">
-                {humanize(m.status)}
-                {m.assignedName ? ` · ${m.assignedName}` : ""}
-              </span>
-            </div>
-          </Popup>
-        </Marker>
+        <Marker
+          key={m.id}
+          position={{ lat: m.latitude, lng: m.longitude }}
+          icon={iconFor(m.category)}
+          onClick={() => setOpenMarkerId(m.id)}
+        />
       ))}
-    </MapContainer>
+      {openMarker && (
+        <InfoWindow
+          position={{ lat: openMarker.latitude, lng: openMarker.longitude }}
+          onCloseClick={() => setOpenMarkerId(null)}
+        >
+          <div className="flex flex-col gap-1 text-sm">
+            <Link href={`/office/jobs/${openMarker.id}`} className="font-medium underline">
+              {openMarker.jobNumber}
+            </Link>
+            <span>{openMarker.siteName}</span>
+            <span className="text-muted-foreground">
+              {humanize(openMarker.status)}
+              {openMarker.assignedName ? ` · ${openMarker.assignedName}` : ""}
+            </span>
+          </div>
+        </InfoWindow>
+      )}
+    </Map>
+  );
+}
+
+export default function JobsMap({ markers }: { markers: JobMapMarker[] }) {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    return (
+      <div className="bg-muted flex h-[420px] w-full items-center justify-center rounded-lg p-4 text-center">
+        <p className="text-muted-foreground text-sm">
+          Map unavailable — set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable Google Maps.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <APIProvider apiKey={apiKey}>
+      <JobsMapInner markers={markers} />
+    </APIProvider>
   );
 }
