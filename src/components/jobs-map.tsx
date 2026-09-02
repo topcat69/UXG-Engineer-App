@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { APIProvider, Map, Marker, InfoWindow, useMap } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, Marker, InfoWindow, useMap, useApiIsLoaded } from "@vis.gl/react-google-maps";
 import Link from "next/link";
 import { humanize } from "@/lib/format/text";
 import type { JobMapMarker, MapCategory } from "@/lib/dashboard/map-markers";
@@ -48,6 +48,13 @@ function FitBounds({ points }: { points: google.maps.LatLngLiteral[] }) {
 
 function JobsMapInner({ markers }: { markers: JobMapMarker[] }) {
   const [openMarkerId, setOpenMarkerId] = useState<string | null>(null);
+  // The Google Maps script loads asynchronously, after this component's
+  // first render — building a marker icon references the `google` global
+  // (google.maps.SymbolPath), which doesn't exist yet on that first pass.
+  // Gate marker rendering on the API actually being loaded rather than
+  // crashing the whole tree with a ReferenceError; markers pop in a beat
+  // after the base map, same as any other async-script-dependent widget.
+  const apiIsLoaded = useApiIsLoaded();
   const points = markers.map((m) => ({ lat: m.latitude, lng: m.longitude }));
   // UK-centred fallback view for the empty-state case (no jobs with site
   // coordinates yet) — this app's stated userbase, per DECISIONS.md.
@@ -63,14 +70,15 @@ function JobsMapInner({ markers }: { markers: JobMapMarker[] }) {
       disableDefaultUI={false}
     >
       <FitBounds points={points} />
-      {markers.map((m) => (
-        <Marker
-          key={m.id}
-          position={{ lat: m.latitude, lng: m.longitude }}
-          icon={iconFor(m.category)}
-          onClick={() => setOpenMarkerId(m.id)}
-        />
-      ))}
+      {apiIsLoaded &&
+        markers.map((m) => (
+          <Marker
+            key={m.id}
+            position={{ lat: m.latitude, lng: m.longitude }}
+            icon={iconFor(m.category)}
+            onClick={() => setOpenMarkerId(m.id)}
+          />
+        ))}
       {openMarker && (
         <InfoWindow
           position={{ lat: openMarker.latitude, lng: openMarker.longitude }}
