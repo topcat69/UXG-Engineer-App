@@ -1,62 +1,57 @@
 import "server-only";
-import { appBaseUrl } from "@/lib/app-url";
-import { computeMapWindow, TILE_SIZE } from "./tile-math";
 
-export { TILE_SIZE };
+const ZOOM = 15; // matches components/site-map.tsx's Google Maps zoom, for visual consistency with the job detail page's own map
+const MAX_STATIC_MAP_DIMENSION_PX = 640; // Google Static Maps API's per-side cap on the `size` param
 
-const ZOOM = 15; // matches components/site-map.tsx's Leaflet zoom, for visual consistency with the job detail page's own map
-
-async function fetchTile(x: number, y: number): Promise<Buffer | null> {
-  try {
-    const response = await fetch(`https://tile.openstreetmap.org/${ZOOM}/${x}/${y}.png`, {
-      headers: { "User-Agent": `UXG-Engineer-Job-Scheduler/1.0 (${appBaseUrl()})` },
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!response.ok) return null;
-    return Buffer.from(await response.arrayBuffer());
-  } catch {
-    return null;
-  }
-}
-
-export type SiteMapPlan = {
-  windowWidthPx: number;
-  windowLeftPx: number;
-  windowTopPx: number;
-  markerPx: { x: number; y: number };
-  tiles: { x: number; y: number; bytes: Buffer }[];
-};
+export type SiteMapImage = { bytes: Buffer; widthPx: number; heightPx: number };
 
 /**
- * Fetches the OpenStreetMap tiles needed to render a small area map around
- * a site, at whatever raw pixel resolution matches the requested PDF box
- * size (see tile-math.ts's computeMapWindow for the geometry), plus the
- * site's exact pixel position within that window so the caller can draw a
- * marker at the right spot (see brand.ts's drawSiteMap).
+ * Fetches a ready-made site location image from Google's Static Maps API —
+ * center pin and all, drawn server-side via the `markers` param, so unlike
+ * the old OpenStreetMap-tile version there's no tile stitching or manual
+ * marker-drawing left for the caller to do (see brand.ts's drawSiteMap).
  *
- * Returns null if ANY tile fails to fetch — a half-drawn map (some tiles
- * present, some blank) reads as broken in a way a map that's simply absent
- * doesn't, and per the Nominatim addenda in DECISIONS.md, this app doesn't
- * assume OpenStreetMap's infrastructure is reliably reachable from this
- * server on every request; the report needs to stay a complete, valid
- * document with or without this section.
+ * Uses GOOGLE_MAPS_API_KEY, not the browser-facing
+ * NEXT_PUBLIC_GOOGLE_MAPS_API_KEY — a key restricted by HTTP referrer (as
+ * the dashboard map's key should be) won't work for this server-to-server
+ * call, which sends no matching Referer header; this one should be
+ * restricted by IP (to this app's server) instead, with the "Maps Static
+ * API" enabled on the same Google Cloud project.
+ *
+ * Returns null if there's no key configured, or the request fails for any
+ * reason — same best-effort contract this had for OpenStreetMap tiles: the
+ * report stays a complete, valid document with or without this section
+ * (see completion-report.ts's caller).
  */
-export async function buildSiteMapPlan(
+export async function fetchSiteMapImage(
   latitude: number,
   longitude: number,
   targetWidthPt: number,
   targetHeightPt: number,
-): Promise<SiteMapPlan | null> {
-  const window = computeMapWindow(latitude, longitude, targetWidthPt, targetHeightPt, ZOOM);
+): Promise<SiteMapImage | null> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return null;
 
-  const fetched = await Promise.all(window.tileCoords.map(({ x, y }) => fetchTile(x, y)));
-  if (fetched.some((bytes) => bytes === null)) return null;
+  const scaleDown = Math.min(1, MAX_STATIC_MAP_DIMENSION_PX / Math.max(targetWidthPt, targetHeightPt));
+  const widthPx = Math.max(1, Math.round(targetWidthPt * scaleDown));
+  const heightPx = Math.max(1, Math.round(targetHeightPt * scaleDown));
 
-  return {
-    windowWidthPx: window.windowWidthPx,
-    windowLeftPx: window.windowLeftPx,
-    windowTopPx: window.windowTopPx,
-    markerPx: window.markerPx,
-    tiles: window.tileCoords.map((coord, i) => ({ ...coord, bytes: fetched[i]! })),
-  };
+  const params = new URLSearchParams({
+    center: `${latitude},${longitude}`,
+    zoom: String(ZOOM),
+    size: `${widthPx}x${heightPx}`,
+    scale: "2", // retina-density bitmap within the same logical `size` box, for print sharpness
+    markers: `color:0xE6007E|${latitude},${longitude}`, // BRAND.digitalPink
+    key: apiKey,
+  });
+
+  try {
+    const response = await fetch(`https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!response.ok) return null;
+    return { bytes: Buffer.from(await response.arrayBuffer()), widthPx, heightPx };
+  } catch {
+    return null;
+  }
 }

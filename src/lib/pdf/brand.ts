@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { BRAND } from "./brand-colors";
 import { severityAccent } from "./severity";
-import { TILE_SIZE, type SiteMapPlan } from "./site-map";
+import type { SiteMapImage } from "./site-map";
 
 export { BRAND, severityAccent };
 
@@ -138,45 +138,22 @@ export function labelledParagraph(doc: Doc, label: string, value: string | null 
 }
 
 /**
- * The site location map beneath the Address line — a grid of the fetched
- * OpenStreetMap tiles (site-map.ts's buildSiteMapPlan) clipped to a box and
- * a pin marker drawn at the site's exact pixel position within it. Includes
- * the "© OpenStreetMap contributors" attribution OSM's tile usage policy
- * requires wherever their tiles are displayed — the same text
- * `components/site-map.tsx`'s Leaflet map already shows in-app.
+ * The site location map beneath the Address line — a ready-made image from
+ * Google's Static Maps API (site-map.ts's fetchSiteMapImage), pin and all,
+ * so unlike the old OpenStreetMap-tile version there's no per-tile drawing
+ * or manual marker to add here; Google's own copyright/logo is baked into
+ * the returned image itself, so no separate attribution text is needed
+ * either (unlike raw OSM tiles, which carry no attribution of their own).
  */
-export function drawSiteMap(doc: Doc, x: number, y: number, width: number, height: number, plan: SiteMapPlan) {
-  const scale = width / plan.windowWidthPx;
-
-  doc.save();
-  doc.rect(x, y, width, height).clip();
-  for (const tile of plan.tiles) {
-    const tileX = x + (tile.x * TILE_SIZE - plan.windowLeftPx) * scale;
-    const tileY = y + (tile.y * TILE_SIZE - plan.windowTopPx) * scale;
-    const tileSize = TILE_SIZE * scale;
-    doc.image(tile.bytes, tileX, tileY, { width: tileSize, height: tileSize });
-  }
-  doc.restore();
-
-  const markerX = x + plan.markerPx.x * scale;
-  const markerY = y + plan.markerPx.y * scale;
-  doc.circle(markerX, markerY, 6).fillColor(BRAND.digitalPink).fill();
-  doc.circle(markerX, markerY, 6).strokeColor(BRAND.white).lineWidth(1.5).stroke();
-
+export function drawSiteMap(doc: Doc, x: number, y: number, width: number, height: number, map: SiteMapImage) {
+  doc.image(map.bytes, x, y, { width, height });
   doc.rect(x, y, width, height).strokeColor(BRAND.paleGrey).lineWidth(1).stroke();
-
-  doc
-    .fontSize(6)
-    .fillColor(BRAND.charcoal)
-    .text("© OpenStreetMap contributors", x + width - 150, y + height - 12, { width: 148, align: "right", lineBreak: false });
 
   // Same lesson as drawBanner/drawSectionBar/drawFooters (see their own
   // comments): pdfkit's .image()/.text() calls leave doc.x/doc.y wherever
-  // their own content happened to land — here, wherever the last tile
-  // image's own (unclipped) bottom edge fell, which can be well past the
-  // visible box since edge tiles are drawn at full size and only clipped
-  // visually. Left alone, the very next content call would start from
-  // that stray position instead of just below the map box.
+  // their own content happened to land. Left alone, the very next content
+  // call would start from that stray position instead of just below the
+  // map box.
   doc.fillColor("black").font("Helvetica");
   doc.x = x;
   doc.y = y + height;

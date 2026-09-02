@@ -23,7 +23,7 @@ import {
   severityAccent,
   twoColumnRow,
 } from "./brand";
-import { buildSiteMapPlan } from "./site-map";
+import { fetchSiteMapImage } from "./site-map";
 
 const SITE_MAP_HEIGHT = 200;
 
@@ -135,17 +135,16 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
   const address = [job.site?.address_line1, job.site?.address_line2, job.site?.town, job.site?.postcode].filter(Boolean).join(", ");
   labelledParagraph(doc, "Address:", address || null);
 
-  // Best-effort: a failed/unreachable tile fetch (see DECISIONS.md's
-  // Nominatim addenda — this app doesn't assume OSM's infrastructure is
-  // reliably reachable from this server) just means the report has no map,
-  // not a failed report.
+  // Best-effort: a missing API key, or a failed/unreachable Static Maps
+  // request, just means the report has no map, not a failed report — same
+  // contract this had for OpenStreetMap tiles before it.
   if (job.site?.latitude != null && job.site?.longitude != null) {
     try {
       const mapWidth = doc.page.width - PAGE_MARGINS.left - PAGE_MARGINS.right;
-      const mapPlan = await buildSiteMapPlan(job.site.latitude, job.site.longitude, mapWidth, SITE_MAP_HEIGHT);
-      if (mapPlan) {
+      const mapImage = await fetchSiteMapImage(job.site.latitude, job.site.longitude, mapWidth, SITE_MAP_HEIGHT);
+      if (mapImage) {
         if (doc.y + SITE_MAP_HEIGHT > doc.page.height - doc.page.margins.bottom) doc.addPage();
-        drawSiteMap(doc, PAGE_MARGINS.left, doc.y, mapWidth, SITE_MAP_HEIGHT, mapPlan);
+        drawSiteMap(doc, PAGE_MARGINS.left, doc.y, mapWidth, SITE_MAP_HEIGHT, mapImage);
         doc.moveDown(0.7);
       }
     } catch {

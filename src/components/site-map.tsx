@@ -1,18 +1,7 @@
 "use client";
 
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
-
-// Leaflet's default marker images don't survive bundling; point at the
-// package's own CDN-hosted release instead of wiring up asset imports.
-const markerIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
+import { useState } from "react";
+import { APIProvider, InfoWindow, Map, Marker } from "@vis.gl/react-google-maps";
 
 export default function SiteMap({
   latitude,
@@ -23,20 +12,36 @@ export default function SiteMap({
   longitude: number;
   label: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const position = { lat: latitude, lng: longitude };
+
+  if (!apiKey) {
+    return (
+      <div className="bg-muted flex h-[240px] w-full items-center justify-center rounded-lg p-4 text-center">
+        <p className="text-muted-foreground text-sm">
+          Map unavailable — set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable Google Maps.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <MapContainer
-      center={[latitude, longitude]}
-      zoom={15}
-      style={{ height: 240, width: "100%", borderRadius: "0.5rem" }}
-      scrollWheelZoom={false}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <Marker position={[latitude, longitude]} icon={markerIcon}>
-        <Popup>{label}</Popup>
-      </Marker>
-    </MapContainer>
+    <APIProvider apiKey={apiKey}>
+      <Map
+        defaultCenter={position}
+        defaultZoom={15}
+        style={{ height: 240, width: "100%", borderRadius: "0.5rem" }}
+        gestureHandling="greedy"
+        disableDefaultUI={false}
+      >
+        <Marker position={position} onClick={() => setOpen(true)} />
+        {open && (
+          <InfoWindow position={position} onCloseClick={() => setOpen(false)}>
+            {label}
+          </InfoWindow>
+        )}
+      </Map>
+    </APIProvider>
   );
 }
