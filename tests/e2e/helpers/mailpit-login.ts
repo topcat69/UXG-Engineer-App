@@ -9,7 +9,7 @@ const MAILPIT_URL = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
  * shortcuts. Requires local Supabase to be running (`pnpm db:start`).
  */
 export async function loginAs(page: Page, email: string): Promise<void> {
-  await page.goto("/login");
+  await page.goto("/login/superadmin");
   await page.fill("#email", email);
   await page.click('button[type="submit"]');
   await page.waitForSelector("text=Check");
