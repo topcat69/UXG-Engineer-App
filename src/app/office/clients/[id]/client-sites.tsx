@@ -84,8 +84,8 @@ export function ClientSites({ clientId, sites: initialSites }: { clientId: strin
       <div>
         <h2 className="font-medium">Sites</h2>
         <p className="text-muted-foreground text-sm">
-          The individual locations this client&apos;s jobs happen at — e.g. each store. If a client
-          has no separate stores, add one site using the client&apos;s own name.
+          The individual locations this customer&apos;s jobs happen at — e.g. each store. If a
+          customer has no separate stores, add one site using the customer&apos;s own name.
         </p>
       </div>
 

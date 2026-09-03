@@ -218,7 +218,7 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
         ["Issues found", installForm.issues_found],
         ["Issue detail", installForm.issue_detail],
         ["Equipment damage", installForm.equipment_damage],
-        ["Client name", installForm.client_name],
+        ["Customer name", installForm.client_name],
         ["Engineer notes", installForm.engineer_notes],
       ]
     : jobDetails

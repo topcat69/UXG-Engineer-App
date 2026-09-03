@@ -73,7 +73,7 @@ export function ProjectsManager({
         <thead>
           <tr className="border-b text-left">
             <th className="py-2 font-medium">Name</th>
-            <th className="py-2 font-medium">Client</th>
+            <th className="py-2 font-medium">Customer</th>
             <th className="py-2 font-medium">Status</th>
             <th className="py-2 font-medium">Dates</th>
             <th className="py-2 font-medium">Jobs</th>
@@ -138,7 +138,7 @@ export function ProjectsManager({
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-muted-foreground text-xs">Client</label>
+              <label className="text-muted-foreground text-xs">Customer</label>
               <select
                 value={editClientId}
                 onChange={(e) => setEditClientId(e.target.value)}

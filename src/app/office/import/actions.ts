@@ -18,7 +18,7 @@ export async function importSitesCsv(formData: FormData): Promise<ImportSitesRes
   }
   const clientId = formData.get("clientId");
   if (typeof clientId !== "string" || !clientId) {
-    return { ok: false, message: "Select a client first — every site belongs to one." };
+    return { ok: false, message: "Select a customer first — every site belongs to one." };
   }
 
   const text = await file.text();

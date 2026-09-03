@@ -16,7 +16,7 @@ export async function createProject(input: {
 }): Promise<CreateProjectResult> {
   const name = input.name.trim();
   if (!name) return { ok: false, message: "Name is required." };
-  if (!input.client_id) return { ok: false, message: "Select a client." };
+  if (!input.client_id) return { ok: false, message: "Select a customer." };
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -54,7 +54,7 @@ export async function updateProject(
 ): Promise<UpdateProjectResult> {
   const name = input.name.trim();
   if (!name) return { ok: false, message: "Name is required." };
-  if (!input.client_id) return { ok: false, message: "Select a client." };
+  if (!input.client_id) return { ok: false, message: "Select a customer." };
 
   const supabase = await createClient();
   const { data, error } = await supabase

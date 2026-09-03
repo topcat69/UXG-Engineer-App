@@ -136,7 +136,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted-foreground" htmlFor="client_id">
-            Client
+            Customer
           </label>
           <select
             id="client_id"
@@ -221,7 +221,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <TableHeader>
           <TableRow>
             <TableHead>Job #</TableHead>
-            <TableHead>Client</TableHead>
+            <TableHead>Customer</TableHead>
             <TableHead>Site</TableHead>
             <TableHead>Project</TableHead>
             <TableHead>Status</TableHead>

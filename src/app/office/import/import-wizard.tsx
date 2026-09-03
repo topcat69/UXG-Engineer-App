@@ -60,7 +60,7 @@ export function ImportWizard({
           <code>address_line2</code>, <code>town</code>, <code>postcode</code>, <code>latitude</code>,{" "}
           <code>longitude</code>, <code>access_notes</code>, <code>contact_name</code>,{" "}
           <code>contact_phone</code>, <code>contact_email</code>. A whole file is imported as one
-          client&apos;s sites — pick which client below.
+          customer&apos;s sites — pick which customer below.
         </p>
         <form action={handleImport} className="flex flex-wrap items-center gap-2">
           <select
@@ -70,7 +70,7 @@ export function ImportWizard({
             required
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           >
-            <option value="">Client…</option>
+            <option value="">Customer…</option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}

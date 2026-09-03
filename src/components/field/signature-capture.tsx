@@ -63,8 +63,8 @@ export function SignatureCapture({
       await enqueueSignature({
         jobId,
         blob,
-        signerName: signerName.trim() || "Client",
-        signerRole: signerTitle.trim() || "Client",
+        signerName: signerName.trim() || "Customer",
+        signerRole: signerTitle.trim() || "Customer",
         capturedBy,
       });
       pad.clear();

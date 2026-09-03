@@ -86,7 +86,7 @@ export function buildScheduledEmail(input: ScheduledEmailInput, attachedFilename
   const paragraphs = [
     `Hi ${input.engineerName},`,
     `You've been scheduled for job ${input.jobNumber} at ${input.siteName}, ${when}.`,
-    input.clientName ? `Client: ${input.clientName}` : null,
+    input.clientName ? `Customer: ${input.clientName}` : null,
     `Site: ${input.siteName} — ${input.siteAddress}`,
     `Job type: ${input.jobType}`,
     input.description ? `Job description: ${input.description}` : null,

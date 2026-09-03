@@ -136,14 +136,14 @@ export function validateInstallForm(
   if (!values.content_displaying) errors.push("Content displaying result is required.");
   if (showIssueDetail(values) && !values.issue_detail.trim()) errors.push("Issue detail is required.");
   if (!values.equipment_damage) errors.push("Equipment damage is required.");
-  if (!values.client_name.trim()) errors.push("Client name is required.");
+  if (!values.client_name.trim()) errors.push("Customer name is required.");
 
   for (const slot of PHOTO_SLOTS) {
     if (!capturedSlots.has(slot)) {
       errors.push(`Photo required: ${slot.replace("photo_", "").replace(/_/g, " ")}.`);
     }
   }
-  if (!hasSignature) errors.push("Client signature is required.");
+  if (!hasSignature) errors.push("Customer signature is required.");
 
   return errors;
 }

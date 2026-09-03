@@ -112,12 +112,12 @@ export function CreateJobForm({
       </div>
       {projectId && !selectedProject?.client_id && (
         <p className="text-muted-foreground text-sm">
-          This project has no client assigned yet — set one on the Projects page first.
+          This project has no customer assigned yet — set one on the Projects page first.
         </p>
       )}
       {selectedProject?.client_id && projectSites.length === 0 && (
         <p className="text-muted-foreground text-sm">
-          This client has no sites yet — add one from its Clients page first.
+          This customer has no sites yet — add one from its Customers page first.
         </p>
       )}
       {message && <p className="text-destructive text-sm">{message}</p>}

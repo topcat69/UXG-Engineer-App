@@ -5,7 +5,7 @@ export type JobExportRow = {
   status: string;
   job_type: string;
   priority: string | null;
-  client: string;
+  customer: string;
   site: string;
   project: string;
   assigned_to: string;
@@ -17,7 +17,7 @@ const COLUMNS = [
   "status",
   "job_type",
   "priority",
-  "client",
+  "customer",
   "site",
   "project",
   "assigned_to",

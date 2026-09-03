@@ -31,7 +31,7 @@ export default async function OfficeSearchPage({
       <div className="flex flex-col gap-4">
         <h1 className="text-xl font-semibold">Search</h1>
         <p className="text-muted-foreground text-sm">
-          Enter a search term above to look across clients, projects, sites, and jobs.
+          Enter a search term above to look across customers, projects, sites, and jobs.
         </p>
       </div>
     );
@@ -86,7 +86,7 @@ export default async function OfficeSearchPage({
 
       {clients.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-muted-foreground text-sm font-medium">Clients</h2>
+          <h2 className="text-muted-foreground text-sm font-medium">Customers</h2>
           <div className="flex flex-col divide-y rounded-md border">
             {clients.map((c) => (
               <Link
@@ -114,7 +114,7 @@ export default async function OfficeSearchPage({
               >
                 <span className="font-medium">{p.name}</span>
                 <span className="text-muted-foreground flex items-center gap-2">
-                  {p.client?.name ?? "No client"}
+                  {p.client?.name ?? "No customer"}
                   <Badge variant="secondary">{humanize(p.status ?? "")}</Badge>
                 </span>
               </Link>

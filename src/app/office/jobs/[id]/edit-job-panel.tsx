@@ -207,7 +207,7 @@ export function EditJobPanel({
       </div>
       {editProjectId && !editSelectedProject?.client_id && (
         <p className="text-muted-foreground text-sm">
-          This project has no client assigned yet — set one on the Projects page first.
+          This project has no customer assigned yet — set one on the Projects page first.
         </p>
       )}
       {message && <p className="text-destructive text-sm">{message}</p>}

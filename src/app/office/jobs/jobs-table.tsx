@@ -142,7 +142,7 @@ export function JobsTable({ jobs, engineers }: { jobs: JobRow[]; engineers: { id
               <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
             </TableHead>
             <TableHead>Job #</TableHead>
-            <TableHead>Client</TableHead>
+            <TableHead>Customer</TableHead>
             <TableHead>Site</TableHead>
             <TableHead>Project</TableHead>
             <TableHead>Type</TableHead>

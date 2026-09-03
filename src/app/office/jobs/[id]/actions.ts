@@ -51,7 +51,7 @@ export async function updateJob(
     supabase.from("sites").select("client_id").eq("id", input.site_id).single(),
   ]);
   if (project?.client_id && site?.client_id && project.client_id !== site.client_id) {
-    return { ok: false, message: "That site doesn't belong to this project's client." };
+    return { ok: false, message: "That site doesn't belong to this project's customer." };
   }
 
   const { error } = await supabase

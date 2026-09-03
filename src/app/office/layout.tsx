@@ -12,7 +12,7 @@ const NAV = [
   { href: "/office/qa", label: "Job Review" },
   { href: "/office/issues", label: "Issues" },
   { href: "/office/reports", label: "Completed Jobs" },
-  { href: "/office/clients", label: "Clients" },
+  { href: "/office/clients", label: "Customers" },
   { href: "/office/projects", label: "Projects" },
   { href: "/office/import", label: "Import" },
   { href: "/office/templates", label: "Templates" },
@@ -40,7 +40,7 @@ export default async function OfficeLayout({ children }: { children: React.React
             <input
               type="search"
               name="q"
-              placeholder="Search clients, jobs, sites, projects…"
+              placeholder="Search customers, jobs, sites, projects…"
               className="border-input h-9 w-64 rounded-md border bg-transparent px-3 text-sm"
             />
           </form>

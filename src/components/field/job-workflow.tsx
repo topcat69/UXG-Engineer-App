@@ -627,7 +627,7 @@ function InstallFormSection({
         <Textarea value={values.engineer_notes} onChange={(e) => setValues((v) => ({ ...v, engineer_notes: e.target.value }))} />
       </Field>
 
-      <Field label="Client name">
+      <Field label="Customer name">
         <input
           value={values.client_name}
           onChange={(e) => setValues((v) => ({ ...v, client_name: e.target.value }))}
@@ -636,7 +636,7 @@ function InstallFormSection({
       </Field>
 
       <div>
-        <p className="mb-2 text-sm font-medium">Client signature</p>
+        <p className="mb-2 text-sm font-medium">Customer signature</p>
         <SignatureCapture jobId={jobId} capturedBy={currentUser.id} captured={!!signature} clientName={values.client_name} onCaptured={onMutated} />
       </div>
 

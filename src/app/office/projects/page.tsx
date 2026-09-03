@@ -20,13 +20,13 @@ export default async function ProjectsPage() {
       <div>
         <h1 className="text-xl font-semibold">Projects</h1>
         <p className="text-muted-foreground text-sm">
-          A container for organising one client&apos;s jobs (e.g. by year) — every project belongs
-          to exactly one client. Sites stay reusable across all of that client&apos;s projects. To
-          add a new project, go to the client&apos;s{" "}
+          A container for organising one customer&apos;s jobs (e.g. by year) — every project
+          belongs to exactly one customer. Sites stay reusable across all of that customer&apos;s
+          projects. To add a new project, go to the customer&apos;s{" "}
           <Link href="/office/clients" className="underline">
-            Clients page
+            Customers page
           </Link>{" "}
-          first — edit an existing project&apos;s name, dates, status, or client here.
+          first — edit an existing project&apos;s name, dates, status, or customer here.
         </p>
       </div>
       <ProjectsManager projects={projects ?? []} jobCounts={Object.fromEntries(jobCounts)} clients={clients ?? []} />

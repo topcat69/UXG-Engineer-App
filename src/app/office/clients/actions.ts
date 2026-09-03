@@ -74,7 +74,7 @@ export async function deleteClientRecord(clientId: string): Promise<DeleteResult
   const { error } = await supabase.from("clients").delete().eq("id", clientId);
   if (error) {
     if (error.code === "23503") {
-      return { ok: false, message: "Can't delete — this client still has sites. Remove or reassign them first." };
+      return { ok: false, message: "Can't delete — this customer still has sites. Remove or reassign them first." };
     }
     return { ok: false, message: error.message };
   }

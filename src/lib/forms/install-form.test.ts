@@ -54,7 +54,7 @@ describe("validateInstallForm", () => {
   it("fails on a completely empty form", () => {
     const errors = validateInstallForm(EMPTY_INSTALL_FORM, new Set(), false);
     expect(errors.length).toBeGreaterThan(5);
-    expect(errors).toContain("Client signature is required.");
+    expect(errors).toContain("Customer signature is required.");
   });
 
   it("requires wifi_signal when network_type is WiFi, but not otherwise", () => {

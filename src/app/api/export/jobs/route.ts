@@ -53,7 +53,7 @@ export async function GET(request: Request) {
     status: job.status,
     job_type: job.job_type,
     priority: job.priority,
-    client: job.site?.client?.name ?? "",
+    customer: job.site?.client?.name ?? "",
     site: job.site?.name ?? "",
     project: job.project?.name ?? "",
     assigned_to: job.assigned?.name ?? "",

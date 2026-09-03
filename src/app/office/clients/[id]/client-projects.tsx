@@ -54,7 +54,7 @@ export function ClientProjects({ clientId, projects: initialProjects }: { client
       <div>
         <h2 className="font-medium">Projects</h2>
         <p className="text-muted-foreground text-sm">
-          This client&apos;s projects. Edit an existing one&apos;s name, dates, or status from the{" "}
+          This customer&apos;s projects. Edit an existing one&apos;s name, dates, or status from the{" "}
           <Link href="/office/projects" className="underline">
             Projects page
           </Link>

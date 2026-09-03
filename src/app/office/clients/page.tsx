@@ -14,11 +14,11 @@ export default async function ClientsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-semibold">Clients</h1>
+        <h1 className="text-xl font-semibold">Customers</h1>
         <p className="text-muted-foreground text-sm">
-          The businesses this app does work for — e.g. a client with 200 stores gets one client
-          record and 200 sites underneath it. Jobs reference a site, so a job&apos;s client is
-          always identifiable for reporting.
+          The businesses this app does work for — e.g. a customer with 200 stores gets one
+          customer record and 200 sites underneath it. Jobs reference a site, so a job&apos;s
+          customer is always identifiable for reporting.
         </p>
       </div>
       <ClientsManager clients={clients ?? []} siteCounts={Object.fromEntries(siteCounts)} />

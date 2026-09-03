@@ -239,7 +239,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <FormField label="Content displaying" value={humanize(installForm.content_displaying ?? "")} />
               <FormField label="Issues found" value={installForm.issues_found ? "Yes" : "No"} />
               <FormField label="Equipment damage" value={installForm.equipment_damage ? humanize(installForm.equipment_damage) : null} />
-              <FormField label="Client name" value={installForm.client_name} />
+              <FormField label="Customer name" value={installForm.client_name} />
             </dl>
           )}
           {surveyForm && (

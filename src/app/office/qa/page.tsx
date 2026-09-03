@@ -34,7 +34,7 @@ export default async function QaQueuePage() {
           <TableHeader>
             <TableRow>
               <TableHead>Job #</TableHead>
-              <TableHead>Client</TableHead>
+              <TableHead>Customer</TableHead>
               <TableHead>Site</TableHead>
               <TableHead>Project</TableHead>
               <TableHead>Type</TableHead>

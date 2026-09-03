@@ -84,7 +84,7 @@ export function ClientsManager({
   }
 
   function handleDelete(clientId: string) {
-    if (!window.confirm("Delete this client? This can't be undone.")) return;
+    if (!window.confirm("Delete this customer? This can't be undone.")) return;
     startTransition(async () => {
       const result = await deleteClientRecord(clientId);
       if (result.ok) {
@@ -189,7 +189,7 @@ export function ClientsManager({
           {clients.length === 0 && (
             <tr>
               <td colSpan={4} className="text-muted-foreground py-4 text-center">
-                No clients yet.
+                No customers yet.
               </td>
             </tr>
           )}
@@ -198,7 +198,7 @@ export function ClientsManager({
       {rowMessage && <p className="text-destructive text-sm">{rowMessage}</p>}
 
       <section className="flex flex-col gap-3 border-t pt-4">
-        <h2 className="font-medium">Add a client</h2>
+        <h2 className="font-medium">Add a customer</h2>
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
             <label className="text-muted-foreground text-xs">Name</label>
@@ -234,14 +234,14 @@ export function ClientsManager({
             />
           </div>
           <Button type="button" onClick={handleCreate} disabled={isPending || !name.trim()}>
-            Add client
+            Add customer
           </Button>
         </div>
         {message && <p className="text-muted-foreground text-sm">{message}</p>}
       </section>
 
       <section className="flex flex-col gap-3 border-t pt-4">
-        <h2 className="font-medium">Or import clients from CSV</h2>
+        <h2 className="font-medium">Or import customers from CSV</h2>
         <p className="text-muted-foreground text-sm">
           Required column: <code>name</code>. Optional: <code>contact_name</code>,{" "}
           <code>contact_email</code>, <code>contact_phone</code>, <code>notes</code>.

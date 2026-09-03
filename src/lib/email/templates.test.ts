@@ -84,7 +84,7 @@ describe("buildScheduledEmail", () => {
 
   it("says nothing about a client when the site has none", () => {
     const email = buildScheduledEmail({ ...base, clientName: null }, []);
-    expect(email.text).not.toContain("Client:");
+    expect(email.text).not.toContain("Customer:");
   });
 
   it("names attached files when there are any", () => {
