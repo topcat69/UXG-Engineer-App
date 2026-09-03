@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { UxgLogo } from "@/components/branding/uxg-logo";
+import { appBaseUrl } from "@/lib/app-url";
 
 type Status = "idle" | "sending" | "sent" | "error";
 type CodeStatus = "idle" | "verifying" | "error";
@@ -28,7 +29,7 @@ export default function LoginPage() {
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${appBaseUrl()}/auth/callback`,
         // Magic link is superadmin-only in practice (enforced in getCurrentUser) —
         // this stops a brand-new email from self-provisioning an account via OTP.
         shouldCreateUser: false,
@@ -50,7 +51,7 @@ export default function LoginPage() {
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${appBaseUrl()}/auth/callback`,
       },
     });
 
