@@ -29,7 +29,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         </p>
       </div>
       <ClientProjects clientId={client.id} projects={projects ?? []} />
-      <ClientSites clientId={client.id} sites={sites ?? []} />
+      <ClientSites sites={sites ?? []} />
     </div>
   );
 }

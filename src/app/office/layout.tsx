@@ -13,6 +13,7 @@ const NAV = [
   { href: "/office/issues", label: "Issues" },
   { href: "/office/reports", label: "Completed Jobs" },
   { href: "/office/clients", label: "Customers" },
+  { href: "/office/sites", label: "Sites" },
   { href: "/office/projects", label: "Projects" },
   { href: "/office/import", label: "Import" },
   { href: "/office/templates", label: "Templates" },
