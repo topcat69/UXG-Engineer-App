@@ -29,6 +29,9 @@ export default function LoginPage() {
       email,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
+        // Magic link is superadmin-only in practice (enforced in getCurrentUser) —
+        // this stops a brand-new email from self-provisioning an account via OTP.
+        shouldCreateUser: false,
       },
     });
 
@@ -39,6 +42,22 @@ export default function LoginPage() {
     }
 
     setStatus("sent");
+  }
+
+  async function handleGoogleSignIn() {
+    setError(null);
+    const supabase = createClient();
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (oauthError) {
+      setStatus("error");
+      setError(oauthError.message);
+    }
   }
 
   /**
@@ -76,9 +95,21 @@ export default function LoginPage() {
         <CardHeader>
           <UxgLogo className="mb-2 h-9 w-auto" />
           <CardTitle>Engineer Job Scheduler</CardTitle>
-          <CardDescription>Sign in with a magic link — no password needed.</CardDescription>
+          <CardDescription>Sign in with your UX Global Google account.</CardDescription>
         </CardHeader>
         <CardContent>
+          {status !== "sent" ? (
+            <div className="mb-6 flex flex-col gap-4">
+              <Button type="button" variant="outline" onClick={handleGoogleSignIn}>
+                Sign in with Google
+              </Button>
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">Superadmin magic link</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+            </div>
+          ) : null}
           {status === "sent" ? (
             <div className="flex flex-col gap-4">
               <p className="text-sm text-muted-foreground">

@@ -38,6 +38,12 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (error) console.error("getCurrentUser: users select failed", error);
   if (!data || !data.active) return null;
 
+  // Magic link is superadmin-only (Google Workspace SSO handles everyone
+  // else, enforcing the org's 2FA policy at the Google layer). A non-Google
+  // session on a non-superadmin account is treated as not signed in, same
+  // as a deactivated account above.
+  if (user.app_metadata.provider === "email" && data.role !== "superadmin") return null;
+
   return data;
 }
 
