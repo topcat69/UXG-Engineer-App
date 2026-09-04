@@ -43,7 +43,7 @@ const nextConfig: NextConfig = {
     // commit). Every mutation in this app goes through a Server Action, so
     // without this every one of them 403s the moment the app's reached via
     // a domain that isn't explicitly allow-listed here.
-    serverActions: { bodySizeLimit: "20mb", allowedOrigins: ["appsuite.uxglobal.co.uk", "46.62.253.203:3000"] },
+    serverActions: { bodySizeLimit: "20mb", allowedOrigins: ["appsuite.uxglobal.co.uk"] },
   },
 };
 

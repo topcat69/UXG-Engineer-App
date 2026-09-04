@@ -22,17 +22,12 @@ services:
     restart: unless-stopped
     env_file:
       - .env.production
+    # Caddy (below) is the only front door now that the real domain is
+    # live — `expose` makes the app reachable to the caddy container over
+    # the internal Docker network without publishing 3000 to the host, so
+    # the app is no longer reachable over plain HTTP in parallel with HTTPS.
     expose:
       - "3000"
-    # Published directly for the pre-domain testing phase, so the app is
-    # reachable at http://<VM_IP>:3000 without Caddy in front of it (Caddy
-    # can't issue a real TLS cert without a domain to issue one for). Safe
-    # to leave in place once Caddy's live too — `expose` above already
-    # covers container-to-container traffic — but worth removing this
-    # `ports:` mapping (and closing 3000 in ufw) once HTTPS is the only
-    # front door, so the app isn't reachable over plain HTTP in parallel.
-    ports:
-      - "3000:3000"
 
   caddy:
     image: caddy:2-alpine
