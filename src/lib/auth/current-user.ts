@@ -41,11 +41,26 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   // Magic link is superadmin-only once Google Workspace SSO is live
   // (GOOGLE_SSO_ENFORCED="true" in .env.production — off by default so
   // local dev, CI, and any environment without Google OAuth configured in
-  // Supabase keep working on magic link for every role). A non-Google
+  // Supabase keep working on magic link for every role). A non-OAuth
   // session on a non-superadmin account is then treated as not signed in,
   // same as a deactivated account above.
+  //
+  // user.app_metadata.provider is NOT this session's actual sign-in
+  // method — once an account has ever linked Google, it stays "email"
+  // (the account's original/first provider) even on a genuine fresh
+  // Google sign-in, locking every non-superadmin out of their own
+  // Google-authenticated session. The JWT's `amr` claim (Authentication
+  // Method References) is the one field that reflects how *this* session
+  // was actually established — `{ method: "oauth" }` for Google, `{
+  // method: "otp" }` for magic link — confirmed by decoding a real
+  // Google-authenticated session's token during this bug's diagnosis.
   const ssoEnforced = process.env.GOOGLE_SSO_ENFORCED === "true";
-  if (ssoEnforced && user.app_metadata.provider === "email" && data.role !== "superadmin") return null;
+  if (ssoEnforced && data.role !== "superadmin") {
+    const { data: claimsData } = await supabase.auth.getClaims();
+    const amr = claimsData?.claims.amr ?? [];
+    const usedOAuth = amr.some((entry) => (typeof entry === "string" ? entry === "oauth" : entry.method === "oauth"));
+    if (!usedOAuth) return null;
+  }
 
   return data;
 }
