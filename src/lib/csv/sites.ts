@@ -61,6 +61,7 @@ export function parseSitesCsv(text: string): ParsedSitesCsv {
 
     rows.push({
       name,
+      store_id: raw.store_id?.trim() || undefined,
       address_line1: raw.address_line1?.trim() || undefined,
       address_line2: raw.address_line2?.trim() || undefined,
       town: raw.town?.trim() || undefined,

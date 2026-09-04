@@ -891,6 +891,7 @@ export type Database = {
           longitude: number | null
           name: string
           postcode: string | null
+          store_id: string | null
           town: string | null
         }
         Insert: {
@@ -907,6 +908,7 @@ export type Database = {
           longitude?: number | null
           name: string
           postcode?: string | null
+          store_id?: string | null
           town?: string | null
         }
         Update: {
@@ -923,6 +925,7 @@ export type Database = {
           longitude?: number | null
           name?: string
           postcode?: string | null
+          store_id?: string | null
           town?: string | null
         }
         Relationships: [

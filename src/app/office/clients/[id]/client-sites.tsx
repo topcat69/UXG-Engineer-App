@@ -26,6 +26,7 @@ export function ClientSites({ sites }: { sites: SiteRow[] }) {
         <thead>
           <tr className="border-b text-left">
             <th className="py-2 font-medium">Name</th>
+            <th className="py-2 font-medium">Store ID</th>
             <th className="py-2 font-medium">Address</th>
           </tr>
         </thead>
@@ -33,6 +34,7 @@ export function ClientSites({ sites }: { sites: SiteRow[] }) {
           {sites.map((s) => (
             <tr key={s.id} className="border-b">
               <td className="py-2">{s.name}</td>
+              <td className="py-2 text-muted-foreground">{s.store_id || "—"}</td>
               <td className="py-2 text-muted-foreground">
                 {[s.address_line1, s.town, s.postcode].filter(Boolean).join(", ") || "—"}
               </td>
@@ -40,7 +42,7 @@ export function ClientSites({ sites }: { sites: SiteRow[] }) {
           ))}
           {sites.length === 0 && (
             <tr>
-              <td colSpan={2} className="text-muted-foreground py-4 text-center">
+              <td colSpan={3} className="text-muted-foreground py-4 text-center">
                 No sites yet.
               </td>
             </tr>

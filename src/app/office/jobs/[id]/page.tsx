@@ -170,6 +170,11 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             {job.site?.name}
             {job.site?.client && <span className="text-muted-foreground"> ({job.site.client.name})</span>}
           </p>
+          {job.site?.store_id && (
+            <p className="text-sm">
+              <span className="text-muted-foreground">Store ID:</span> {job.site.store_id}
+            </p>
+          )}
           <p className="text-muted-foreground text-sm">
             {[job.site?.address_line1, job.site?.town, job.site?.postcode].filter(Boolean).join(", ")}
           </p>

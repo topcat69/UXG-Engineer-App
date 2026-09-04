@@ -55,8 +55,8 @@ export default async function OfficeSearchPage({
       .limit(RESULT_LIMIT),
     supabase
       .from("sites")
-      .select("id, name, town, postcode, client_id, client:clients(name)")
-      .or(`name.ilike.${like},address_line1.ilike.${like},town.ilike.${like},postcode.ilike.${like}`)
+      .select("id, name, store_id, town, postcode, client_id, client:clients(name)")
+      .or(`name.ilike.${like},store_id.ilike.${like},address_line1.ilike.${like},town.ilike.${like},postcode.ilike.${like}`)
       .order("name")
       .limit(RESULT_LIMIT),
     supabase
@@ -133,7 +133,10 @@ export default async function OfficeSearchPage({
                 href={`/office/clients/${s.client_id}`}
                 className="flex items-center justify-between px-3 py-2 text-sm hover:bg-accent"
               >
-                <span className="font-medium">{s.name}</span>
+                <span className="font-medium">
+                  {s.name}
+                  {s.store_id && <span className="text-muted-foreground"> ({s.store_id})</span>}
+                </span>
                 <span className="text-muted-foreground">
                   {[s.client?.name, [s.town, s.postcode].filter(Boolean).join(", ") || null].filter(Boolean).join(" · ") || "—"}
                 </span>

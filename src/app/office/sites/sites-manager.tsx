@@ -5,12 +5,20 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { createSite, deleteSite, updateSite, type SiteRow } from "./actions";
 
-type EditFields = { name: string; client_id: string; address_line1: string; town: string; postcode: string };
+type EditFields = {
+  name: string;
+  client_id: string;
+  store_id: string;
+  address_line1: string;
+  town: string;
+  postcode: string;
+};
 
 function toEditFields(s: SiteRow): EditFields {
   return {
     name: s.name,
     client_id: s.client_id,
+    store_id: s.store_id ?? "",
     address_line1: s.address_line1 ?? "",
     town: s.town ?? "",
     postcode: s.postcode ?? "",
@@ -31,6 +39,7 @@ export function SitesManager({
 
   const [name, setName] = useState("");
   const [clientId, setClientId] = useState("");
+  const [storeId, setStoreId] = useState("");
   const [addressLine1, setAddressLine1] = useState("");
   const [town, setTown] = useState("");
   const [postcode, setPostcode] = useState("");
@@ -40,6 +49,7 @@ export function SitesManager({
   const [editFields, setEditFields] = useState<EditFields>({
     name: "",
     client_id: "",
+    store_id: "",
     address_line1: "",
     town: "",
     postcode: "",
@@ -55,6 +65,7 @@ export function SitesManager({
       const result = await createSite({
         client_id: clientId,
         name,
+        store_id: storeId,
         address_line1: addressLine1,
         town,
         postcode,
@@ -63,6 +74,7 @@ export function SitesManager({
         setSites((prev) => [...prev, result.site].sort((a, b) => a.name.localeCompare(b.name)));
         setName("");
         setClientId("");
+        setStoreId("");
         setAddressLine1("");
         setTown("");
         setPostcode("");
@@ -109,6 +121,7 @@ export function SitesManager({
         <thead>
           <tr className="border-b text-left">
             <th className="py-2 font-medium">Name</th>
+            <th className="py-2 font-medium">Store ID</th>
             <th className="py-2 font-medium">Customer</th>
             <th className="py-2 font-medium">Address</th>
             <th className="py-2 font-medium">Jobs</th>
@@ -123,6 +136,13 @@ export function SitesManager({
                   <input
                     value={editFields.name}
                     onChange={(e) => setEditFields((f) => ({ ...f, name: e.target.value }))}
+                    className="border-input h-8 w-full rounded-md border bg-transparent px-2 text-sm"
+                  />
+                </td>
+                <td className="py-2">
+                  <input
+                    value={editFields.store_id}
+                    onChange={(e) => setEditFields((f) => ({ ...f, store_id: e.target.value }))}
                     className="border-input h-8 w-full rounded-md border bg-transparent px-2 text-sm"
                   />
                 </td>
@@ -184,6 +204,7 @@ export function SitesManager({
             ) : (
               <tr key={s.id} className="border-b">
                 <td className="py-2">{s.name}</td>
+                <td className="py-2 text-muted-foreground">{s.store_id || "—"}</td>
                 <td className="py-2 text-muted-foreground">
                   <Link href={`/office/clients/${s.client_id}`} className="hover:underline">
                     {clientName(s.client_id)}
@@ -208,7 +229,7 @@ export function SitesManager({
           )}
           {sites.length === 0 && (
             <tr>
-              <td colSpan={5} className="text-muted-foreground py-4 text-center">
+              <td colSpan={6} className="text-muted-foreground py-4 text-center">
                 No sites yet.
               </td>
             </tr>
@@ -242,6 +263,14 @@ export function SitesManager({
                 </option>
               ))}
             </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-muted-foreground text-xs">Store ID</label>
+            <input
+              value={storeId}
+              onChange={(e) => setStoreId(e.target.value)}
+              className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+            />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-muted-foreground text-xs">Address</label>

@@ -56,10 +56,11 @@ export function ImportWizard({
       <section className="flex flex-col gap-3">
         <h2 className="font-medium">1. Import sites from CSV</h2>
         <p className="text-muted-foreground text-sm">
-          Required column: <code>name</code>. Optional: <code>address_line1</code>,{" "}
-          <code>address_line2</code>, <code>town</code>, <code>postcode</code>, <code>latitude</code>,{" "}
-          <code>longitude</code>, <code>access_notes</code>, <code>contact_name</code>,{" "}
-          <code>contact_phone</code>, <code>contact_email</code>. A whole file is imported as one
+          Required column: <code>name</code>. Optional: <code>store_id</code>,{" "}
+          <code>address_line1</code>, <code>address_line2</code>, <code>town</code>,{" "}
+          <code>postcode</code>, <code>latitude</code>, <code>longitude</code>,{" "}
+          <code>access_notes</code>, <code>contact_name</code>, <code>contact_phone</code>,{" "}
+          <code>contact_email</code>. A whole file is imported as one
           customer&apos;s sites — pick which customer below.
         </p>
         <form action={handleImport} className="flex flex-wrap items-center gap-2">

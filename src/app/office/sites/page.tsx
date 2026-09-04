@@ -28,7 +28,9 @@ export default async function SitesPage({ searchParams }: { searchParams: Promis
   if (clientId) sitesQuery = sitesQuery.eq("client_id", clientId);
   if (q) {
     const like = `%${q}%`;
-    sitesQuery = sitesQuery.or(`name.ilike.${like},address_line1.ilike.${like},town.ilike.${like},postcode.ilike.${like}`);
+    sitesQuery = sitesQuery.or(
+      `name.ilike.${like},store_id.ilike.${like},address_line1.ilike.${like},town.ilike.${like},postcode.ilike.${like}`,
+    );
   }
 
   const [{ data: sites }, { data: jobs }, { data: clients }] = await Promise.all([
@@ -62,7 +64,7 @@ export default async function SitesPage({ searchParams }: { searchParams: Promis
             id="q"
             name="q"
             defaultValue={q}
-            placeholder="Name, address, town, postcode"
+            placeholder="Name, store ID, address, town, postcode"
             className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
           />
         </div>

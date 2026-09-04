@@ -11,6 +11,7 @@ export type CreateSiteResult = { ok: true; site: SiteRow } | { ok: false; messag
 export async function createSite(input: {
   client_id: string;
   name: string;
+  store_id?: string;
   address_line1?: string;
   town?: string;
   postcode?: string;
@@ -34,6 +35,7 @@ export async function createSite(input: {
     .insert({
       client_id: input.client_id,
       name,
+      store_id: input.store_id?.trim() || undefined,
       address_line1: input.address_line1?.trim() || undefined,
       town: input.town?.trim() || undefined,
       postcode,
@@ -59,6 +61,7 @@ export async function updateSite(
   input: {
     client_id: string;
     name: string;
+    store_id?: string;
     address_line1?: string;
     town?: string;
     postcode?: string;
@@ -86,6 +89,7 @@ export async function updateSite(
     .update({
       client_id: input.client_id,
       name,
+      store_id: input.store_id?.trim() || null,
       address_line1: input.address_line1?.trim() || null,
       town: input.town?.trim() || null,
       postcode,
