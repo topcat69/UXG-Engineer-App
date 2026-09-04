@@ -36,7 +36,14 @@ const nextConfig: NextConfig = {
     // message. Field-app photo/video capture is unaffected — that goes
     // straight to Supabase Storage from the browser (Phase 3's outbox),
     // never through a Server Action.
-    serverActions: { bodySizeLimit: "20mb" },
+    // Server Actions reject any request whose Origin doesn't match what
+    // Next resolves as the Host — which, self-hosted behind Caddy, isn't
+    // read from the incoming Host header by default (same reason
+    // /auth/callback needed appBaseUrl() instead of request.url; see that
+    // commit). Every mutation in this app goes through a Server Action, so
+    // without this every one of them 403s the moment the app's reached via
+    // a domain that isn't explicitly allow-listed here.
+    serverActions: { bodySizeLimit: "20mb", allowedOrigins: ["appsuite.uxglobal.co.uk", "46.62.253.203:3000"] },
   },
 };
 
