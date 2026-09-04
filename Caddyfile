@@ -2,6 +2,19 @@
 # provisions and renews a Let's Encrypt certificate for it automatically,
 # as long as DNS for the domain already points at this VM's IP and ports
 # 80/443 reach it. See DECISIONS.md's deploy addendum.
+#
+# www redirects to the bare domain rather than being served directly:
+# NEXT_PUBLIC_APP_URL, Supabase's Auth Site URL/Redirect URLs, and the
+# Google Maps key's HTTP-referrer allow-list are all configured for the
+# bare domain only, and a Supabase session cookie is scoped to whichever
+# exact hostname it was set on (no explicit Domain attribute) — someone
+# who signs in on one host and later browses to the other looks logged
+# out even though sign-in genuinely succeeded, since the cookie never
+# gets sent cross-host. One canonical host removes that trap entirely.
+www.appsuite.uxglobal.co.uk {
+	redir https://appsuite.uxglobal.co.uk{uri} permanent
+}
+
 appsuite.uxglobal.co.uk {
 	reverse_proxy app:3000
 }
