@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { humanize } from "@/lib/format/text";
-import { updateProject, type ProjectRow } from "./actions";
+import { deleteProject, updateProject, type ProjectRow } from "./actions";
 
 const STATUSES = ["active", "on_hold", "completed"];
 
@@ -45,6 +45,18 @@ export function ProjectsManager({
 
   function handleCancelEdit() {
     setEditingId(null);
+  }
+
+  function handleDelete(id: string) {
+    if (!window.confirm("Delete this project? This can't be undone.")) return;
+    startTransition(async () => {
+      const result = await deleteProject(id);
+      if (result.ok) {
+        setProjects((prev) => prev.filter((p) => p.id !== id));
+      } else {
+        setMessage(result.message);
+      }
+    });
   }
 
   function handleSaveEdit() {
@@ -109,9 +121,14 @@ export function ProjectsManager({
                 </Link>
               </td>
               <td className="py-2">
-                <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleStartEdit(p)}>
-                  Edit
-                </Button>
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleStartEdit(p)}>
+                    Edit
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleDelete(p.id)}>
+                    Delete
+                  </Button>
+                </div>
               </td>
             </tr>
           ))}

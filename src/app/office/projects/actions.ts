@@ -75,3 +75,20 @@ export async function updateProject(
   revalidatePath(`/office/clients/${input.client_id}`);
   return { ok: true, project: data };
 }
+
+export type DeleteProjectResult = { ok: true } | { ok: false; message: string };
+
+/** A project can't be deleted while it still has jobs (or an active share link) against it — the FK is a plain RESTRICT (no cascade), same reasoning as deleteClientRecord/deleteSite: deleting a project should never silently take job history with it. */
+export async function deleteProject(id: string): Promise<DeleteProjectResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("projects").delete().eq("id", id);
+  if (error) {
+    if (error.code === "23503") {
+      return { ok: false, message: "Can't delete — this project still has jobs (or a share link) against it." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath("/office/projects");
+  return { ok: true };
+}
