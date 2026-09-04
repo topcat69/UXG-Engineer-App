@@ -2,6 +2,6 @@
 # provisions and renews a Let's Encrypt certificate for it automatically,
 # as long as DNS for the domain already points at this VM's IP and ports
 # 80/443 reach it. See DECISIONS.md's deploy addendum.
-your-domain.example.com {
+appsuite.uxglobal.co.uk {
 	reverse_proxy app:3000
 }
