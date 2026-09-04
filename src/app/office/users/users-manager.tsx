@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import type { Database } from "@/lib/supabase/database.types";
 import { humanize } from "@/lib/format/text";
-import { changeUserRole, createUser, setUserActive, updateUser, type UserRow } from "./actions";
+import { changeUserRole, createUser, deleteUser, setUserActive, updateUser, type UserRow } from "./actions";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
 
@@ -76,6 +76,19 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
       const result = await changeUserRole(userId, newRole);
       if (result.ok) {
         setUsers((prev) => prev.map((u) => (u.id === userId ? result.user : u)));
+      } else {
+        setMessage(result.message);
+      }
+    });
+  }
+
+  function handleDelete(u: UserRow) {
+    if (!window.confirm(`Delete ${u.name}'s account? This can't be undone. If they have any job history this will fail — deactivate them instead.`))
+      return;
+    startTransition(async () => {
+      const result = await deleteUser(u.id);
+      if (result.ok) {
+        setUsers((prev) => prev.filter((row) => row.id !== u.id));
       } else {
         setMessage(result.message);
       }
@@ -172,6 +185,16 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
                         onClick={() => handleSetActive(u.id, !u.active)}
                       >
                         {u.active ? "Deactivate" : "Reactivate"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={isPending || isSelf}
+                        title={isSelf ? "You can't delete your own account" : undefined}
+                        onClick={() => handleDelete(u)}
+                      >
+                        Delete
                       </Button>
                     </div>
                   )}

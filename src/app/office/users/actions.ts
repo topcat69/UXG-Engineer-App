@@ -109,6 +109,55 @@ export async function changeUserRole(userId: string, role: UserRole): Promise<Up
   return { ok: true, user: updated };
 }
 
+export type DeleteUserResult = { ok: true } | { ok: false; message: string };
+
+/**
+ * A real delete, not the same thing as setUserActive(false) — removes both
+ * the public.users row and the underlying Supabase Auth account, freeing
+ * the email up for a fresh createUser() (e.g. recreating someone whose
+ * account predates Google SSO). Only works when nothing references them:
+ * jobs.assigned_to/status_events.user_id/issues.raised_by/
+ * share_links.created_by are all plain FKs with no cascade, by design
+ * (same reasoning as deleteClientRecord/deleteSite/deleteProject — a
+ * person's name should never silently vanish from job history), so anyone
+ * with real activity has to stay on setUserActive(false) instead.
+ *
+ * public.users is deleted first (RLS + the FK checks against job history
+ * both apply here) — only once that succeeds is the auth.users row removed
+ * via the admin client, since public.users.id references auth.users(id)
+ * with no cascade the other way either.
+ */
+export async function deleteUser(userId: string): Promise<DeleteUserResult> {
+  const actor = await getCurrentUser();
+  if (!actor) return { ok: false, message: "Not signed in." };
+  if (actor.id === userId) return { ok: false, message: "You can't delete your own account." };
+
+  const supabase = await createClient();
+  const { data: target } = await supabase.from("users").select("role").eq("id", userId).single();
+  if (!target) return { ok: false, message: "User not found." };
+  if (!canManage(actor.role, target.role)) {
+    return { ok: false, message: "You don't have permission to delete this user." };
+  }
+
+  const { error: deleteError } = await supabase.from("users").delete().eq("id", userId);
+  if (deleteError) {
+    if (deleteError.code === "23503") {
+      return {
+        ok: false,
+        message: "Can't delete — this user still has job history (assigned jobs, issues, or status updates) against them. Deactivate instead.",
+      };
+    }
+    return { ok: false, message: deleteError.message };
+  }
+
+  const admin = createAdminClient();
+  const { error: authError } = await admin.auth.admin.deleteUser(userId);
+  if (authError) return { ok: false, message: authError.message };
+
+  revalidatePath("/office/users");
+  return { ok: true };
+}
+
 export type EditableUserFields = {
   name: string;
   email: string;
