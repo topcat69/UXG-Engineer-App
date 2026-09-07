@@ -4,6 +4,7 @@ import { signOut } from "@/lib/auth/actions";
 import { humanize } from "@/lib/format/text";
 import { UxgLogo } from "@/components/branding/uxg-logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { AdminToolsNav } from "@/components/office/admin-tools-nav";
 
 const NAV = [
   { href: "/office/dashboard", label: "Dashboard" },
@@ -13,6 +14,10 @@ const NAV = [
   { href: "/office/qa", label: "Job Review" },
   { href: "/office/issues", label: "Issues" },
   { href: "/office/reports", label: "Completed Jobs" },
+];
+
+/** Low-frequency admin pages, tucked behind the "Admin Tools" dropdown (see AdminToolsNav) rather than cluttering the main nav bar. */
+const ADMIN_TOOLS_NAV = [
   { href: "/office/clients", label: "Customers" },
   { href: "/office/sites", label: "Sites" },
   { href: "/office/projects", label: "Projects" },
@@ -29,12 +34,13 @@ export default async function OfficeLayout({ children }: { children: React.React
       <header className="flex items-center justify-between border-b px-6 py-3">
         <div className="flex items-center gap-6">
           <UxgLogo className="h-6 w-auto" />
-          <nav className="flex gap-4 text-sm">
+          <nav className="flex items-center gap-4 text-sm">
             {NAV.map((item) => (
               <Link key={item.href} href={item.href} className="text-muted-foreground hover:text-foreground">
                 {item.label}
               </Link>
             ))}
+            <AdminToolsNav links={ADMIN_TOOLS_NAV} />
           </nav>
         </div>
         <div className="flex items-center gap-3 text-sm">
