@@ -12,6 +12,8 @@ export type SignatureRow = Database["public"]["Tables"]["signatures"]["Row"];
 export type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
 export type JobTaskRow = Database["public"]["Tables"]["job_tasks"]["Row"];
 export type JobOptionalFieldRow = Database["public"]["Tables"]["job_optional_fields"]["Row"];
+export type ClientSlaFixtureTypeRow = Database["public"]["Tables"]["client_sla_fixture_types"]["Row"];
+export type ClientSlaReasonRow = Database["public"]["Tables"]["client_sla_reasons"]["Row"];
 export type JobStatus = Database["public"]["Enums"]["job_status"];
 
 type OutboxBase = {
@@ -103,6 +105,8 @@ class OfflineDB extends Dexie {
   jobDetails!: EntityTable<JobDetailsRow, "id">;
   jobEquipment!: EntityTable<JobEquipmentRow, "id">;
   jobOptionalFields!: EntityTable<JobOptionalFieldRow, "id">;
+  clientSlaFixtureTypes!: EntityTable<ClientSlaFixtureTypeRow, "id">;
+  clientSlaReasons!: EntityTable<ClientSlaReasonRow, "id">;
 
   constructor() {
     super("uxg-engineer-job-scheduler");
@@ -168,6 +172,28 @@ class OfflineDB extends Dexie {
       jobDetails: "id, job_id",
       jobEquipment: "id, job_id",
       jobOptionalFields: "id, job_id",
+    });
+    // client_sla_fixture_types/client_sla_reasons: read-only reference data
+    // the same shape as clients above — the engineer needs the customer's
+    // fixture-type label (read-only, office-set at SLA creation) and
+    // reason list (a dropdown to pick from at completion) for job_type
+    // "sla" jobs. Indexed by client_id, not just id, since JobDetailsSection
+    // looks these up filtered to the job's site's client.
+    this.version(6).stores({
+      jobs: "id, status, assigned_to, scheduled_start, site_id",
+      sites: "id",
+      clients: "id",
+      installForms: "id, job_id",
+      surveyForms: "id, job_id",
+      outbox: "id, createdAt",
+      mediaQueue: "id, jobId, status",
+      syncMeta: "key",
+      jobTasks: "id, job_id, is_done",
+      jobDetails: "id, job_id",
+      jobEquipment: "id, job_id",
+      jobOptionalFields: "id, job_id",
+      clientSlaFixtureTypes: "id, client_id",
+      clientSlaReasons: "id, client_id",
     });
   }
 }

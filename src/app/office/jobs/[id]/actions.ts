@@ -333,6 +333,18 @@ export async function updateSlaRequirement(jobId: string, detail: string): Promi
   return { ok: true, message: "Saved." };
 }
 
+/** SLA jobs only — what broke, picked by the office from the job's customer's client_sla_fixture_types list. Read-only to the engineer (see JobDetailsSection in job-workflow.tsx), same soft-enforcement convention as rams_storage_path/sla_requirement_detail. */
+export async function updateFixtureType(jobId: string, fixtureTypeId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("job_details")
+    .upsert({ job_id: jobId, fixture_type_id: fixtureTypeId || null }, { onConflict: "job_id" });
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/office/jobs/${jobId}`);
+  return { ok: true, message: "Saved." };
+}
+
 /** Free-text job notes the office adds while preparing the job — shown read-only to the engineer in the field app's Job Information panel. */
 export async function updateJobInformation(jobId: string, detail: string): Promise<ActionResult> {
   const supabase = await createClient();

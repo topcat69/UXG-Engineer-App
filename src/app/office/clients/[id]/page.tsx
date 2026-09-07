@@ -2,12 +2,13 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ClientSites } from "./client-sites";
 import { ClientProjects } from "./client-projects";
+import { SlaListsManager } from "./sla-lists-manager";
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: client }, { data: sites }, { data: projects }] = await Promise.all([
+  const [{ data: client }, { data: sites }, { data: projects }, { data: fixtureTypes }, { data: reasons }] = await Promise.all([
     supabase.from("clients").select("*").eq("id", id).single(),
     supabase.from("sites").select("*").eq("client_id", id).order("name"),
     supabase
@@ -15,6 +16,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       .select("id, name, status, start_date, end_date")
       .eq("client_id", id)
       .order("created_at", { ascending: false }),
+    supabase.from("client_sla_fixture_types").select("id, name").eq("client_id", id).order("name"),
+    supabase.from("client_sla_reasons").select("id, name").eq("client_id", id).order("name"),
   ]);
 
   if (!client) notFound();
@@ -30,6 +33,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       </div>
       <ClientProjects clientId={client.id} projects={projects ?? []} />
       <ClientSites sites={sites ?? []} />
+      <SlaListsManager clientId={client.id} fixtureTypes={fixtureTypes ?? []} reasons={reasons ?? []} />
     </div>
   );
 }

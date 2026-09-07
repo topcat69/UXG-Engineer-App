@@ -3,33 +3,31 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { CREATABLE_JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
-import { createJob } from "./actions";
+import { createSlaJob } from "./actions";
 
-export function CreateJobForm({
-  projects,
+export function CreateSlaForm({
+  clients,
   sites,
+  fixtureTypes,
 }: {
-  projects: { id: string; name: string; client_id: string | null }[];
+  clients: { id: string; name: string }[];
   sites: { id: string; name: string; client_id: string }[];
+  fixtureTypes: { id: string; name: string; client_id: string }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [projectId, setProjectId] = useState("");
+  const [clientId, setClientId] = useState("");
   const [siteId, setSiteId] = useState("");
-  const [jobType, setJobType] = useState("");
+  const [fixtureTypeId, setFixtureTypeId] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const selectedProject = projects.find((p) => p.id === projectId);
-  const projectSites = useMemo(
-    () => (selectedProject?.client_id ? sites.filter((s) => s.client_id === selectedProject.client_id) : []),
-    [sites, selectedProject],
-  );
+  const clientSites = useMemo(() => sites.filter((s) => s.client_id === clientId), [sites, clientId]);
+  const clientFixtureTypes = useMemo(() => fixtureTypes.filter((f) => f.client_id === clientId), [fixtureTypes, clientId]);
 
   function handleCreate() {
     startTransition(async () => {
-      const result = await createJob(projectId, siteId, jobType);
+      const result = await createSlaJob(clientId, siteId, fixtureTypeId);
       if (result.ok) {
         router.push(`/office/jobs/${result.jobId}`);
       } else {
@@ -41,7 +39,7 @@ export function CreateJobForm({
   if (!open) {
     return (
       <Button type="button" size="sm" onClick={() => setOpen(true)}>
-        New Job
+        New SLA
       </Button>
     );
   }
@@ -50,19 +48,20 @@ export function CreateJobForm({
     <div className="flex flex-col gap-3 rounded-md border bg-muted/40 p-3">
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex flex-col gap-1">
-          <label className="text-muted-foreground text-xs">Project</label>
+          <label className="text-muted-foreground text-xs">Customer</label>
           <select
-            value={projectId}
+            value={clientId}
             onChange={(e) => {
-              setProjectId(e.target.value);
+              setClientId(e.target.value);
               setSiteId("");
+              setFixtureTypeId("");
             }}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           >
             <option value="">Select…</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>
@@ -72,11 +71,11 @@ export function CreateJobForm({
           <select
             value={siteId}
             onChange={(e) => setSiteId(e.target.value)}
-            disabled={!selectedProject?.client_id}
+            disabled={!clientId}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           >
-            <option value="">{selectedProject?.client_id ? "Select…" : "Pick a project first"}</option>
-            {projectSites.map((s) => (
+            <option value="">{clientId ? "Select…" : "Pick a customer first"}</option>
+            {clientSites.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
@@ -84,47 +83,37 @@ export function CreateJobForm({
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-muted-foreground text-xs">Job type</label>
+          <label className="text-muted-foreground text-xs">Fixture type</label>
           <select
-            value={jobType}
-            onChange={(e) => setJobType(e.target.value)}
+            value={fixtureTypeId}
+            onChange={(e) => setFixtureTypeId(e.target.value)}
+            disabled={!clientId}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           >
-            <option value="">Select…</option>
-            {CREATABLE_JOB_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {JOB_TYPE_LABELS[t]}
+            <option value="">{clientId ? "Select…" : "Pick a customer first"}</option>
+            {clientFixtureTypes.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
               </option>
             ))}
           </select>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          disabled={isPending || !projectId || !siteId || !jobType}
-          onClick={handleCreate}
-        >
-          {isPending ? "Creating…" : "Create job"}
+        <Button type="button" size="sm" disabled={isPending || !clientId || !siteId || !fixtureTypeId} onClick={handleCreate}>
+          {isPending ? "Creating…" : "Create SLA"}
         </Button>
         <Button type="button" size="sm" variant="outline" onClick={() => setOpen(false)}>
           Cancel
         </Button>
       </div>
-      {projectId && !selectedProject?.client_id && (
-        <p className="text-muted-foreground text-sm">
-          This project has no customer assigned yet — set one on the Projects page first.
-        </p>
+      {clientId && clientSites.length === 0 && (
+        <p className="text-muted-foreground text-sm">This customer has no sites yet — add one from its Customers page first.</p>
       )}
-      {selectedProject?.client_id && projectSites.length === 0 && (
+      {clientId && clientFixtureTypes.length === 0 && (
         <p className="text-muted-foreground text-sm">
-          This customer has no sites yet — add one from its Customers page first.
+          This customer has no fixture types yet — add some from its Customers page first.
         </p>
       )}
       {message && <p className="text-destructive text-sm">{message}</p>}
-      <p className="text-muted-foreground text-xs">
-        Creating an SLA callout? Use the <a href="/office/sla" className="underline">SLA</a> section instead — it
-        collects the customer&apos;s fixture type and doesn&apos;t need a project.
-      </p>
     </div>
   );
 }

@@ -90,6 +90,64 @@ export type Database = {
           },
         ]
       }
+      client_sla_fixture_types: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_sla_fixture_types_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_sla_reasons: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_sla_reasons_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           contact_email: string | null
@@ -272,6 +330,7 @@ export type Database = {
           design_pack_storage_path: string | null
           engineer_notes: string | null
           equipment_damage: Database["public"]["Enums"]["equipment_damage_status"] | null
+          fixture_type_id: string | null
           id: string
           issue_detail: string | null
           issues_found: boolean | null
@@ -287,6 +346,7 @@ export type Database = {
           player_serial: string | null
           power_source: string | null
           rams_storage_path: string | null
+          reason_id: string | null
           reported_to_site_manager: boolean | null
           revisit_required: boolean | null
           screen_serial: string | null
@@ -303,6 +363,7 @@ export type Database = {
           design_pack_storage_path?: string | null
           engineer_notes?: string | null
           equipment_damage?: Database["public"]["Enums"]["equipment_damage_status"] | null
+          fixture_type_id?: string | null
           id?: string
           issue_detail?: string | null
           issues_found?: boolean | null
@@ -318,6 +379,7 @@ export type Database = {
           player_serial?: string | null
           power_source?: string | null
           rams_storage_path?: string | null
+          reason_id?: string | null
           reported_to_site_manager?: boolean | null
           revisit_required?: boolean | null
           screen_serial?: string | null
@@ -334,6 +396,7 @@ export type Database = {
           design_pack_storage_path?: string | null
           engineer_notes?: string | null
           equipment_damage?: Database["public"]["Enums"]["equipment_damage_status"] | null
+          fixture_type_id?: string | null
           id?: string
           issue_detail?: string | null
           issues_found?: boolean | null
@@ -349,6 +412,7 @@ export type Database = {
           player_serial?: string | null
           power_source?: string | null
           rams_storage_path?: string | null
+          reason_id?: string | null
           reported_to_site_manager?: boolean | null
           revisit_required?: boolean | null
           screen_serial?: string | null
@@ -365,6 +429,20 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: true
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_details_fixture_type_id_fkey"
+            columns: ["fixture_type_id"]
+            isOneToOne: false
+            referencedRelation: "client_sla_fixture_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_details_reason_id_fkey"
+            columns: ["reason_id"]
+            isOneToOne: false
+            referencedRelation: "client_sla_reasons"
             referencedColumns: ["id"]
           },
         ]

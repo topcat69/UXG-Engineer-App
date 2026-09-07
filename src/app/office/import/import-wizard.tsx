@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
+import { CREATABLE_JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 import { generateJobs, importSitesCsv } from "./actions";
 
 export function ImportWizard({
@@ -139,7 +139,7 @@ export function ImportWizard({
               className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
             >
               <option value="">Select…</option>
-              {JOB_TYPES.map((t) => (
+              {CREATABLE_JOB_TYPES.map((t) => (
                 <option key={t} value={t}>
                   {JOB_TYPE_LABELS[t]}
                 </option>

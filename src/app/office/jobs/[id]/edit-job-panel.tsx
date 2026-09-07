@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { humanize } from "@/lib/format/text";
-import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
+import { CREATABLE_JOB_TYPES, JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 import { updateJob } from "./actions";
 
 const PRIORITIES = ["P1", "P2", "P3", "P4"];
@@ -58,6 +58,12 @@ export function EditJobPanel({
   const [editQuickbooksNo, setEditQuickbooksNo] = useState(quickbooksNo ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // Only offer "SLA" here if the job already is one — the general Edit Job
+  // panel can't be used to turn some other job into an SLA (that needs the
+  // dedicated /office/sla flow, which also collects a fixture type), but an
+  // existing SLA job must still show its own type correctly.
+  const jobTypeOptions = jobType === "sla" ? JOB_TYPES : CREATABLE_JOB_TYPES;
 
   const editSelectedProject = projects.find((p) => p.id === editProjectId);
   const projectSites = useMemo(
@@ -157,7 +163,7 @@ export function EditJobPanel({
             onChange={(e) => setEditJobType(e.target.value)}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           >
-            {JOB_TYPES.map((t) => (
+            {jobTypeOptions.map((t) => (
               <option key={t} value={t}>
                 {JOB_TYPE_LABELS[t]}
               </option>

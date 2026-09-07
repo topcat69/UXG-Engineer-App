@@ -72,12 +72,20 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   // Revisit traceability: which job this one was raised from (if any), and
   // which job(s) were raised from this one (e.g. a QA rejection's follow-up).
   // Queried separately from the main batch since it needs job.parent_job_id,
-  // which isn't known until the main query above resolves.
-  const [{ data: parentJob }, { data: revisitChildren }] = await Promise.all([
+  // which isn't known until the main query above resolves. The SLA fixture
+  // type/reason lists are fetched the same way, for the same reason —
+  // they're scoped to the job's site's client, only known once job resolves.
+  const [{ data: parentJob }, { data: revisitChildren }, { data: fixtureTypes }, { data: reasons }] = await Promise.all([
     job.parent_job_id
       ? supabase.from("jobs").select("id, job_number").eq("id", job.parent_job_id).single()
       : Promise.resolve({ data: null }),
     supabase.from("jobs").select("id, job_number").eq("parent_job_id", id),
+    job.site?.client?.id
+      ? supabase.from("client_sla_fixture_types").select("id, name").eq("client_id", job.site.client.id).order("name")
+      : Promise.resolve({ data: [] }),
+    job.site?.client?.id
+      ? supabase.from("client_sla_reasons").select("id, name").eq("client_id", job.site.client.id).order("name")
+      : Promise.resolve({ data: [] }),
   ]);
 
   // Signed URLs so the office can actually see the photos/videos, not just
@@ -283,6 +291,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               {jobDetails.issues_found && <FormField label="Issue detail" value={jobDetails.issue_detail} />}
               <FormField label="Equipment damage" value={jobDetails.equipment_damage ? humanize(jobDetails.equipment_damage) : null} />
               <FormField label="Engineer notes" value={jobDetails.engineer_notes} />
+              {jobDetails.fixture_type_id && (
+                <FormField label="Fixture type" value={(fixtureTypes ?? []).find((f) => f.id === jobDetails.fixture_type_id)?.name} />
+              )}
+              {jobDetails.reason_id && (
+                <FormField label="Reason" value={(reasons ?? []).find((r) => r.id === jobDetails.reason_id)?.name} />
+              )}
             </dl>
           )}
         </section>
@@ -293,6 +307,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         jobType={job.job_type as JobDetailsType}
         jobDetails={jobDetails ?? null}
         equipment={jobEquipment ?? []}
+        fixtureTypes={fixtureTypes ?? []}
       />
 
       <RequiredFieldsPanel

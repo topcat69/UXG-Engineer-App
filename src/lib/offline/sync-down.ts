@@ -41,6 +41,22 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
     clientIds.length > 0 ? await supabase.from("clients").select("*").in("id", clientIds) : { data: [], error: null };
   if (clientsError) throw clientsError;
 
+  // Same reference-data treatment as clients above — fixture type (shown
+  // read-only, office-set at SLA creation) and reason (an engineer-facing
+  // dropdown at completion) only matter for job_type "sla" jobs, but
+  // pulling both lists for every client this engineer has a job for is
+  // cheap and keeps JobDetailsSection's lookups purely local.
+  const { data: fixtureTypes, error: fixtureTypesError } =
+    clientIds.length > 0
+      ? await supabase.from("client_sla_fixture_types").select("*").in("client_id", clientIds)
+      : { data: [], error: null };
+  if (fixtureTypesError) throw fixtureTypesError;
+  const { data: reasons, error: reasonsError } =
+    clientIds.length > 0
+      ? await supabase.from("client_sla_reasons").select("*").in("client_id", clientIds)
+      : { data: [], error: null };
+  if (reasonsError) throw reasonsError;
+
   const jobIds = (jobs ?? []).map((j) => j.id);
 
   const pendingOps = await db.outbox.toArray();
@@ -112,12 +128,16 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
       db.jobDetails,
       db.jobEquipment,
       db.jobOptionalFields,
+      db.clientSlaFixtureTypes,
+      db.clientSlaReasons,
       db.syncMeta,
     ],
     async () => {
       await db.jobs.bulkPut(jobs ?? []);
       await db.sites.bulkPut(sites ?? []);
       await db.clients.bulkPut(clients ?? []);
+      await db.clientSlaFixtureTypes.bulkPut(fixtureTypes ?? []);
+      await db.clientSlaReasons.bulkPut(reasons ?? []);
 
       for (const row of installForms ?? []) {
         if (row.job_id && overwritableJobIds.has(row.job_id)) await db.installForms.put(row);

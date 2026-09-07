@@ -3,10 +3,11 @@
 import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { showsSiteplanAndEquipment, showsSlaRequirement, usesJobDetails, type JobDetailsType } from "@/lib/forms/job-form";
+import { showsFixtureType, showsSiteplanAndEquipment, showsSlaRequirement, usesJobDetails, type JobDetailsType } from "@/lib/forms/job-form";
 import {
   addJobEquipment,
   deleteJobEquipment,
+  updateFixtureType,
   updateJobInformation,
   updateParkingNotes,
   updateSiteManagerContact,
@@ -21,6 +22,7 @@ type JobDetailsData = {
   design_pack_storage_path: string | null;
   parking_permit_storage_path: string | null;
   sla_requirement_detail: string | null;
+  fixture_type_id: string | null;
   job_information: string | null;
   parking_notes: string | null;
   site_manager_name: string | null;
@@ -40,16 +42,19 @@ export function JobDetailsPanel({
   jobType,
   jobDetails,
   equipment: initialEquipment,
+  fixtureTypes,
 }: {
   jobId: string;
   jobType: JobDetailsType | string;
   jobDetails: JobDetailsData;
   equipment: JobEquipmentRow[];
+  fixtureTypes: { id: string; name: string }[];
 }) {
   const [equipment, setEquipment] = useState(initialEquipment);
   const [model, setModel] = useState("");
   const [serial, setSerial] = useState("");
   const [slaDetail, setSlaDetail] = useState(jobDetails?.sla_requirement_detail ?? "");
+  const [fixtureTypeId, setFixtureTypeId] = useState(jobDetails?.fixture_type_id ?? "");
   const [jobInfo, setJobInfo] = useState(jobDetails?.job_information ?? "");
   const [parkingNotes, setParkingNotes] = useState(jobDetails?.parking_notes ?? "");
   const [siteManagerName, setSiteManagerName] = useState(jobDetails?.site_manager_name ?? "");
@@ -79,6 +84,14 @@ export function JobDetailsPanel({
   function handleSaveSla() {
     startTransition(async () => {
       const result = await updateSlaRequirement(jobId, slaDetail);
+      setMessage(result.message);
+    });
+  }
+
+  function handleSaveFixtureType(value: string) {
+    setFixtureTypeId(value);
+    startTransition(async () => {
+      const result = await updateFixtureType(jobId, value);
       setMessage(result.message);
     });
   }
@@ -229,6 +242,30 @@ export function JobDetailsPanel({
           <Button type="button" size="sm" disabled={isPending} onClick={handleSaveSla} className="self-start">
             Save
           </Button>
+        </div>
+      )}
+
+      {showsFixtureType(type) && (
+        <div className="flex flex-col gap-2">
+          <span className="text-muted-foreground text-xs">Fixture type — shown to the engineer, not editable in the field</span>
+          <select
+            value={fixtureTypeId}
+            onChange={(e) => handleSaveFixtureType(e.target.value)}
+            disabled={isPending}
+            className="border-input h-9 w-64 rounded-md border bg-transparent px-2 text-sm"
+          >
+            <option value="">Select…</option>
+            {fixtureTypes.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+          {fixtureTypes.length === 0 && (
+            <p className="text-muted-foreground text-xs">
+              This customer has no fixture types set up yet — add some from its Customers page first.
+            </p>
+          )}
         </div>
       )}
 

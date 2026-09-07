@@ -22,6 +22,7 @@ export function cloneJobDetailsForRevisit(source: JobDetailsRow): Omit<JobDetail
     parking_permit_storage_path: source.parking_permit_storage_path,
     job_information: source.job_information,
     sla_requirement_detail: source.sla_requirement_detail,
+    fixture_type_id: source.fixture_type_id,
     parking_notes: source.parking_notes,
     site_manager_name: source.site_manager_name,
     site_manager_phone: source.site_manager_phone,

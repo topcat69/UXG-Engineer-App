@@ -15,7 +15,7 @@ export function usesJobDetails(jobType: string): jobType is JobDetailsType {
   return jobType === "install" || jobType === "sla" || jobType === "maintenance" || jobType === "delivery";
 }
 
-/** Every selectable job type across the app, with a human-readable label — single source of truth instead of duplicating this list in each picker. */
+/** Every job type in use across the app, with a human-readable label — single source of truth instead of duplicating this list in each picker/filter/badge. */
 export const JOB_TYPES = ["install", "sla", "maintenance", "delivery", "survey"] as const;
 export const JOB_TYPE_LABELS: Record<(typeof JOB_TYPES)[number], string> = {
   install: "Installation",
@@ -24,6 +24,16 @@ export const JOB_TYPE_LABELS: Record<(typeof JOB_TYPES)[number], string> = {
   delivery: "Delivery",
   survey: "Survey",
 };
+
+/**
+ * What the general "New Job"/"Edit Job" type picker offers — everything
+ * except "sla". An SLA is still a `jobs` row with job_type "sla" under the
+ * hood (see JOB_TYPES above), but it's only ever created through the
+ * dedicated /office/sla flow (Customer -> Site -> Fixture Type, no
+ * Project), which sets job_type itself — office staff can no longer pick
+ * "SLA" from the generic job-creation dropdown.
+ */
+export const CREATABLE_JOB_TYPES = JOB_TYPES.filter((t) => t !== "sla") as Exclude<(typeof JOB_TYPES)[number], "sla">[];
 
 export type JobDetailsValues = {
   player_serial: string;
@@ -45,6 +55,17 @@ export type JobDetailsValues = {
   issue_detail: string;
   equipment_damage: string;
   engineer_notes: string;
+  /**
+   * SLA only — the diagnosed root cause, picked by the engineer at
+   * completion from the job's customer's client_sla_reasons list (id, not
+   * a free-text value). Unlike fixture_type_id (office-set at SLA
+   * creation, read-only to the engineer, so it's a passthrough on
+   * JobDetailsRow rather than form state), reason_id is only known once
+   * diagnosed on site, same as player_boot_test/issues_found are answers
+   * rather than site facts — hence it lives in engineer-editable form
+   * state here, not as a passthrough.
+   */
+  reason_id: string;
 };
 
 export const EMPTY_JOB_DETAILS: JobDetailsValues = {
@@ -67,6 +88,7 @@ export const EMPTY_JOB_DETAILS: JobDetailsValues = {
   issue_detail: "",
   equipment_damage: "",
   engineer_notes: "",
+  reason_id: "",
 };
 
 export const MOUNT_TYPES = ["Wall", "Ceiling", "Freestanding", "Totem", "N/A"];
@@ -98,6 +120,14 @@ export function showsIssuesSection(jobType: JobDetailsType): boolean {
 export function showsRevisitRequired(jobType: JobDetailsType): boolean {
   return jobType === "install" || jobType === "sla";
 }
+/** Office-set at SLA creation (what broke) — read-only to the engineer, shown in the Job Information info box like RAMS/the SLA requirement note. */
+export function showsFixtureType(jobType: JobDetailsType): boolean {
+  return jobType === "sla";
+}
+/** Engineer-picked at completion (why, once diagnosed) — an answer, not a site fact, so it lives alongside the other form fields rather than the read-only info box. */
+export function showsReason(jobType: JobDetailsType): boolean {
+  return jobType === "sla";
+}
 
 /** Photo slots per job type — delivery's "prior to packing" replaces the others' "before starting". */
 export function photoSlotsFor(jobType: JobDetailsType): readonly string[] {
@@ -126,7 +156,8 @@ export type RequirableFieldKey =
   | "reported_to_site_manager"
   | "issue_detail"
   | "equipment_damage"
-  | "revisit_required";
+  | "revisit_required"
+  | "reason_id";
 
 export type RequirableField = { key: RequirableFieldKey; label: string };
 
@@ -152,6 +183,7 @@ export function requirableFieldsFor(jobType: JobDetailsType): RequirableField[] 
     fields.push({ key: "equipment_damage", label: "Equipment damage" });
   }
   if (showsRevisitRequired(jobType)) fields.push({ key: "revisit_required", label: "Revisit required" });
+  if (showsReason(jobType)) fields.push({ key: "reason_id", label: "Reason" });
   return fields;
 }
 
@@ -190,6 +222,7 @@ export function jobDetailsRowToValues(row: JobDetailsRow | undefined): JobDetail
     issue_detail: row.issue_detail ?? "",
     equipment_damage: row.equipment_damage ?? "",
     engineer_notes: row.engineer_notes ?? "",
+    reason_id: row.reason_id ?? "",
   };
 }
 
@@ -264,6 +297,9 @@ export function validateJobDetails(
   }
   if (requires("revisit_required") && showsRevisitRequired(jobType) && !values.revisit_required) {
     errors.push("Revisit required must be answered.");
+  }
+  if (requires("reason_id") && showsReason(jobType) && !values.reason_id) {
+    errors.push("Reason is required.");
   }
 
   for (const slot of photoSlotsFor(jobType)) {

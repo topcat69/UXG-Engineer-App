@@ -8,7 +8,9 @@ import {
   showNetworkPort,
   showWifiSignal,
   showsAvFields,
+  showsFixtureType,
   showsIssuesSection,
+  showsReason,
   showsRevisitRequired,
   showsSiteplanAndEquipment,
   showsSlaRequirement,
@@ -75,6 +77,17 @@ describe("per-type section visibility", () => {
     expect(showsRevisitRequired("sla")).toBe(true);
     expect(showsRevisitRequired("maintenance")).toBe(false);
     expect(showsRevisitRequired("delivery")).toBe(false);
+  });
+
+  it("shows fixture type and reason for sla only", () => {
+    expect(showsFixtureType("sla")).toBe(true);
+    expect(showsFixtureType("install")).toBe(false);
+    expect(showsFixtureType("maintenance")).toBe(false);
+    expect(showsFixtureType("delivery")).toBe(false);
+    expect(showsReason("sla")).toBe(true);
+    expect(showsReason("install")).toBe(false);
+    expect(showsReason("maintenance")).toBe(false);
+    expect(showsReason("delivery")).toBe(false);
   });
 
   it("delivery's before-photo is 'prior to packing', others are 'before starting'", () => {
@@ -154,6 +167,19 @@ describe("validateJobDetails", () => {
     expect(errors).toContain("Photo required: completed.");
     expect(errors).toContain("Photo required: equipment in situ.");
   });
+
+  it("requires reason_id for sla but not install/maintenance/delivery", () => {
+    const values = { ...completeAvValues, revisit_required: "no", reason_id: "" };
+    expect(validateJobDetails("sla", values, avSlots, true)).toContain("Reason is required.");
+    expect(validateJobDetails("install", values, avSlots, true)).not.toContain("Reason is required.");
+    expect(
+      validateJobDetails("maintenance", { ...values, revisit_required: "" }, avSlots, true),
+    ).not.toContain("Reason is required.");
+
+    expect(
+      validateJobDetails("sla", { ...values, reason_id: "reason-1" }, avSlots, true),
+    ).not.toContain("Reason is required.");
+  });
 });
 
 describe("requirableFieldsFor", () => {
@@ -180,6 +206,13 @@ describe("requirableFieldsFor", () => {
     expect(keys).toContain("issue_detail");
     expect(keys).toContain("equipment_damage");
     expect(keys).not.toContain("revisit_required");
+  });
+
+  it("includes reason_id for sla only — fixture_type_id is office-set, not an engineer-facing requirable field", () => {
+    expect(requirableFieldsFor("sla").map((f) => f.key)).toContain("reason_id");
+    expect(requirableFieldsFor("install").map((f) => f.key)).not.toContain("reason_id");
+    expect(requirableFieldsFor("maintenance").map((f) => f.key)).not.toContain("reason_id");
+    expect(requirableFieldsFor("delivery").map((f) => f.key)).not.toContain("reason_id");
   });
 });
 

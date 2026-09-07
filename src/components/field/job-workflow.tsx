@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { CurrentUser } from "@/lib/auth/current-user";
-import { db, type InstallFormRow, type JobDetailsRow, type MediaQueueItem } from "@/lib/offline/db";
+import { db, type ClientSlaReasonRow, type InstallFormRow, type JobDetailsRow, type MediaQueueItem } from "@/lib/offline/db";
 import { generateId } from "@/lib/offline/id";
 import {
   checkIn,
@@ -47,7 +47,9 @@ import {
   showNetworkPort as showNetworkPortJobDetails,
   showWifiSignal as showWifiSignalJobDetails,
   showsAvFields,
+  showsFixtureType,
   showsIssuesSection,
+  showsReason,
   showsRevisitRequired,
   showsSiteplanAndEquipment,
   showsSlaRequirement,
@@ -89,6 +91,18 @@ export function JobWorkflow({
   const client = useLiveQuery(() => (site ? db.clients.get(site.client_id) : undefined), [site?.client_id]);
   const formRow = useLiveQuery(() => db.installForms.where("job_id").equals(jobId).first(), [jobId]);
   const detailsRow = useLiveQuery(() => db.jobDetails.where("job_id").equals(jobId).first(), [jobId]);
+  const fixtureType = useLiveQuery(
+    () => (detailsRow?.fixture_type_id ? db.clientSlaFixtureTypes.get(detailsRow.fixture_type_id) : undefined),
+    [detailsRow?.fixture_type_id],
+  );
+  const reasons = useLiveQuery(
+    () =>
+      site
+        ? db.clientSlaReasons.where("client_id").equals(site.client_id).sortBy("name")
+        : Promise.resolve<ClientSlaReasonRow[]>([]),
+    [site?.client_id],
+    [] as ClientSlaReasonRow[],
+  );
   const equipment = useLiveQuery(() => db.jobEquipment.where("job_id").equals(jobId).sortBy("position"), [jobId], []);
   const optionalFieldRows = useLiveQuery(() => db.jobOptionalFields.where("job_id").equals(jobId).toArray(), [jobId], []);
   const media = useLiveQuery(() => db.mediaQueue.where("jobId").equals(jobId).toArray(), [jobId], []);
@@ -184,6 +198,8 @@ export function JobWorkflow({
       design_pack_storage_path: detailsRow?.design_pack_storage_path ?? null,
       parking_permit_storage_path: detailsRow?.parking_permit_storage_path ?? null,
       sla_requirement_detail: detailsRow?.sla_requirement_detail ?? null,
+      fixture_type_id: detailsRow?.fixture_type_id ?? null,
+      reason_id: detailsValues.reason_id || null,
       job_information: detailsRow?.job_information ?? null,
       parking_notified: detailsValues.parking_notified,
       parking_notes: detailsValues.parking_notes || null,
@@ -471,6 +487,8 @@ export function JobWorkflow({
           values={detailsValues}
           setValues={setDetailsValues}
           detailsRow={detailsRow}
+          fixtureTypeName={fixtureType?.name ?? null}
+          reasons={reasons ?? []}
           equipment={equipment ?? []}
           tasks={tasks ?? []}
           onToggleTask={handleToggleTask}
@@ -654,6 +672,8 @@ function JobDetailsSection({
   values,
   setValues,
   detailsRow,
+  fixtureTypeName,
+  reasons,
   equipment,
   tasks,
   onToggleTask,
@@ -679,6 +699,10 @@ function JobDetailsSection({
   values: JobDetailsValues;
   setValues: React.Dispatch<React.SetStateAction<JobDetailsValues>>;
   detailsRow: JobDetailsRow | undefined;
+  /** SLA only — office-set at creation, read-only here (see showsFixtureType). */
+  fixtureTypeName: string | null;
+  /** SLA only — the completing engineer's pick (see showsReason), scoped to the job's site's client. */
+  reasons: { id: string; name: string }[];
   equipment: { id: string; model: string; serial: string | null }[];
   tasks: { id: string; label: string; is_done: boolean }[];
   onToggleTask: (taskId: string, isDone: boolean) => void;
@@ -729,6 +753,11 @@ function JobDetailsSection({
         {showsSlaRequirement(jobType) && detailsRow?.sla_requirement_detail && (
           <p className="mt-2 text-sm">
             <span className="text-muted-foreground">SLA requirement:</span> {detailsRow.sla_requirement_detail}
+          </p>
+        )}
+        {showsFixtureType(jobType) && (
+          <p className="mt-2 text-sm">
+            <span className="text-muted-foreground">Fixture type:</span> {fixtureTypeName ?? "Not set"}
           </p>
         )}
       </div>
@@ -853,6 +882,23 @@ function JobDetailsSection({
             </Field>
           )}
         </>
+      )}
+
+      {showsReason(jobType) && (
+        <Field label="Reason">
+          <select
+            value={values.reason_id}
+            onChange={(e) => setValues((v) => ({ ...v, reason_id: e.target.value }))}
+            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+          >
+            <option value="">Select…</option>
+            {reasons.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </Field>
       )}
 
       {showsRevisitRequired(jobType) && (

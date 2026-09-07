@@ -8,6 +8,7 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 const NAV = [
   { href: "/office/dashboard", label: "Dashboard" },
   { href: "/office/jobs", label: "Jobs" },
+  { href: "/office/sla", label: "SLA" },
   { href: "/office/scheduler", label: "Scheduler" },
   { href: "/office/qa", label: "Job Review" },
   { href: "/office/issues", label: "Issues" },

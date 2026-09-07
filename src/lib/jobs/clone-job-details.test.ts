@@ -22,6 +22,8 @@ function jobDetailsRow(overrides: Partial<JobDetailsRow> = {}): JobDetailsRow {
     design_pack_storage_path: "jobs/job-1/design_pack-1.pdf",
     parking_permit_storage_path: "jobs/job-1/parking_permit-1.pdf",
     sla_requirement_detail: "4-hour response",
+    fixture_type_id: "fixture-1",
+    reason_id: "reason-1",
     job_information: "Site manager on site 9-5",
     parking_notes: "Use the loading bay round back",
     parking_notified: true,
@@ -49,6 +51,7 @@ describe("cloneJobDetailsForRevisit", () => {
       parking_permit_storage_path: "jobs/job-1/parking_permit-1.pdf",
       job_information: "Site manager on site 9-5",
       sla_requirement_detail: "4-hour response",
+      fixture_type_id: "fixture-1",
       parking_notes: "Use the loading bay round back",
       site_manager_name: "Sam Okafor",
       site_manager_phone: "01234 567890",
@@ -74,6 +77,7 @@ describe("cloneJobDetailsForRevisit", () => {
       "equipment_damage",
       "engineer_notes",
       "submitted_at",
+      "reason_id",
     ];
     for (const field of outcomeFields) {
       expect(result).not.toHaveProperty(field);
