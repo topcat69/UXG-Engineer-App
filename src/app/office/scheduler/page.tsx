@@ -23,7 +23,7 @@ export default async function SchedulerPage({
       supabase
         .from("users")
         .select("id, name, max_jobs_per_day")
-        .in("role", ["engineer", "manager"])
+        .in("role", ["engineer", "manager", "superadmin"])
         .eq("active", true)
         .order("name"),
       // Jobs that start within the displayed week.

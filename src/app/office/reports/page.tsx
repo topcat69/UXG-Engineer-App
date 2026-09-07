@@ -66,7 +66,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     await Promise.all([
       query,
       supabase.from("projects").select("id, name").order("name"),
-      supabase.from("users").select("id, name").in("role", ["engineer", "manager"]).eq("active", true).order("name"),
+      supabase.from("users").select("id, name").in("role", ["engineer", "manager", "superadmin"]).eq("active", true).order("name"),
       supabase.from("clients").select("id, name").order("name"),
       supabase.from("sites").select("id, name, client_id").order("name"),
     ]);
