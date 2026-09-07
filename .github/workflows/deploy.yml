@@ -37,9 +37,20 @@ jobs:
 
             # Smoke test: the app must actually answer before this run is
             # "green" — a container that starts but crash-loops on a bad
-            # env var should fail the deploy, not report success.
+            # env var should fail the deploy, not report success. Probed
+            # from *inside* the app container (docker compose exec), not
+            # `curl http://localhost:3000` on the host — the app service
+            # only `expose`s 3000 to the Docker network now that Caddy is
+            # the sole public front door (see docker-compose.yml's own
+            # comment on that), so the host itself has had no way to reach
+            # that port since :3000 was closed. Every deploy since then
+            # failed this exact check regardless of whether the app was
+            # actually healthy — using node's own http client rather than
+            # curl since the minimal node:22-slim runner image doesn't
+            # have curl installed.
             for i in $(seq 1 10); do
-              if curl -fsS http://localhost:3000/ > /dev/null; then
+              if docker compose --env-file .env.production exec -T app \
+                node -e "require('http').get('http://localhost:3000/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"; then
                 echo "App responded, deploy OK."
                 exit 0
               fi
