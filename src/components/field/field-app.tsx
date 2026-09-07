@@ -13,9 +13,10 @@ import { summarizeOutbox } from "@/lib/offline/outbox";
 import { useSyncEngine } from "@/lib/offline/use-sync-engine";
 import { JobList } from "./job-list";
 import { JobWorkflow } from "./job-workflow";
+import { KnowledgeBaseView } from "./knowledge-base-view";
 import { OutboxScreen } from "./outbox-screen";
 
-type View = { screen: "list" } | { screen: "job"; jobId: string } | { screen: "outbox" };
+type View = { screen: "list" } | { screen: "job"; jobId: string } | { screen: "outbox" } | { screen: "kb" };
 
 export function FieldApp({ user }: { user: CurrentUser }) {
   const [view, setView] = useState<View>({ screen: "list" });
@@ -46,6 +47,9 @@ export function FieldApp({ user }: { user: CurrentUser }) {
           >
             {hasPending ? `${summary.pendingOps + summary.pendingMedia} unsent` : "All synced"}
           </button>
+          <button type="button" onClick={() => setView({ screen: "kb" })} className="text-muted-foreground underline">
+            Knowledge Base
+          </button>
           <span className="text-muted-foreground">{user.name}</span>
           <ThemeSwitcher currentTheme={user.theme} />
           {/* Managers/superadmins can be assigned jobs too, so they can reach this
@@ -73,6 +77,7 @@ export function FieldApp({ user }: { user: CurrentUser }) {
         {view.screen === "outbox" && (
           <OutboxScreen onBack={() => setView({ screen: "list" })} onRetry={runSync} />
         )}
+        {view.screen === "kb" && <KnowledgeBaseView currentUser={user} onBack={() => setView({ screen: "list" })} />}
       </main>
 
       <StorageOnboarding />

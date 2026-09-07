@@ -751,6 +751,123 @@ export type Database = {
           },
         ]
       }
+      kb_article_attachments: {
+        Row: {
+          article_id: string
+          created_at: string | null
+          filename: string
+          id: string
+          storage_path: string
+        }
+        Insert: {
+          article_id: string
+          created_at?: string | null
+          filename: string
+          id?: string
+          storage_path: string
+        }
+        Update: {
+          article_id?: string
+          created_at?: string | null
+          filename?: string
+          id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_article_attachments_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "kb_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kb_articles: {
+        Row: {
+          author_id: string
+          body: string
+          category_id: string
+          created_at: string | null
+          decline_reason: string | null
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["kb_article_status"]
+          tags: string[]
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          author_id: string
+          body: string
+          category_id: string
+          created_at?: string | null
+          decline_reason?: string | null
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["kb_article_status"]
+          tags?: string[]
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          category_id?: string
+          created_at?: string | null
+          decline_reason?: string | null
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["kb_article_status"]
+          tags?: string[]
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_articles_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_articles_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "kb_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_articles_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kb_categories: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       media_assets: {
         Row: {
           accuracy_m: number | null
@@ -1173,6 +1290,7 @@ export type Database = {
     }
     Enums: {
       equipment_damage_status: "na" | "yes" | "accidental" | "customer"
+      kb_article_status: "draft" | "pending_review" | "published" | "declined"
       job_status:
         | "draft"
         | "provisional"
