@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { CategoryPicker } from "@/components/kb/category-picker";
 import { createClient } from "@/lib/supabase/client";
 import { humanize } from "@/lib/format/text";
 import { resubmitArticle, submitArticle, type KbArticleRow } from "@/lib/kb/actions";
@@ -11,10 +12,18 @@ import type { CurrentUser } from "@/lib/auth/current-user";
 import type { Database } from "@/lib/supabase/database.types";
 
 type Category = Database["public"]["Tables"]["kb_categories"]["Row"];
+type Manufacturer = Database["public"]["Tables"]["kb_manufacturers"]["Row"];
+type ModelRange = Database["public"]["Tables"]["kb_model_ranges"]["Row"];
 type ArticleListRow = Pick<KbArticleRow, "id" | "title" | "status" | "created_at" | "tags"> & {
   category: { name: string } | null;
+  manufacturer: { name: string } | null;
+  model_range: { name: string } | null;
 };
-type ArticleDetailRow = KbArticleRow & { category: { name: string } | null };
+type ArticleDetailRow = KbArticleRow & {
+  category: { name: string } | null;
+  manufacturer: { name: string } | null;
+  model_range: { name: string } | null;
+};
 type Attachment = { id: string; filename: string; url: string | null };
 
 type View =
@@ -40,6 +49,10 @@ function getServerOnlineSnapshot() {
 }
 function useIsOnline(): boolean {
   return useSyncExternalStore(subscribeToOnlineStatus, getOnlineSnapshot, getServerOnlineSnapshot);
+}
+
+function breadcrumb(article: { category: { name: string } | null; manufacturer: { name: string } | null; model_range: { name: string } | null }) {
+  return [article.category?.name, article.manufacturer?.name, article.model_range?.name].filter(Boolean).join(" > ") || "Uncategorized";
 }
 
 /**
@@ -107,11 +120,17 @@ function BrowseScreen({
   onWrite: () => void;
 }) {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
+  const [modelRanges, setModelRanges] = useState<ModelRange[]>([]);
   const [articles, setArticles] = useState<ArticleListRow[] | null>(null);
   const [mine, setMine] = useState<ArticleListRow[] | null>(null);
   const [q, setQ] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [manufacturerId, setManufacturerId] = useState("");
+  const [modelRangeId, setModelRangeId] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const ARTICLE_LIST_SELECT = "id, title, status, created_at, tags, category:kb_categories(name), manufacturer:kb_manufacturers(name), model_range:kb_model_ranges(name)";
 
   useEffect(() => {
     const supabase = createClient();
@@ -121,8 +140,18 @@ function BrowseScreen({
       .order("name")
       .then(({ data }) => setCategories(data ?? []));
     supabase
+      .from("kb_manufacturers")
+      .select("*")
+      .order("name")
+      .then(({ data }) => setManufacturers(data ?? []));
+    supabase
+      .from("kb_model_ranges")
+      .select("*")
+      .order("name")
+      .then(({ data }) => setModelRanges(data ?? []));
+    supabase
       .from("kb_articles")
-      .select("id, title, status, created_at, tags, category:kb_categories(name)")
+      .select(ARTICLE_LIST_SELECT)
       .eq("author_id", currentUser.id)
       .neq("status", "published")
       .order("created_at", { ascending: false })
@@ -134,16 +163,18 @@ function BrowseScreen({
     const supabase = createClient();
     let query = supabase
       .from("kb_articles")
-      .select("id, title, status, created_at, tags, category:kb_categories(name)")
+      .select(ARTICLE_LIST_SELECT)
       .eq("status", "published")
       .order("created_at", { ascending: false });
     if (categoryId) query = query.eq("category_id", categoryId);
+    if (manufacturerId) query = query.eq("manufacturer_id", manufacturerId);
+    if (modelRangeId) query = query.eq("model_range_id", modelRangeId);
     if (q.trim()) query = query.ilike("title", `%${q.trim()}%`);
     query.then(({ data, error: err }) => {
       if (err) setError(err.message);
       else setArticles((data as ArticleListRow[] | null) ?? []);
     });
-  }, [q, categoryId]);
+  }, [q, categoryId, manufacturerId, modelRangeId]);
 
   return (
     <div className="flex flex-col gap-4 p-4 pb-24">
@@ -168,31 +199,26 @@ function BrowseScreen({
         </div>
       )}
 
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex flex-col gap-1">
-          <label className="text-muted-foreground text-xs">Search</label>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-muted-foreground text-xs">Category</label>
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-          >
-            <option value="">All</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-muted-foreground text-xs">Search</label>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+        />
       </div>
+      <CategoryPicker
+        categories={categories}
+        manufacturers={manufacturers}
+        modelRanges={modelRanges}
+        categoryId={categoryId}
+        manufacturerId={manufacturerId}
+        modelRangeId={modelRangeId}
+        onCategoryChange={setCategoryId}
+        onManufacturerChange={setManufacturerId}
+        onModelRangeChange={setModelRangeId}
+        categoryRequired={false}
+      />
 
       {error && <p className="text-destructive text-sm">{error}</p>}
       {articles === null ? (
@@ -219,7 +245,7 @@ function ArticleRow({ article, onOpen }: { article: ArticleListRow; onOpen: () =
           {article.status !== "published" && <Badge variant="outline">{humanize(article.status)}</Badge>}
         </div>
         <p className="text-muted-foreground text-sm">
-          {article.category?.name ?? "Uncategorized"}
+          {breadcrumb(article)}
           {article.tags.length > 0 && ` · ${article.tags.join(", ")}`}
         </p>
       </button>
@@ -243,7 +269,7 @@ function ArticleScreen({
     const supabase = createClient();
     supabase
       .from("kb_articles")
-      .select("*, category:kb_categories(name)")
+      .select("*, category:kb_categories(name), manufacturer:kb_manufacturers(name), model_range:kb_model_ranges(name)")
       .eq("id", articleId)
       .single()
       .then(({ data }) => setArticle((data as ArticleDetailRow | null) ?? null));
@@ -288,7 +314,7 @@ function ArticleScreen({
           {article.status !== "published" && <Badge variant="outline">{humanize(article.status)}</Badge>}
         </div>
         <p className="text-muted-foreground text-sm">
-          {article.category?.name ?? "Uncategorized"}
+          {breadcrumb(article)}
           {article.tags.length > 0 && ` · ${article.tags.join(", ")}`}
         </p>
       </div>
@@ -336,27 +362,41 @@ function SubmitScreen({
   onDone: () => void;
 }) {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
+  const [modelRanges, setModelRanges] = useState<ModelRange[]>([]);
   const [title, setTitle] = useState(existing?.title ?? "");
   const [body, setBody] = useState(existing?.body ?? "");
   const [categoryId, setCategoryId] = useState(existing?.category_id ?? "");
+  const [manufacturerId, setManufacturerId] = useState(existing?.manufacturer_id ?? "");
+  const [modelRangeId, setModelRangeId] = useState(existing?.model_range_id ?? "");
   const [tags, setTags] = useState(existing?.tags.join(", ") ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    createClient()
+    const supabase = createClient();
+    supabase
       .from("kb_categories")
       .select("*")
       .order("name")
       .then(({ data }) => setCategories(data ?? []));
+    supabase
+      .from("kb_manufacturers")
+      .select("*")
+      .order("name")
+      .then(({ data }) => setManufacturers(data ?? []));
+    supabase
+      .from("kb_model_ranges")
+      .select("*")
+      .order("name")
+      .then(({ data }) => setModelRanges(data ?? []));
   }, []);
 
   async function handleSubmit() {
     setIsSubmitting(true);
     try {
-      const result = existing
-        ? await resubmitArticle(existing.id, { title, body, categoryId, tags })
-        : await submitArticle({ title, body, categoryId, tags });
+      const input = { title, body, categoryId, manufacturerId, modelRangeId, tags };
+      const result = existing ? await resubmitArticle(existing.id, input) : await submitArticle(input);
       if (result.ok) onDone();
       else setMessage(result.message);
     } finally {
@@ -380,21 +420,17 @@ function SubmitScreen({
           className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
         />
       </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Category</span>
-        <select
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-        >
-          <option value="">Select…</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <CategoryPicker
+        categories={categories}
+        manufacturers={manufacturers}
+        modelRanges={modelRanges}
+        categoryId={categoryId}
+        manufacturerId={manufacturerId}
+        modelRangeId={modelRangeId}
+        onCategoryChange={setCategoryId}
+        onManufacturerChange={setManufacturerId}
+        onModelRangeChange={setModelRangeId}
+      />
       <label className="flex flex-col gap-1">
         <span className="text-sm font-medium">Tags (comma-separated)</span>
         <input

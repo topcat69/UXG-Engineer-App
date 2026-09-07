@@ -791,6 +791,8 @@ export type Database = {
           created_at: string | null
           decline_reason: string | null
           id: string
+          manufacturer_id: string | null
+          model_range_id: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["kb_article_status"]
@@ -805,6 +807,8 @@ export type Database = {
           created_at?: string | null
           decline_reason?: string | null
           id?: string
+          manufacturer_id?: string | null
+          model_range_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["kb_article_status"]
@@ -819,6 +823,8 @@ export type Database = {
           created_at?: string | null
           decline_reason?: string | null
           id?: string
+          manufacturer_id?: string | null
+          model_range_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["kb_article_status"]
@@ -839,6 +845,20 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "kb_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_articles_manufacturer_id_fkey"
+            columns: ["manufacturer_id"]
+            isOneToOne: false
+            referencedRelation: "kb_manufacturers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_articles_model_range_id_fkey"
+            columns: ["model_range_id"]
+            isOneToOne: false
+            referencedRelation: "kb_model_ranges"
             referencedColumns: ["id"]
           },
           {
@@ -867,6 +887,64 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      kb_manufacturers: {
+        Row: {
+          category_id: string
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_manufacturers_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "kb_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kb_model_ranges: {
+        Row: {
+          created_at: string | null
+          id: string
+          manufacturer_id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          manufacturer_id: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          manufacturer_id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_model_ranges_manufacturer_id_fkey"
+            columns: ["manufacturer_id"]
+            isOneToOne: false
+            referencedRelation: "kb_manufacturers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       media_assets: {
         Row: {

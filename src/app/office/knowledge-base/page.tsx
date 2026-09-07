@@ -14,12 +14,16 @@ function statusVariant(status: string): "secondary" | "outline" | "destructive" 
 export default async function KnowledgeBasePage() {
   const supabase = await createClient();
 
-  const [{ data: articles }, { data: categories }] = await Promise.all([
+  const [{ data: articles }, { data: categories }, { data: manufacturers }, { data: modelRanges }] = await Promise.all([
     supabase
       .from("kb_articles")
-      .select("id, title, status, created_at, category:kb_categories(name), author:users!kb_articles_author_id_fkey(name)")
+      .select(
+        "id, title, status, created_at, category:kb_categories(name), manufacturer:kb_manufacturers(name), model_range:kb_model_ranges(name), author:users!kb_articles_author_id_fkey(name)",
+      )
       .order("created_at", { ascending: false }),
     supabase.from("kb_categories").select("*").order("name"),
+    supabase.from("kb_manufacturers").select("*").order("name"),
+    supabase.from("kb_model_ranges").select("*").order("name"),
   ]);
 
   const pendingCount = (articles ?? []).filter((a) => a.status === "pending_review").length;
@@ -34,7 +38,7 @@ export default async function KnowledgeBasePage() {
         </p>
       </div>
 
-      <CreateArticleForm categories={categories ?? []} />
+      <CreateArticleForm categories={categories ?? []} manufacturers={manufacturers ?? []} modelRanges={modelRanges ?? []} />
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
@@ -59,7 +63,9 @@ export default async function KnowledgeBasePage() {
                     {a.title}
                   </Link>
                 </td>
-                <td className="py-2 text-muted-foreground">{a.category?.name ?? "—"}</td>
+                <td className="py-2 text-muted-foreground">
+                  {[a.category?.name, a.manufacturer?.name, a.model_range?.name].filter(Boolean).join(" > ") || "—"}
+                </td>
                 <td className="py-2 text-muted-foreground">{a.author?.name ?? "—"}</td>
                 <td className="py-2">
                   <Badge variant={statusVariant(a.status)}>{humanize(a.status)}</Badge>
@@ -80,7 +86,7 @@ export default async function KnowledgeBasePage() {
         </table>
       </section>
 
-      <CategoryManager categories={categories ?? []} />
+      <CategoryManager categories={categories ?? []} manufacturers={manufacturers ?? []} modelRanges={modelRanges ?? []} />
     </div>
   );
 }

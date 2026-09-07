@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { CategoryPicker } from "@/components/kb/category-picker";
 import { humanize } from "@/lib/format/text";
 import {
   approveArticle,
@@ -16,10 +17,14 @@ import {
   type KbArticleRow,
   type KbAttachmentRow,
   type KbCategoryRow,
+  type KbManufacturerRow,
+  type KbModelRangeRow,
 } from "../actions";
 
 type ArticleWithJoins = KbArticleRow & {
   category: { id: string; name: string } | null;
+  manufacturer: { id: string; name: string } | null;
+  model_range: { id: string; name: string } | null;
   author: { name: string } | null;
   reviewer: { name: string } | null;
 };
@@ -33,10 +38,14 @@ function statusVariant(status: string): "secondary" | "outline" | "destructive" 
 export function ArticleDetail({
   article,
   categories,
+  manufacturers,
+  modelRanges,
   attachments: initialAttachments,
 }: {
   article: ArticleWithJoins;
   categories: KbCategoryRow[];
+  manufacturers: KbManufacturerRow[];
+  modelRanges: KbModelRangeRow[];
   attachments: (KbAttachmentRow & { url: string | null })[];
 }) {
   const router = useRouter();
@@ -44,6 +53,8 @@ export function ArticleDetail({
   const [title, setTitle] = useState(article.title);
   const [body, setBody] = useState(article.body);
   const [categoryId, setCategoryId] = useState(article.category_id);
+  const [manufacturerId, setManufacturerId] = useState(article.manufacturer_id ?? "");
+  const [modelRangeId, setModelRangeId] = useState(article.model_range_id ?? "");
   const [tags, setTags] = useState(article.tags.join(", "));
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -57,7 +68,7 @@ export function ArticleDetail({
 
   function handleSaveEdit() {
     startTransition(async () => {
-      const result = await updateArticle(article.id, { title, body, categoryId, tags });
+      const result = await updateArticle(article.id, { title, body, categoryId, manufacturerId, modelRangeId, tags });
       if (result.ok) {
         setEditing(false);
         router.refresh();
@@ -132,7 +143,9 @@ export function ArticleDetail({
             <Badge variant={statusVariant(article.status)}>{humanize(article.status)}</Badge>
           </div>
           <p className="text-muted-foreground text-sm">
-            {article.category?.name ?? "Uncategorized"} · by {article.author?.name ?? "Unknown"}
+            {[article.category?.name, article.manufacturer?.name, article.model_range?.name].filter(Boolean).join(" > ") ||
+              "Uncategorized"}{" "}
+            · by {article.author?.name ?? "Unknown"}
             {article.tags.length > 0 && ` · ${article.tags.join(", ")}`}
           </p>
           {article.status === "declined" && article.decline_reason && (
@@ -189,29 +202,24 @@ export function ArticleDetail({
               className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
             />
           </div>
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-muted-foreground text-xs">Category</label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-muted-foreground text-xs">Tags (comma-separated)</label>
-              <input
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                className="border-input h-9 w-64 rounded-md border bg-transparent px-2 text-sm"
-              />
-            </div>
+          <CategoryPicker
+            categories={categories}
+            manufacturers={manufacturers}
+            modelRanges={modelRanges}
+            categoryId={categoryId}
+            manufacturerId={manufacturerId}
+            modelRangeId={modelRangeId}
+            onCategoryChange={setCategoryId}
+            onManufacturerChange={setManufacturerId}
+            onModelRangeChange={setModelRangeId}
+          />
+          <div className="flex flex-col gap-1">
+            <label className="text-muted-foreground text-xs">Tags (comma-separated)</label>
+            <input
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              className="border-input h-9 w-64 rounded-md border bg-transparent px-2 text-sm"
+            />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-muted-foreground text-xs">Body</label>
