@@ -41,8 +41,8 @@ function cameraErrorMessage(err: unknown): string {
   if (name === "NotFoundError" || name === "OverconstrainedError") {
     return "No usable camera found on this device — enter the serial manually below.";
   }
-  if (name === "NotReadableError") {
-    return "Camera is already in use by another app — close it and try again, or enter the serial manually below.";
+  if (name === "NotReadableError" || name === "AbortError") {
+    return "The camera didn't start — it may be in use by another app (or another browser tab). Close it, fully quit and reopen Safari, and try again — or enter the serial manually below.";
   }
   return `Camera unavailable${name ? ` (${name})` : ""} — enter the serial manually below.`;
 }
@@ -76,13 +76,17 @@ export function BarcodeScanButton({ onScan }: { onScan: (value: string) => void 
         try {
           stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         } catch (constrainedError) {
-          // Some browsers (certain iOS Safari/WKWebView versions especially)
-          // throw on the facingMode constraint itself rather than just
-          // falling back to whatever camera is available — retry with no
-          // constraint at all before giving up. Only worth trying for an
-          // error that's actually about the constraint, not a permission
-          // or hardware failure (those would fail the same way again).
-          if (constrainedError instanceof DOMException && constrainedError.name === "OverconstrainedError") {
+          // Some browsers (certain iOS Safari versions especially) throw on
+          // the facingMode constraint itself rather than just falling back
+          // to whatever camera is available — retry with no constraint at
+          // all before giving up. OverconstrainedError is the spec name for
+          // this; Safari has a well-documented habit of reporting the exact
+          // same "can't negotiate facingMode:environment" failure as
+          // AbortError instead, so both are worth a retry. A genuine
+          // permission or hardware failure would just fail the same way
+          // again, so this costs nothing when it isn't the real cause.
+          const name = constrainedError instanceof DOMException ? constrainedError.name : null;
+          if (name === "OverconstrainedError" || name === "AbortError") {
             stream = await navigator.mediaDevices.getUserMedia({ video: true });
           } else {
             throw constrainedError;
