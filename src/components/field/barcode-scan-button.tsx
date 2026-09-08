@@ -97,8 +97,15 @@ export function BarcodeScanButton({ onScan }: { onScan: (value: string) => void 
           return;
         }
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        if (!videoRef.current) {
+          return;
+        }
+        videoRef.current.srcObject = stream;
+
+        if (window.BarcodeDetector) {
+          // This path polls the video element directly with no play-start
+          // handshake of its own, so it needs the video actually playing
+          // before that starts.
           try {
             await videoRef.current.play();
           } catch (playError) {
@@ -114,9 +121,7 @@ export function BarcodeScanButton({ onScan }: { onScan: (value: string) => void 
               throw playError;
             }
           }
-        }
 
-        if (window.BarcodeDetector) {
           const detector = new window.BarcodeDetector();
           const scanFrame = async () => {
             if (cancelled || !videoRef.current) return;
@@ -133,7 +138,19 @@ export function BarcodeScanButton({ onScan }: { onScan: (value: string) => void 
             rafRef.current = requestAnimationFrame(scanFrame);
           };
           rafRef.current = requestAnimationFrame(scanFrame);
-        } else if (videoRef.current) {
+        } else {
+          // @zxing/library's decodeFromVideoElementContinuously starts
+          // playback itself: it attaches a 'playing' listener to the video
+          // element, THEN calls play() on it, and only starts the scan loop
+          // once that listener fires. Calling videoRef.current.play() first
+          // (as this used to, unconditionally, before this path split)
+          // made that handshake hang forever on this exact video element —
+          // by the time zxing attached its listener, the video was already
+          // playing, so the 'playing' event had already fired and would
+          // never fire again. The visible symptom was the camera preview
+          // looking "on" while nothing ever happened: the scan loop never
+          // actually started. Leaving play() to zxing lets its listener
+          // catch the real event.
           const reader = new BrowserMultiFormatReader();
           zxingReaderRef.current = reader;
           reader.decodeFromVideoElementContinuously(videoRef.current, (result) => {
