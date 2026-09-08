@@ -2,23 +2,12 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
+import { isIOS, isStandalone } from "@/lib/device";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
-
-function isStandalone(): boolean {
-  return (
-    window.matchMedia?.("(display-mode: standalone)").matches ||
-    // Safari's own non-standard flag — matchMedia above doesn't cover iOS.
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
-}
-
-function isIOS(): boolean {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent);
-}
 
 // These don't change during a session, so a no-op subscribe is fine — the
 // point of useSyncExternalStore here is purely to read a browser-only value

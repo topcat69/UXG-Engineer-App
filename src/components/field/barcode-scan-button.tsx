@@ -3,6 +3,7 @@
 import { BrowserMultiFormatReader } from "@zxing/library";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { isIOS, isStandalone } from "@/lib/device";
 
 // BarcodeDetector is a real, shipping browser API (Chrome/Android/Edge) but
 // TypeScript's lib.dom doesn't declare it yet — hence the ambient type.
@@ -12,6 +13,38 @@ declare global {
       detect: (source: CanvasImageSource) => Promise<{ rawValue: string }[]>;
     };
   }
+}
+
+/**
+ * getUserMedia throws a DOMException whose `.name` says why — surfacing
+ * that (instead of one generic "Camera unavailable" for every cause, as
+ * this used to) is the difference between a permission problem, a busy
+ * camera, and a device that genuinely has none, all of which need a
+ * different fix from whoever's looking at this. NotAllowedError gets its
+ * own message on iOS standalone specifically: a home-screen "Add to Home
+ * Screen" web app runs in a separate WebKit context from a regular Safari
+ * tab, and iOS has a long history of that context either never showing the
+ * camera permission prompt at all or not honouring a grant made in Safari
+ * — "I already allowed it" (in Safari) and "the installed app still can't
+ * get a camera" are both true at once. Opening the same URL in Safari
+ * itself is the fastest way to tell whether that's what's happening.
+ */
+function cameraErrorMessage(err: unknown): string {
+  const name = err instanceof DOMException ? err.name : null;
+
+  if (name === "NotAllowedError" && isStandalone() && isIOS()) {
+    return "Camera permission isn't reaching this installed app on iOS, even if you've allowed it in Safari — try opening this app in Safari itself (not the home screen icon) to scan, or enter the serial manually below.";
+  }
+  if (name === "NotAllowedError") {
+    return "Camera access was denied — check this site's camera permission in your browser settings, or enter the serial manually below.";
+  }
+  if (name === "NotFoundError" || name === "OverconstrainedError") {
+    return "No usable camera found on this device — enter the serial manually below.";
+  }
+  if (name === "NotReadableError") {
+    return "Camera is already in use by another app — close it and try again, or enter the serial manually below.";
+  }
+  return `Camera unavailable${name ? ` (${name})` : ""} — enter the serial manually below.`;
 }
 
 export function BarcodeScanButton({ onScan }: { onScan: (value: string) => void }) {
@@ -39,7 +72,22 @@ export function BarcodeScanButton({ onScan }: { onScan: (value: string) => void 
         return;
       }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        } catch (constrainedError) {
+          // Some browsers (certain iOS Safari/WKWebView versions especially)
+          // throw on the facingMode constraint itself rather than just
+          // falling back to whatever camera is available — retry with no
+          // constraint at all before giving up. Only worth trying for an
+          // error that's actually about the constraint, not a permission
+          // or hardware failure (those would fail the same way again).
+          if (constrainedError instanceof DOMException && constrainedError.name === "OverconstrainedError") {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          } else {
+            throw constrainedError;
+          }
+        }
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -77,8 +125,8 @@ export function BarcodeScanButton({ onScan }: { onScan: (value: string) => void 
             }
           });
         }
-      } catch {
-        setError("Camera unavailable — enter the serial manually below.");
+      } catch (err) {
+        setError(cameraErrorMessage(err));
       }
     }
 
