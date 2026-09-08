@@ -108,6 +108,25 @@ export function showsSlaRequirement(jobType: JobDetailsType): boolean {
   return jobType === "sla" || jobType === "maintenance";
 }
 /**
+ * SLA jobs don't need paperwork prep the way an install/maintenance/
+ * delivery visit does — no RAMS, no design pack for a fault callout. Both
+ * stay unconditional for every other job type; this only ever narrows what
+ * already showed, never widens it.
+ */
+export function showsRamsAndDesignPack(jobType: JobDetailsType): boolean {
+  return jobType !== "sla";
+}
+/**
+ * The free-text "Job Information" note only makes sense where there's
+ * install-style prep to describe. An SLA callout's equivalent brief is the
+ * SLA requirement note instead (see showsSlaRequirement) — it takes over
+ * this field's spot in the office panel for SLA specifically; maintenance
+ * keeps both, unaffected.
+ */
+export function showsJobInformation(jobType: JobDetailsType): boolean {
+  return jobType !== "sla";
+}
+/**
  * Every job_details type gets the issues section, including delivery —
  * originally spec'd as install/sla/maintenance only ("delivery has none",
  * see 20260117000000_job_details.sql), but a delivery can go wrong (wrong

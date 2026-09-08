@@ -10,6 +10,8 @@ import {
   showsAvFields,
   showsFixtureType,
   showsIssuesSection,
+  showsJobInformation,
+  showsRamsAndDesignPack,
   showsReason,
   showsRevisitRequired,
   showsSiteplanAndEquipment,
@@ -88,6 +90,20 @@ describe("per-type section visibility", () => {
     expect(showsReason("install")).toBe(false);
     expect(showsReason("maintenance")).toBe(false);
     expect(showsReason("delivery")).toBe(false);
+  });
+
+  it("shows RAMS + design pack for every job_details type except sla", () => {
+    expect(showsRamsAndDesignPack("sla")).toBe(false);
+    expect(showsRamsAndDesignPack("install")).toBe(true);
+    expect(showsRamsAndDesignPack("maintenance")).toBe(true);
+    expect(showsRamsAndDesignPack("delivery")).toBe(true);
+  });
+
+  it("shows the Job Information note for every job_details type except sla — an SLA job shows the SLA requirement note in its place instead", () => {
+    expect(showsJobInformation("sla")).toBe(false);
+    expect(showsJobInformation("install")).toBe(true);
+    expect(showsJobInformation("maintenance")).toBe(true);
+    expect(showsJobInformation("delivery")).toBe(true);
   });
 
   it("delivery's before-photo is 'prior to packing', others are 'before starting'", () => {

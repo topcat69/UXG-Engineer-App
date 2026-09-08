@@ -3,7 +3,15 @@
 import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { showsFixtureType, showsSiteplanAndEquipment, showsSlaRequirement, usesJobDetails, type JobDetailsType } from "@/lib/forms/job-form";
+import {
+  showsFixtureType,
+  showsJobInformation,
+  showsRamsAndDesignPack,
+  showsSiteplanAndEquipment,
+  showsSlaRequirement,
+  usesJobDetails,
+  type JobDetailsType,
+} from "@/lib/forms/job-form";
 import {
   addJobEquipment,
   deleteJobEquipment,
@@ -142,13 +150,23 @@ export function JobDetailsPanel({
     <section className="flex flex-col gap-3 rounded-md border p-3">
       <h2 className="font-medium">Job Information</h2>
 
-      <div className="flex flex-col gap-2">
-        <span className="text-muted-foreground text-xs">Details about the job (shown to the engineer)</span>
-        <Textarea value={jobInfo} onChange={(e) => setJobInfo(e.target.value)} rows={4} />
-        <Button type="button" size="sm" disabled={isPending} onClick={handleSaveJobInfo} className="self-start">
-          Save
-        </Button>
-      </div>
+      {showsJobInformation(type) ? (
+        <div className="flex flex-col gap-2">
+          <span className="text-muted-foreground text-xs">Details about the job (shown to the engineer)</span>
+          <Textarea value={jobInfo} onChange={(e) => setJobInfo(e.target.value)} rows={4} />
+          <Button type="button" size="sm" disabled={isPending} onClick={handleSaveJobInfo} className="self-start">
+            Save
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <span className="text-muted-foreground text-xs">SLA requirement (shown to the engineer)</span>
+          <Textarea value={slaDetail} onChange={(e) => setSlaDetail(e.target.value)} rows={4} />
+          <Button type="button" size="sm" disabled={isPending} onClick={handleSaveSla} className="self-start">
+            Save
+          </Button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-start gap-4">
         <div className="flex flex-col gap-2">
@@ -198,44 +216,50 @@ export function JobDetailsPanel({
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="flex flex-col gap-1">
-          <span className="text-muted-foreground text-xs">RAMS</span>
-          <div className="flex items-center gap-2">
-            <span className="text-sm">{jobDetails?.rams_storage_path ? "Attached" : "Not attached"}</span>
-            <input ref={ramsInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={() => handleUpload("rams", ramsInputRef.current)} />
-            <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => ramsInputRef.current?.click()}>
-              Upload
-            </Button>
-          </div>
-        </div>
-
-        {showsSiteplanAndEquipment(type) && (
-          <div className="flex flex-col gap-1">
-            <span className="text-muted-foreground text-xs">Site plan</span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm">{jobDetails?.site_plan_storage_path ? "Attached" : "Not attached"}</span>
-              <input ref={sitePlanInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={() => handleUpload("site_plan", sitePlanInputRef.current)} />
-              <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => sitePlanInputRef.current?.click()}>
-                Upload
-              </Button>
+      {(showsRamsAndDesignPack(type) || showsSiteplanAndEquipment(type)) && (
+        <div className="flex flex-wrap items-end gap-4">
+          {showsRamsAndDesignPack(type) && (
+            <div className="flex flex-col gap-1">
+              <span className="text-muted-foreground text-xs">RAMS</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{jobDetails?.rams_storage_path ? "Attached" : "Not attached"}</span>
+                <input ref={ramsInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={() => handleUpload("rams", ramsInputRef.current)} />
+                <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => ramsInputRef.current?.click()}>
+                  Upload
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="flex flex-col gap-1">
-          <span className="text-muted-foreground text-xs">Design pack</span>
-          <div className="flex items-center gap-2">
-            <span className="text-sm">{jobDetails?.design_pack_storage_path ? "Attached" : "Not attached"}</span>
-            <input ref={designPackInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={() => handleUpload("design_pack", designPackInputRef.current)} />
-            <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => designPackInputRef.current?.click()}>
-              Upload
-            </Button>
-          </div>
+          {showsSiteplanAndEquipment(type) && (
+            <div className="flex flex-col gap-1">
+              <span className="text-muted-foreground text-xs">Site plan</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{jobDetails?.site_plan_storage_path ? "Attached" : "Not attached"}</span>
+                <input ref={sitePlanInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={() => handleUpload("site_plan", sitePlanInputRef.current)} />
+                <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => sitePlanInputRef.current?.click()}>
+                  Upload
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {showsRamsAndDesignPack(type) && (
+            <div className="flex flex-col gap-1">
+              <span className="text-muted-foreground text-xs">Design pack</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{jobDetails?.design_pack_storage_path ? "Attached" : "Not attached"}</span>
+                <input ref={designPackInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={() => handleUpload("design_pack", designPackInputRef.current)} />
+                <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => designPackInputRef.current?.click()}>
+                  Upload
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
-      {showsSlaRequirement(type) && (
+      {showsSlaRequirement(type) && showsJobInformation(type) && (
         <div className="flex flex-col gap-2">
           <span className="text-muted-foreground text-xs">SLA requirement</span>
           <Textarea value={slaDetail} onChange={(e) => setSlaDetail(e.target.value)} rows={3} />

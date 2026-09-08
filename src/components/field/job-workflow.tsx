@@ -49,6 +49,7 @@ import {
   showsAvFields,
   showsFixtureType,
   showsIssuesSection,
+  showsRamsAndDesignPack,
   showsReason,
   showsRevisitRequired,
   showsSiteplanAndEquipment,
@@ -725,8 +726,12 @@ function JobDetailsSection({
         <p className="text-sm">
           Customer contact: {[site?.contact_name, site?.contact_phone, site?.contact_email].filter(Boolean).join(" · ") || "Not on file"}
         </p>
-        <p className="text-sm">RAMS: {detailsRow?.rams_storage_path ? "Attached — view in office system" : "Not attached"}</p>
-        <p className="text-sm">Design pack: {detailsRow?.design_pack_storage_path ? "Attached — view in office system" : "Not attached"}</p>
+        {showsRamsAndDesignPack(jobType) && (
+          <>
+            <p className="text-sm">RAMS: {detailsRow?.rams_storage_path ? "Attached — view in office system" : "Not attached"}</p>
+            <p className="text-sm">Design pack: {detailsRow?.design_pack_storage_path ? "Attached — view in office system" : "Not attached"}</p>
+          </>
+        )}
         {site?.access_notes && (
           <p className="mt-2 text-sm">
             <span className="text-muted-foreground">Particular instructions:</span> {site.access_notes}
