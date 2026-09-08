@@ -99,7 +99,21 @@ export function BarcodeScanButton({ onScan }: { onScan: (value: string) => void 
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+          try {
+            await videoRef.current.play();
+          } catch (playError) {
+            // Safari has a well-known quirk where the play() promise
+            // rejects with AbortError even though the video — muted and
+            // playsInline, so autoplay is allowed — actually starts
+            // anyway moments later regardless of that promise's outcome.
+            // Treating this as fatal produced the confusing "camera
+            // didn't start" message while a live feed was visibly playing
+            // right above it. Only a real (non-AbortError) play() failure
+            // should stop the scan here.
+            if (!(playError instanceof DOMException && playError.name === "AbortError")) {
+              throw playError;
+            }
+          }
         }
 
         if (window.BarcodeDetector) {
