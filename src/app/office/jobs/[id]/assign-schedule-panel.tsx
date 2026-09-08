@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { localDateInputValueToIso, toLocalDateInputValue } from "@/lib/format/datetime-local";
 import { assignAndScheduleJob } from "./actions";
@@ -20,6 +21,7 @@ type Engineer = { id: string; name: string };
  */
 export function AssignSchedulePanel({
   jobId,
+  jobType,
   assignedTo,
   assignedName,
   scheduledStart,
@@ -28,6 +30,8 @@ export function AssignSchedulePanel({
   engineers,
 }: {
   jobId: string;
+  /** Decides which list this panel returns to on save — /office/sla for an SLA job, /office/jobs for everything else. */
+  jobType: string;
   assignedTo: string | null;
   assignedName: string | null;
   scheduledStart: string | null;
@@ -35,6 +39,7 @@ export function AssignSchedulePanel({
   isProvisional: boolean;
   engineers: Engineer[];
 }) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [engineerId, setEngineerId] = useState(assignedTo ?? "");
   const [scheduledLocal, setScheduledLocal] = useState(toLocalDateInputValue(scheduledStart));
@@ -58,8 +63,23 @@ export function AssignSchedulePanel({
         localDateInputValueToIso(scheduledEndLocal),
         provisional,
       );
-      setMessage(result.ok ? (result.warning ?? null) : result.message);
-      if (result.ok) setEditing(false);
+      if (!result.ok) {
+        setMessage(result.message);
+        return;
+      }
+      if (result.warning) {
+        // A scheduling conflict is worth actually seeing (e.g. a
+        // double-booked engineer) — stay put and show it rather than
+        // navigating it out of view immediately.
+        setMessage(result.warning);
+        setEditing(false);
+        return;
+      }
+      // This panel's whole job is "assign and schedule" — once that's
+      // saved cleanly, there's nothing left to do on this job's own page,
+      // so head back to wherever it came from rather than leaving the
+      // office user to close it out manually every time.
+      router.push(jobType === "sla" ? "/office/sla" : "/office/jobs");
     });
   }
 
@@ -79,6 +99,10 @@ export function AssignSchedulePanel({
         <button type="button" onClick={() => setEditing(true)} className="text-xs underline">
           Assign / schedule
         </button>
+        {/* A save that ended in a conflict warning collapses straight back
+            to this view (see handleSave) — it has to show up here too, or
+            setting it right before collapsing was pointless. */}
+        {message && <p className="text-muted-foreground max-w-48 text-xs">{message}</p>}
       </div>
     );
   }

@@ -385,6 +385,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </p>
         <AssignSchedulePanel
           jobId={job.id}
+          jobType={job.job_type}
           assignedTo={job.assigned_to}
           assignedName={job.assigned?.name ?? null}
           scheduledStart={job.scheduled_start}
