@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode } from "@/lib/geo/postcode";
+import { titleCase } from "@/lib/format/text";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type SiteRow = Database["public"]["Tables"]["sites"]["Row"];
@@ -18,7 +19,7 @@ export async function createSite(input: {
   contact_name?: string;
   contact_phone?: string;
 }): Promise<CreateSiteResult> {
-  const name = input.name.trim();
+  const name = titleCase(input.name.trim());
   if (!name) return { ok: false, message: "Name is required." };
   if (!input.client_id) return { ok: false, message: "Select a customer." };
 
@@ -36,8 +37,8 @@ export async function createSite(input: {
       client_id: input.client_id,
       name,
       store_id: input.store_id?.trim() || undefined,
-      address_line1: input.address_line1?.trim() || undefined,
-      town: input.town?.trim() || undefined,
+      address_line1: input.address_line1?.trim() ? titleCase(input.address_line1.trim()) : undefined,
+      town: input.town?.trim() ? titleCase(input.town.trim()) : undefined,
       postcode,
       contact_name: input.contact_name?.trim() || undefined,
       contact_phone: input.contact_phone?.trim() || undefined,
@@ -69,7 +70,7 @@ export async function updateSite(
     contact_phone?: string;
   },
 ): Promise<UpdateSiteResult> {
-  const name = input.name.trim();
+  const name = titleCase(input.name.trim());
   if (!name) return { ok: false, message: "Name is required." };
   if (!input.client_id) return { ok: false, message: "Select a customer." };
 
@@ -90,8 +91,8 @@ export async function updateSite(
       client_id: input.client_id,
       name,
       store_id: input.store_id?.trim() || null,
-      address_line1: input.address_line1?.trim() || null,
-      town: input.town?.trim() || null,
+      address_line1: input.address_line1?.trim() ? titleCase(input.address_line1.trim()) : null,
+      town: input.town?.trim() ? titleCase(input.town.trim()) : null,
       postcode,
       contact_name: input.contact_name?.trim() || null,
       contact_phone: input.contact_phone?.trim() || null,

@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { titleCase } from "@/lib/format/text";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type SiteInsert = Database["public"]["Tables"]["sites"]["Insert"];
@@ -60,11 +61,15 @@ export function parseSitesCsv(text: string): ParsedSitesCsv {
     }
 
     rows.push({
-      name,
+      // Store exports are frequently ALL CAPS — title-cased on the way in
+      // so "ABERDEEN" lands as "Aberdeen" rather than needing a manual
+      // cleanup pass after every import. postcode is deliberately left
+      // alone (must stay uppercase, e.g. "AB10 1AA").
+      name: titleCase(name),
       store_id: raw.store_id?.trim() || undefined,
-      address_line1: raw.address_line1?.trim() || undefined,
-      address_line2: raw.address_line2?.trim() || undefined,
-      town: raw.town?.trim() || undefined,
+      address_line1: raw.address_line1?.trim() ? titleCase(raw.address_line1.trim()) : undefined,
+      address_line2: raw.address_line2?.trim() ? titleCase(raw.address_line2.trim()) : undefined,
+      town: raw.town?.trim() ? titleCase(raw.town.trim()) : undefined,
       postcode: raw.postcode?.trim() || undefined,
       latitude,
       longitude,

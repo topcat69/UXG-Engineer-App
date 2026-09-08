@@ -52,4 +52,16 @@ Site B,,,,,,,`;
     const { rows } = parseSitesCsv("name\n");
     expect(rows).toHaveLength(0);
   });
+
+  it("title-cases ALL CAPS name/address/town, but leaves postcode alone", () => {
+    const csv = `name,address_line1,address_line2,town,postcode\nABERDEEN STORE,12 HIGH STREET,UNIT 4,ABERDEEN,AB10 1AA`;
+    const { rows } = parseSitesCsv(csv);
+    expect(rows[0]).toMatchObject({
+      name: "Aberdeen Store",
+      address_line1: "12 High Street",
+      address_line2: "Unit 4",
+      town: "Aberdeen",
+      postcode: "AB10 1AA",
+    });
+  });
 });
