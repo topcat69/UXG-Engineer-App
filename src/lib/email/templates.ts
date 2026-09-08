@@ -192,6 +192,22 @@ export function buildApprovedEmail(input: ApprovedEmailInput): EmailContent {
   return { subject: `${input.jobNumber} — ${input.siteName} — completed`, html, text };
 }
 
+export type KbArticleSubmittedEmailInput = {
+  articleTitle: string;
+  authorName: string;
+  reviewerName: string;
+  deepLink: string;
+};
+
+export function buildKbArticleSubmittedEmail(input: KbArticleSubmittedEmailInput): EmailContent {
+  const { html, text } = wrap([
+    `Hi ${input.reviewerName},`,
+    `${input.authorName} submitted a Knowledge Base article for review: "${input.articleTitle}".`,
+    `Review it: ${input.deepLink}`,
+  ]);
+  return { subject: `KB article for review — ${input.articleTitle}`, html, text };
+}
+
 export type WeeklySummaryEmailInput = {
   projectName: string;
   weekLabel: string;

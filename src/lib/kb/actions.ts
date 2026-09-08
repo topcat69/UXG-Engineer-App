@@ -1,14 +1,48 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { validatePlacement } from "@/lib/kb/validate-placement";
+import { sendKbArticleSubmittedEmail } from "@/lib/email/send-kb-emails";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type KbArticleRow = Database["public"]["Tables"]["kb_articles"]["Row"];
 type ArticleResult = { ok: true; article: KbArticleRow } | { ok: false; message: string };
 type ArticlePlacementInput = { title: string; body: string; categoryId: string; manufacturerId: string; modelRangeId: string; tags: string };
+
+/**
+ * Fans a "KB article for review" email out to every active manager/
+ * superadmin — same shape as the job-submitted webhook's fan-out (see
+ * api/webhooks/status-submitted/route.ts), but reached directly rather
+ * than via a DB webhook: unlike a job submit, an article submit/resubmit
+ * only ever happens through this Server Action (KB is online-only, no
+ * offline outbox — see submitArticle's comment), so there's no other
+ * write path to catch. Needs the admin client since the caller here is
+ * the engineer's own RLS-scoped session, which can't see other users'
+ * rows (users_select only allows your own row or manager+ — see
+ * 20260103000000_rls.sql). Same best-effort, non-blocking contract as
+ * the scheduled/assigned emails in office/jobs/[id]/actions.ts: runs
+ * after the response via after(), errors logged rather than surfaced,
+ * so a Resend hiccup never blocks the engineer's submit.
+ */
+function notifyReviewers(articleId: string, articleTitle: string, authorName: string) {
+  after(async () => {
+    try {
+      const admin = createAdminClient();
+      const { data: reviewers } = await admin.from("users").select("email, name").in("role", ["superadmin", "manager"]).eq("active", true);
+      await Promise.all(
+        (reviewers ?? []).map((reviewer) =>
+          sendKbArticleSubmittedEmail(articleId, articleTitle, authorName, reviewer.email, reviewer.name),
+        ),
+      );
+    } catch (error) {
+      console.error(`KB article-submitted email failed for article ${articleId}`, error);
+    }
+  });
+}
 
 function parseTags(raw: string): string[] {
   return Array.from(
@@ -60,6 +94,7 @@ export async function submitArticle(input: ArticlePlacementInput): Promise<Artic
     .single();
   if (error) return { ok: false, message: error.message };
 
+  notifyReviewers(data.id, data.title, actor.name);
   revalidatePath("/office/knowledge-base");
   return { ok: true, article: data };
 }
@@ -98,10 +133,11 @@ export async function resubmitArticle(articleId: string, input: ArticlePlacement
       reviewed_at: null,
     })
     .eq("id", articleId)
-    .select("*")
+    .select("*, author:users!kb_articles_author_id_fkey(name)")
     .single();
   if (error) return { ok: false, message: error.message };
 
+  notifyReviewers(data.id, data.title, data.author?.name ?? "An engineer");
   revalidatePath("/office/knowledge-base");
   return { ok: true, article: data };
 }
