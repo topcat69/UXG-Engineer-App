@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
-import { formatScheduleRange, jobDayKeys } from "@/lib/scheduler/week";
+import { jobDayKeys } from "@/lib/scheduler/week";
 import { statusColorBucket, STATUS_COLOR_CLASSES, STATUS_SWATCH_CLASSES, type StatusColorBucket } from "@/lib/scheduler/status-colors";
 import { humanize } from "@/lib/format/text";
 import { rescheduleJob } from "./actions";
@@ -192,9 +192,6 @@ function FragmentRow({
                     )}
                   </div>
                   <div className="text-muted-foreground truncate">{siteLabel(job.site)}</div>
-                  {job.scheduled_start && (
-                    <div className="text-muted-foreground">{formatScheduleRange(job.scheduled_start, job.scheduled_end)}</div>
-                  )}
                   {lane.engineerId && <div className="text-muted-foreground truncate">{lane.label}</div>}
                   <div className="mt-0.5 flex flex-wrap gap-1">
                     <Badge variant="secondary" className="text-[10px]">
