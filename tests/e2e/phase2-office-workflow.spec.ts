@@ -41,10 +41,14 @@ test("manager imports sites, generates jobs, and bulk assigns/schedules them", a
   await page.getByRole("button", { name: "Import" }).click();
   await expect(page.getByText("Imported 50 site(s).")).toBeVisible({ timeout: 15_000 });
 
+  // Case-insensitive: parseSitesCsv now title-cases the imported name (see
+  // lib/csv/sites.ts), so "E2E-..." comes back stored as "E2e-..." — this
+  // test isn't about casing, it's just using the tag as a unique-enough
+  // prefix to find the rows this run created.
   const { data: importedSites, error: sitesError } = await admin
     .from("sites")
     .select("id")
-    .like("name", `${tag}%`);
+    .ilike("name", `${tag}%`);
   expect(sitesError).toBeNull();
   expect(importedSites).toHaveLength(50);
 
