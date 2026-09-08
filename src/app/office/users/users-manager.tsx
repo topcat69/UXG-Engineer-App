@@ -83,7 +83,7 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
   }
 
   function handleDelete(u: UserRow) {
-    if (!window.confirm(`Delete ${u.name}'s account? This can't be undone. If they have any job history this will fail — deactivate them instead.`))
+    if (!window.confirm(`Delete ${u.name}'s account? This can't be undone. Only works for an account with no job history at all — if they've ever been assigned a job, raised an issue, or had a status update, this will fail (deactivating is the correct way to remove someone with real history).`))
       return;
     startTransition(async () => {
       const result = await deleteUser(u.id);

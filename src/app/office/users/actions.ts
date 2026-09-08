@@ -144,7 +144,8 @@ export async function deleteUser(userId: string): Promise<DeleteUserResult> {
     if (deleteError.code === "23503") {
       return {
         ok: false,
-        message: "Can't delete — this user still has job history (assigned jobs, issues, or status updates) against them. Deactivate instead.",
+        message:
+          "Can't delete — this user has job history (assigned jobs, issues, or status updates) tied to their name, which has to stay on record. Deletion only works for an account with no activity at all — if they're already deactivated, that's the correct, permanent state; there's no further action needed.",
       };
     }
     return { ok: false, message: deleteError.message };
