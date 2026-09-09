@@ -7,6 +7,11 @@ import { humanize } from "@/lib/format/text";
 import { AssignToJobForm } from "./assign-to-job-form";
 import { ReassignStockItemControl } from "./reassign-stock-item-control";
 
+// Matches the TTL other pages use for their own signed URLs (see e.g.
+// office/knowledge-base/[id]/page.tsx) — this page is loaded fresh on every
+// visit, so there's no need for anything longer-lived.
+const PHOTO_SIGNED_URL_TTL_SECONDS = 60 * 60;
+
 /**
  * Read-only for Office — everything here comes from Warehouse's work in
  * /kiosk (see the Goods-In & Job Sheets proposal's "Who does what": Office
@@ -32,13 +37,21 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
       .single(),
     supabase
       .from("stock_items")
-      .select("id, manufacturer, model, serial_no, tested, damaged")
+      .select("id, manufacturer, model, serial_no, tested, damaged, image_path")
       .eq("job_sheet_id", id)
       .order("received_at", { ascending: false }),
     supabase.from("job_sheet_tests").select("id, item_description, tested, outcome").eq("job_sheet_id", id).order("position"),
   ]);
 
   if (jobSheetError || !jobSheet) notFound();
+
+  const stockItemsWithPhotoUrls = await Promise.all(
+    (stockItems ?? []).map(async (item) => {
+      if (!item.image_path) return { ...item, imageUrl: null };
+      const { data } = await supabase.storage.from("stock-item-photos").createSignedUrl(item.image_path, PHOTO_SIGNED_URL_TTL_SECONDS);
+      return { ...item, imageUrl: data?.signedUrl ?? null };
+    }),
+  );
 
   const { data: jobsForSite } = jobSheet.site?.id
     ? await supabase
@@ -85,24 +98,34 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
               <TableHead>Serial no.</TableHead>
               <TableHead>Tested</TableHead>
               <TableHead>Damaged</TableHead>
+              <TableHead>Photo</TableHead>
               <TableHead>Job sheet</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(stockItems ?? []).length === 0 && (
+            {stockItemsWithPhotoUrls.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground text-center">
+                <TableCell colSpan={7} className="text-muted-foreground text-center">
                   Nothing received yet.
                 </TableCell>
               </TableRow>
             )}
-            {(stockItems ?? []).map((item) => (
+            {stockItemsWithPhotoUrls.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>{item.manufacturer ?? "—"}</TableCell>
                 <TableCell>{item.model ?? "—"}</TableCell>
                 <TableCell>{item.serial_no ?? "—"}</TableCell>
                 <TableCell>{item.tested ? "Yes" : "No"}</TableCell>
                 <TableCell>{item.damaged ? <Badge variant="destructive">Damaged</Badge> : "No"}</TableCell>
+                <TableCell>
+                  {item.imageUrl ? (
+                    <a href={item.imageUrl} target="_blank" rel="noreferrer" className="text-sm underline-offset-2 hover:underline">
+                      View
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">—</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <ReassignStockItemControl stockItemId={item.id} currentJobSheetId={jobSheet.id} otherJobSheets={otherJobSheets ?? []} />
                 </TableCell>

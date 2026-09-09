@@ -183,6 +183,51 @@ export async function updateClosingChecklist(jobSheetId: string, input: ClosingC
   return { ok: true };
 }
 
+export type UploadStockItemPhotoResult = { ok: true; imagePath: string } | { ok: false; message: string };
+
+/**
+ * The paper job sheet's "Image Link" column — one photo per Stock Item,
+ * uploaded straight to Storage rather than routed through PhotoSlot.tsx's
+ * offline Dexie/outbox queue, which the kiosk's always-online model doesn't
+ * need. Not gated on the item's or sheet's status, same as everything else
+ * here (Decision 7) — a photo can be added or replaced at any point.
+ */
+export async function uploadStockItemPhoto(
+  stockItemId: string,
+  jobSheetId: string,
+  formData: FormData,
+): Promise<UploadStockItemPhotoResult> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose a file first." };
+
+  const supabase = await createClient();
+  const storagePath = `${jobSheetId}/${stockItemId}-${Date.now()}-${file.name}`;
+  const { error: uploadError } = await supabase.storage.from("stock-item-photos").upload(storagePath, file, {
+    contentType: file.type || undefined,
+  });
+  if (uploadError) return { ok: false, message: uploadError.message };
+
+  const { error } = await supabase.from("stock_items").update({ image_path: storagePath }).eq("id", stockItemId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/kiosk/${jobSheetId}`);
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  return { ok: true, imagePath: storagePath };
+}
+
+export async function deleteStockItemPhoto(stockItemId: string, jobSheetId: string, imagePath: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error: removeError } = await supabase.storage.from("stock-item-photos").remove([imagePath]);
+  if (removeError) return { ok: false, message: removeError.message };
+
+  const { error } = await supabase.from("stock_items").update({ image_path: null }).eq("id", stockItemId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/kiosk/${jobSheetId}`);
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  return { ok: true };
+}
+
 /**
  * Name + timestamp, not a signature (Decision 2) — the signed-in
  * Configurator's own account stands in for both. Always moves the sheet

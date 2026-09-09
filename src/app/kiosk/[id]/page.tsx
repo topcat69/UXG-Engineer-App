@@ -10,6 +10,12 @@ import { SoftwareSetupForm } from "./software-setup-form";
 import { ClosingChecklistForm } from "./closing-checklist-form";
 import { toItem } from "./checklist-item";
 import { SignOffPanel } from "./sign-off-panel";
+import { StockItemPhotoControl } from "./stock-item-photo-control";
+
+// Matches the TTL other pages use for their own signed URLs (see e.g.
+// office/knowledge-base/[id]/page.tsx) — this page is loaded fresh on every
+// visit, so there's no need for anything longer-lived.
+const PHOTO_SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 export default async function KioskJobSheetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,7 +39,7 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
         .single(),
       supabase
         .from("stock_items")
-        .select("id, manufacturer, model, serial_no, firmware_update, tested, damaged, received_at")
+        .select("id, manufacturer, model, serial_no, firmware_update, tested, damaged, received_at, image_path")
         .eq("job_sheet_id", id)
         .order("received_at", { ascending: false }),
       supabase
@@ -47,6 +53,14 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
   if (stockItemsError) {
     return <p className="text-destructive">Failed to load stock items: {stockItemsError.message}</p>;
   }
+
+  const stockItemsWithPhotoUrls = await Promise.all(
+    (stockItems ?? []).map(async (item) => {
+      if (!item.image_path) return { ...item, imageUrl: null };
+      const { data } = await supabase.storage.from("stock-item-photos").createSignedUrl(item.image_path, PHOTO_SIGNED_URL_TTL_SECONDS);
+      return { ...item, imageUrl: data?.signedUrl ?? null };
+    }),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -77,17 +91,18 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
               <TableHead>Tested</TableHead>
               <TableHead>Damaged</TableHead>
               <TableHead>Received</TableHead>
+              <TableHead>Photo</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(stockItems ?? []).length === 0 && (
+            {stockItemsWithPhotoUrls.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground text-center">
+                <TableCell colSpan={8} className="text-muted-foreground text-center">
                   Nothing scanned in yet.
                 </TableCell>
               </TableRow>
             )}
-            {(stockItems ?? []).map((item) => (
+            {stockItemsWithPhotoUrls.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>{item.manufacturer ?? "—"}</TableCell>
                 <TableCell>{item.model ?? "—"}</TableCell>
@@ -96,6 +111,14 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
                 <TableCell>{item.tested ? "Yes" : "No"}</TableCell>
                 <TableCell>{item.damaged ? <Badge variant="destructive">Damaged</Badge> : "No"}</TableCell>
                 <TableCell>{item.received_at ? new Date(item.received_at).toLocaleString() : "—"}</TableCell>
+                <TableCell>
+                  <StockItemPhotoControl
+                    stockItemId={item.id}
+                    jobSheetId={jobSheet.id}
+                    imagePath={item.image_path}
+                    imageUrl={item.imageUrl}
+                  />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
