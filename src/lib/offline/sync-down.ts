@@ -80,6 +80,7 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
     { data: jobDetails, error: jobDetailsError },
     { data: jobEquipment, error: jobEquipmentError },
     { data: jobOptionalFields, error: jobOptionalFieldsError },
+    { data: jobSheets, error: jobSheetsError },
   ] =
     jobIds.length > 0
       ? await Promise.all([
@@ -93,8 +94,14 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
           // Same as job_equipment above — a manager's mandatory/optional
           // toggle, never written by the engineer.
           supabase.from("job_optional_fields").select("*").in("job_id", jobIds),
+          // Same read-only treatment — Office/Warehouse manage the Job
+          // Sheet entirely outside the field app (see the Goods-In & Job
+          // Sheets proposal's "Who does what"); the engineer only ever
+          // views it.
+          supabase.from("job_sheets").select("*").in("linked_job_id", jobIds),
         ])
       : [
+          { data: [], error: null } as const,
           { data: [], error: null } as const,
           { data: [], error: null } as const,
           { data: [], error: null } as const,
@@ -108,6 +115,14 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
   if (jobDetailsError) throw jobDetailsError;
   if (jobEquipmentError) throw jobEquipmentError;
   if (jobOptionalFieldsError) throw jobOptionalFieldsError;
+  if (jobSheetsError) throw jobSheetsError;
+
+  const jobSheetIds = (jobSheets ?? []).map((js) => js.id);
+  const { data: stockItems, error: stockItemsError } =
+    jobSheetIds.length > 0
+      ? await supabase.from("stock_items").select("*").in("job_sheet_id", jobSheetIds)
+      : { data: [], error: null };
+  if (stockItemsError) throw stockItemsError;
 
   // A task the engineer just ticked/unticked offline has a pending
   // task_toggle op keyed by its own id — pulling the server's stale copy
@@ -130,6 +145,8 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
       db.jobOptionalFields,
       db.clientSlaFixtureTypes,
       db.clientSlaReasons,
+      db.jobSheets,
+      db.stockItems,
       db.syncMeta,
     ],
     async () => {
@@ -160,6 +177,9 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
       // locally, silently letting the engineer skip a field they shouldn't.
       await db.jobOptionalFields.where("job_id").anyOf(jobIds).delete();
       await db.jobOptionalFields.bulkPut(jobOptionalFields ?? []);
+
+      await db.jobSheets.bulkPut(jobSheets ?? []);
+      await db.stockItems.bulkPut(stockItems ?? []);
 
       // Drop local jobs that have fallen out of the assigned/windowed set —
       // unless they still have unsynced work, which must survive until drained.

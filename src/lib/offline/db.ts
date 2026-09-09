@@ -14,6 +14,8 @@ export type JobTaskRow = Database["public"]["Tables"]["job_tasks"]["Row"];
 export type JobOptionalFieldRow = Database["public"]["Tables"]["job_optional_fields"]["Row"];
 export type ClientSlaFixtureTypeRow = Database["public"]["Tables"]["client_sla_fixture_types"]["Row"];
 export type ClientSlaReasonRow = Database["public"]["Tables"]["client_sla_reasons"]["Row"];
+export type JobSheetRow = Database["public"]["Tables"]["job_sheets"]["Row"];
+export type StockItemRow = Database["public"]["Tables"]["stock_items"]["Row"];
 export type JobStatus = Database["public"]["Enums"]["job_status"];
 
 type OutboxBase = {
@@ -107,6 +109,8 @@ class OfflineDB extends Dexie {
   jobOptionalFields!: EntityTable<JobOptionalFieldRow, "id">;
   clientSlaFixtureTypes!: EntityTable<ClientSlaFixtureTypeRow, "id">;
   clientSlaReasons!: EntityTable<ClientSlaReasonRow, "id">;
+  jobSheets!: EntityTable<JobSheetRow, "id">;
+  stockItems!: EntityTable<StockItemRow, "id">;
 
   constructor() {
     super("uxg-engineer-job-scheduler");
@@ -194,6 +198,28 @@ class OfflineDB extends Dexie {
       jobOptionalFields: "id, job_id",
       clientSlaFixtureTypes: "id, client_id",
       clientSlaReasons: "id, client_id",
+    });
+    // jobSheets/stockItems: read-only reference for the engineer, same
+    // treatment as jobEquipment above — Office/Warehouse manage these
+    // entirely outside the field app, so there's no pending-outbox guard
+    // to worry about on a sync-down (see sync-down.ts).
+    this.version(7).stores({
+      jobs: "id, status, assigned_to, scheduled_start, site_id",
+      sites: "id",
+      clients: "id",
+      installForms: "id, job_id",
+      surveyForms: "id, job_id",
+      outbox: "id, createdAt",
+      mediaQueue: "id, jobId, status",
+      syncMeta: "key",
+      jobTasks: "id, job_id, is_done",
+      jobDetails: "id, job_id",
+      jobEquipment: "id, job_id",
+      jobOptionalFields: "id, job_id",
+      clientSlaFixtureTypes: "id, client_id",
+      clientSlaReasons: "id, client_id",
+      jobSheets: "id, linked_job_id",
+      stockItems: "id, job_sheet_id",
     });
   }
 }

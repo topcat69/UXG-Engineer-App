@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { CurrentUser } from "@/lib/auth/current-user";
-import { db, type ClientSlaReasonRow, type InstallFormRow, type JobDetailsRow, type MediaQueueItem } from "@/lib/offline/db";
+import { db, type ClientSlaReasonRow, type InstallFormRow, type JobDetailsRow, type MediaQueueItem, type StockItemRow } from "@/lib/offline/db";
 import { generateId } from "@/lib/offline/id";
 import {
   checkIn,
@@ -105,6 +105,12 @@ export function JobWorkflow({
     [] as ClientSlaReasonRow[],
   );
   const equipment = useLiveQuery(() => db.jobEquipment.where("job_id").equals(jobId).sortBy("position"), [jobId], []);
+  const jobSheet = useLiveQuery(() => db.jobSheets.where("linked_job_id").equals(jobId).first(), [jobId]);
+  const stockItems = useLiveQuery(
+    () => (jobSheet ? db.stockItems.where("job_sheet_id").equals(jobSheet.id).toArray() : []),
+    [jobSheet?.id],
+    [],
+  );
   const optionalFieldRows = useLiveQuery(() => db.jobOptionalFields.where("job_id").equals(jobId).toArray(), [jobId], []);
   const media = useLiveQuery(() => db.mediaQueue.where("jobId").equals(jobId).toArray(), [jobId], []);
   const tasks = useLiveQuery(() => db.jobTasks.where("job_id").equals(jobId).sortBy("position"), [jobId], []);
@@ -491,6 +497,8 @@ export function JobWorkflow({
           fixtureTypeName={fixtureType?.name ?? null}
           reasons={reasons ?? []}
           equipment={equipment ?? []}
+          jobSheet={jobSheet}
+          stockItems={stockItems ?? []}
           tasks={tasks ?? []}
           onToggleTask={handleToggleTask}
           mediaBySlot={mediaBySlot}
@@ -676,6 +684,8 @@ function JobDetailsSection({
   fixtureTypeName,
   reasons,
   equipment,
+  jobSheet,
+  stockItems,
   tasks,
   onToggleTask,
   mediaBySlot,
@@ -705,6 +715,9 @@ function JobDetailsSection({
   /** SLA only — the completing engineer's pick (see showsReason), scoped to the job's site's client. */
   reasons: { id: string; name: string }[];
   equipment: { id: string; model: string; serial: string | null }[];
+  /** Set once Office has assigned a Job Sheet to this job (see phase 5) — read-only here, Office/Warehouse manage it entirely outside the field app. */
+  jobSheet: { id: string; reference: string; status: string } | undefined;
+  stockItems: StockItemRow[];
   tasks: { id: string; label: string; is_done: boolean }[];
   onToggleTask: (taskId: string, isDone: boolean) => void;
   mediaBySlot: Map<string, MediaQueueItem[]>;
@@ -754,6 +767,26 @@ function JobDetailsSection({
               </div>
             )}
           </>
+        )}
+        {jobSheet && (
+          <div className="mt-2">
+            <p className="text-sm font-medium">
+              Job Sheet: {jobSheet.reference} <span className="text-muted-foreground">({humanize(jobSheet.status)})</span>
+            </p>
+            {stockItems.length > 0 ? (
+              <ul className="list-disc pl-5 text-sm">
+                {stockItems.map((item) => (
+                  <li key={item.id}>
+                    {[item.manufacturer, item.model].filter(Boolean).join(" ") || "Unlisted item"}
+                    {item.serial_no ? ` — ${item.serial_no}` : ""}
+                    {item.damaged && <span className="text-destructive"> (flagged damaged at goods-in)</span>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground text-sm">No stock recorded yet.</p>
+            )}
+          </div>
         )}
         {showsSlaRequirement(jobType) && detailsRow?.sla_requirement_detail && (
           <p className="mt-2 text-sm">
