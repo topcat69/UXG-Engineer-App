@@ -60,6 +60,16 @@ export default async function OfficeLayout({ children }: { children: React.React
           <Link href="/my-jobs" className="text-muted-foreground hover:text-foreground underline">
             My Jobs (field app)
           </Link>
+          {user.role === "superadmin" && (
+            // Warehouse's own kiosk surface isn't part of the Office nav by design
+            // (see the Goods-In & Job Sheets proposal's "Who does what"), but
+            // superadmin can reach both, so give it a way in until there's a
+            // proper cross-surface nav — managers can't use /kiosk, so it's
+            // hidden for them rather than bouncing them to "/".
+            <Link href="/kiosk" className="text-muted-foreground hover:text-foreground underline">
+              Kiosk (goods-in)
+            </Link>
+          )}
           <ThemeSwitcher currentTheme={user.theme} />
           <form action={signOut}>
             <button type="submit" className="text-muted-foreground hover:text-foreground underline">
