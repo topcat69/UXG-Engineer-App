@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { humanize } from "@/lib/format/text";
 import { AssignToJobForm } from "./assign-to-job-form";
+import { ReassignStockItemControl } from "./reassign-stock-item-control";
 
 /**
  * Read-only for Office — everything here comes from Warehouse's work in
@@ -47,6 +48,15 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
         .order("created_at", { ascending: false })
     : { data: [] };
 
+  // Other pickable sheets to pull a Stock Item onto (Decision 7) — any
+  // sheet but this one, excluding ones already Complete.
+  const { data: otherJobSheets } = await supabase
+    .from("job_sheets")
+    .select("id, reference")
+    .neq("id", id)
+    .neq("status", "complete")
+    .order("reference");
+
   return (
     <div className="flex flex-col gap-6">
       <Link href="/office/job-sheets" className="text-muted-foreground text-sm underline">
@@ -75,12 +85,13 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
               <TableHead>Serial no.</TableHead>
               <TableHead>Tested</TableHead>
               <TableHead>Damaged</TableHead>
+              <TableHead>Job sheet</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {(stockItems ?? []).length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground text-center">
+                <TableCell colSpan={6} className="text-muted-foreground text-center">
                   Nothing received yet.
                 </TableCell>
               </TableRow>
@@ -92,6 +103,9 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
                 <TableCell>{item.serial_no ?? "—"}</TableCell>
                 <TableCell>{item.tested ? "Yes" : "No"}</TableCell>
                 <TableCell>{item.damaged ? <Badge variant="destructive">Damaged</Badge> : "No"}</TableCell>
+                <TableCell>
+                  <ReassignStockItemControl stockItemId={item.id} currentJobSheetId={jobSheet.id} otherJobSheets={otherJobSheets ?? []} />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -27,3 +27,23 @@ export async function assignJobSheetToJob(jobSheetId: string, jobId: string): Pr
   revalidatePath("/office/job-sheets");
   return { ok: true };
 }
+
+/**
+ * Pulls a Stock Item onto a different Job Sheet — Decision 7's other
+ * half: stock sometimes gets pulled for a different, higher-priority
+ * job, so job_sheet_id has to be a plain, freely reassignable foreign
+ * key, not something locked once scanned in. No status check on either
+ * sheet, same reasoning as assignJobSheetToJob above.
+ */
+export async function reassignStockItem(stockItemId: string, fromJobSheetId: string, toJobSheetId: string): Promise<ActionResult> {
+  if (!toJobSheetId) return { ok: false, message: "Select a job sheet." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("stock_items").update({ job_sheet_id: toJobSheetId }).eq("id", stockItemId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/office/job-sheets/${fromJobSheetId}`);
+  revalidatePath(`/office/job-sheets/${toJobSheetId}`);
+  revalidatePath("/office/job-sheets");
+  return { ok: true };
+}

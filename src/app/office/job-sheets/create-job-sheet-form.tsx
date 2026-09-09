@@ -32,7 +32,19 @@ export function CreateJobSheetForm({
     startTransition(async () => {
       const result = await createJobSheet(projectId, siteId, reference, proposedInstallDate, jobDescription);
       if (result.ok) {
-        router.push("/office/job-sheets");
+        // router.push to this same URL wouldn't reset any of this form's own
+        // state (same route, no remount) — clearing it explicitly is what
+        // actually gets a fresh form for the next one, collapsed back to the
+        // button rather than left open with the just-created sheet's values
+        // still sitting in it.
+        setOpen(false);
+        setProjectId("");
+        setSiteId("");
+        setReference("");
+        setProposedInstallDate("");
+        setJobDescription("");
+        setMessage(null);
+        router.refresh();
       } else {
         setMessage(result.message);
       }
