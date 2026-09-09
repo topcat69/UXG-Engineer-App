@@ -30,7 +30,7 @@ test("superadmin and manager have different user-management reach, per the users
     .locator("section", { hasText: "Add a user" })
     .locator("select option")
     .allTextContents();
-  expect(superadminRoles.sort()).toEqual(["Engineer", "Manager", "Superadmin"]);
+  expect(superadminRoles.sort()).toEqual(["Engineer", "Manager", "Superadmin", "Warehouse"].sort());
 
   const managerEmail = `${tag.toLowerCase()}-manager@gmail.com`;
   const createForm = page.locator("section", { hasText: "Add a user" });
