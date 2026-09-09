@@ -5,6 +5,7 @@ export default async function Home() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.role === "superadmin" || user.role === "manager") redirect("/office/dashboard");
+  if (user.role === "warehouse") redirect("/kiosk");
   // Engineer: the field PWA lands here in Phase 3.
   redirect("/my-jobs");
 }

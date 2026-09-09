@@ -16,6 +16,7 @@ declare
   admin_id uuid := '00000000-0000-0000-0000-000000000001';
   manager_id uuid := '00000000-0000-0000-0000-000000000002';
   engineer_id uuid := '00000000-0000-0000-0000-000000000003';
+  warehouse_id uuid := '00000000-0000-0000-0000-000000000004';
   project_id uuid := gen_random_uuid();
   client_id uuid := gen_random_uuid();
   site_ids uuid[];
@@ -43,6 +44,9 @@ begin
      '{"provider":"email","providers":["email"]}', '{}', false, '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', engineer_id, 'authenticated', 'authenticated',
      'engineer@opoc.test', crypt(gen_random_uuid()::text, gen_salt('bf')), now(), now(), now(),
+     '{"provider":"email","providers":["email"]}', '{}', false, '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', warehouse_id, 'authenticated', 'authenticated',
+     'warehouse@opoc.test', crypt(gen_random_uuid()::text, gen_salt('bf')), now(), now(), now(),
      '{"provider":"email","providers":["email"]}', '{}', false, '', '', '', '');
 
   insert into auth.identities (
@@ -53,7 +57,9 @@ begin
     (gen_random_uuid(), manager_id::text, manager_id,
      jsonb_build_object('sub', manager_id::text, 'email', 'manager@opoc.test'), 'email', now(), now(), now()),
     (gen_random_uuid(), engineer_id::text, engineer_id,
-     jsonb_build_object('sub', engineer_id::text, 'email', 'engineer@opoc.test'), 'email', now(), now(), now());
+     jsonb_build_object('sub', engineer_id::text, 'email', 'engineer@opoc.test'), 'email', now(), now(), now()),
+    (gen_random_uuid(), warehouse_id::text, warehouse_id,
+     jsonb_build_object('sub', warehouse_id::text, 'email', 'warehouse@opoc.test'), 'email', now(), now(), now());
 
   -- The on_auth_user_created trigger already inserted a default 'engineer'
   -- row for each of these from the auth.users insert above; upsert the real
@@ -61,7 +67,8 @@ begin
   insert into users (id, email, name, role, active) values
     (admin_id, 'admin@opoc.test', 'Ada Superadmin', 'superadmin', true),
     (manager_id, 'manager@opoc.test', 'Mo Manager', 'manager', true),
-    (engineer_id, 'engineer@opoc.test', 'Eve Engineer', 'engineer', true)
+    (engineer_id, 'engineer@opoc.test', 'Eve Engineer', 'engineer', true),
+    (warehouse_id, 'warehouse@opoc.test', 'Wes Warehouse', 'warehouse', true)
   on conflict (id) do update set name = excluded.name, role = excluded.role, active = excluded.active;
 
   -- 1 client, 1 project (a project belongs to exactly one client -- see

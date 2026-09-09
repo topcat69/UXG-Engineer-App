@@ -26,5 +26,5 @@ export async function loginAs(page: Page, email: string): Promise<void> {
   if (!match) throw new Error(`No confirmation link found in email body for ${email}`);
 
   await page.goto(match[0].replace(/&amp;/g, "&"));
-  await page.waitForURL(/\/(office|my-jobs)/, { timeout: 10_000 });
+  await page.waitForURL(/\/(office|my-jobs|kiosk)/, { timeout: 10_000 });
 }

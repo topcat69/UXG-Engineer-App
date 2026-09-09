@@ -72,3 +72,17 @@ export async function requireOfficeUser(): Promise<CurrentUser> {
   if (user.role !== "superadmin" && user.role !== "manager") redirect("/");
   return user;
 }
+
+/**
+ * Redirects to /login if not signed in, or to / if signed in but not
+ * superadmin/warehouse. Manager deliberately isn't included here — per the
+ * Goods-In & Job Sheets proposal's "Who does what", Manager works through
+ * the office (creates sheets, assigns them to jobs) rather than the
+ * warehouse-floor kiosk; superadmin is included as usual for full access.
+ */
+export async function requireWarehouseUser(): Promise<CurrentUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.role !== "superadmin" && user.role !== "warehouse") redirect("/");
+  return user;
+}

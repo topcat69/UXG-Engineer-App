@@ -12,6 +12,7 @@ import { FieldApp } from "@/components/field/field-app";
 export default async function MyJobsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (user.role === "warehouse") redirect("/kiosk");
 
   return <FieldApp user={user} />;
 }
