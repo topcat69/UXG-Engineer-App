@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -7,11 +8,10 @@ import { CreateJobSheetForm } from "./create-job-sheet-form";
 const PAGE_SIZE = 50;
 
 /**
- * List + creation only, per the Goods-In & Job Sheets proposal's build
- * order — Warehouse's scanning/configuring stages and the office's
- * assign-to-job step are later phases, with their own UI. A Job Sheet has
- * no detail page yet because nothing here needs one: there's nothing to
- * drill into on a Building sheet until Warehouse starts adding stock.
+ * List + creation, plus a link into each sheet's own detail page (see
+ * [id]/page.tsx) — that's where Office reviews a Ready sheet and assigns
+ * it to a job. Warehouse's scanning/configuring stages live entirely in
+ * /kiosk; nothing here edits that side.
  */
 export default async function JobSheetsPage() {
   const supabase = await createClient();
@@ -20,7 +20,9 @@ export default async function JobSheetsPage() {
     supabase
       .from("job_sheets")
       .select(
-        "id, reference, status, proposed_install_date, created_at, site:sites(name, client:clients(name)), project:projects(name)",
+        `id, reference, status, proposed_install_date, created_at,
+         site:sites(name, client:clients(name)), project:projects(name),
+         linked_job:jobs(id, job_number)`,
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
@@ -56,6 +58,7 @@ export default async function JobSheetsPage() {
             <TableHead>Site</TableHead>
             <TableHead>Project</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Job</TableHead>
             <TableHead>Proposed install</TableHead>
             <TableHead>Created</TableHead>
           </TableRow>
@@ -63,19 +66,32 @@ export default async function JobSheetsPage() {
         <TableBody>
           {(jobSheets ?? []).length === 0 && (
             <TableRow>
-              <TableCell colSpan={7} className="text-muted-foreground text-center">
+              <TableCell colSpan={8} className="text-muted-foreground text-center">
                 No job sheets yet.
               </TableCell>
             </TableRow>
           )}
           {(jobSheets ?? []).map((jobSheet) => (
             <TableRow key={jobSheet.id}>
-              <TableCell className="font-medium">{jobSheet.reference}</TableCell>
+              <TableCell>
+                <Link href={`/office/job-sheets/${jobSheet.id}`} className="font-medium underline-offset-2 hover:underline">
+                  {jobSheet.reference}
+                </Link>
+              </TableCell>
               <TableCell>{jobSheet.site?.client?.name ?? "—"}</TableCell>
               <TableCell>{jobSheet.site?.name ?? "—"}</TableCell>
               <TableCell>{jobSheet.project?.name ?? "—"}</TableCell>
               <TableCell>
                 <Badge variant="secondary">{humanize(jobSheet.status)}</Badge>
+              </TableCell>
+              <TableCell>
+                {jobSheet.linked_job ? (
+                  <Link href={`/office/jobs/${jobSheet.linked_job.id}`} className="underline-offset-2 hover:underline">
+                    {jobSheet.linked_job.job_number}
+                  </Link>
+                ) : (
+                  "—"
+                )}
               </TableCell>
               <TableCell>
                 {jobSheet.proposed_install_date ? new Date(jobSheet.proposed_install_date).toLocaleDateString() : "—"}
