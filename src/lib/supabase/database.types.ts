@@ -511,6 +511,210 @@ export type Database = {
           },
         ]
       }
+      job_sheet_tests: {
+        Row: {
+          created_at: string | null
+          id: string
+          ir_bud: boolean | null
+          item_description: string | null
+          job_sheet_id: string
+          notes: string | null
+          outcome: string | null
+          position: number
+          tested: boolean | null
+          tested_by: string | null
+          wifi_cable: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          ir_bud?: boolean | null
+          item_description?: string | null
+          job_sheet_id: string
+          notes?: string | null
+          outcome?: string | null
+          position: number
+          tested?: boolean | null
+          tested_by?: string | null
+          wifi_cable?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          ir_bud?: boolean | null
+          item_description?: string | null
+          job_sheet_id?: string
+          notes?: string | null
+          outcome?: string | null
+          position?: number
+          tested?: boolean | null
+          tested_by?: string | null
+          wifi_cable?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_sheet_tests_job_sheet_id_fkey"
+            columns: ["job_sheet_id"]
+            isOneToOne: false
+            referencedRelation: "job_sheets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheet_tests_tested_by_fkey"
+            columns: ["tested_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_sheets: {
+        Row: {
+          added_to_uxg_account: boolean | null
+          cms_name: string | null
+          created_at: string | null
+          created_by: string | null
+          defects: boolean | null
+          defects_detail: string | null
+          defects_photo: boolean | null
+          id: string
+          job_description: string | null
+          licence_added: boolean | null
+          linked_job_id: string | null
+          missing_items: boolean | null
+          missing_items_detail: string | null
+          missing_items_photo: boolean | null
+          other_issues: boolean | null
+          other_issues_detail: string | null
+          other_issues_photo: boolean | null
+          other_parts_used: boolean | null
+          other_parts_used_detail: string | null
+          other_parts_used_photo: boolean | null
+          packed_correctly: boolean | null
+          packed_correctly_detail: string | null
+          packed_correctly_photo: boolean | null
+          project_id: string | null
+          proposed_install_date: string | null
+          reference: string
+          signed_off_at: string | null
+          signed_off_by: string | null
+          site_id: string
+          software_notes: string | null
+          status: Database["public"]["Enums"]["job_sheet_status"]
+          teamviewer_added: boolean | null
+          updated_at: string | null
+          work_area_tidy: boolean | null
+        }
+        Insert: {
+          added_to_uxg_account?: boolean | null
+          cms_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          defects?: boolean | null
+          defects_detail?: string | null
+          defects_photo?: boolean | null
+          id?: string
+          job_description?: string | null
+          licence_added?: boolean | null
+          linked_job_id?: string | null
+          missing_items?: boolean | null
+          missing_items_detail?: string | null
+          missing_items_photo?: boolean | null
+          other_issues?: boolean | null
+          other_issues_detail?: string | null
+          other_issues_photo?: boolean | null
+          other_parts_used?: boolean | null
+          other_parts_used_detail?: string | null
+          other_parts_used_photo?: boolean | null
+          packed_correctly?: boolean | null
+          packed_correctly_detail?: string | null
+          packed_correctly_photo?: boolean | null
+          project_id?: string | null
+          proposed_install_date?: string | null
+          reference: string
+          signed_off_at?: string | null
+          signed_off_by?: string | null
+          site_id: string
+          software_notes?: string | null
+          status?: Database["public"]["Enums"]["job_sheet_status"]
+          teamviewer_added?: boolean | null
+          updated_at?: string | null
+          work_area_tidy?: boolean | null
+        }
+        Update: {
+          added_to_uxg_account?: boolean | null
+          cms_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          defects?: boolean | null
+          defects_detail?: string | null
+          defects_photo?: boolean | null
+          id?: string
+          job_description?: string | null
+          licence_added?: boolean | null
+          linked_job_id?: string | null
+          missing_items?: boolean | null
+          missing_items_detail?: string | null
+          missing_items_photo?: boolean | null
+          other_issues?: boolean | null
+          other_issues_detail?: string | null
+          other_issues_photo?: boolean | null
+          other_parts_used?: boolean | null
+          other_parts_used_detail?: string | null
+          other_parts_used_photo?: boolean | null
+          packed_correctly?: boolean | null
+          packed_correctly_detail?: string | null
+          packed_correctly_photo?: boolean | null
+          project_id?: string | null
+          proposed_install_date?: string | null
+          reference?: string
+          signed_off_at?: string | null
+          signed_off_by?: string | null
+          site_id?: string
+          software_notes?: string | null
+          status?: Database["public"]["Enums"]["job_sheet_status"]
+          teamviewer_added?: boolean | null
+          updated_at?: string | null
+          work_area_tidy?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_sheets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheets_linked_job_id_fkey"
+            columns: ["linked_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheets_signed_off_by_fkey"
+            columns: ["signed_off_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheets_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_tasks: {
         Row: {
           created_at: string | null
@@ -1262,6 +1466,85 @@ export type Database = {
           },
         ]
       }
+      stock_items: {
+        Row: {
+          damage_notes: string | null
+          damaged: boolean
+          firmware_update: string | null
+          id: string
+          image_path: string | null
+          job_sheet_id: string
+          manufacturer: string | null
+          model: string | null
+          received_at: string | null
+          received_by: string | null
+          serial_no: string | null
+          status: Database["public"]["Enums"]["stock_item_status"]
+          tested: boolean
+          tested_at: string | null
+          tested_by: string | null
+          warranty_end: string | null
+        }
+        Insert: {
+          damage_notes?: string | null
+          damaged?: boolean
+          firmware_update?: string | null
+          id?: string
+          image_path?: string | null
+          job_sheet_id: string
+          manufacturer?: string | null
+          model?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          serial_no?: string | null
+          status?: Database["public"]["Enums"]["stock_item_status"]
+          tested?: boolean
+          tested_at?: string | null
+          tested_by?: string | null
+          warranty_end?: string | null
+        }
+        Update: {
+          damage_notes?: string | null
+          damaged?: boolean
+          firmware_update?: string | null
+          id?: string
+          image_path?: string | null
+          job_sheet_id?: string
+          manufacturer?: string | null
+          model?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          serial_no?: string | null
+          status?: Database["public"]["Enums"]["stock_item_status"]
+          tested?: boolean
+          tested_at?: string | null
+          tested_by?: string | null
+          warranty_end?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_items_job_sheet_id_fkey"
+            columns: ["job_sheet_id"]
+            isOneToOne: false
+            referencedRelation: "job_sheets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_items_received_by_fkey"
+            columns: ["received_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_items_tested_by_fkey"
+            columns: ["tested_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       survey_forms: {
         Row: {
           access_restrictions: string | null
@@ -1369,6 +1652,13 @@ export type Database = {
     Enums: {
       equipment_damage_status: "na" | "yes" | "accidental" | "customer"
       kb_article_status: "draft" | "pending_review" | "published" | "declined"
+      job_sheet_status:
+        | "building"
+        | "receiving"
+        | "configuring"
+        | "ready"
+        | "assigned"
+        | "complete"
       job_status:
         | "draft"
         | "provisional"
@@ -1387,7 +1677,8 @@ export type Database = {
         | "revisit"
       pass_fail: "pass" | "fail" | "na"
       qa_status: "pending" | "approved" | "rejected"
-      user_role: "superadmin" | "manager" | "engineer"
+      stock_item_status: "received" | "configured" | "installed" | "returned"
+      user_role: "superadmin" | "manager" | "engineer" | "warehouse"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1519,6 +1810,14 @@ export const Constants = {
   public: {
     Enums: {
       equipment_damage_status: ["na", "yes", "accidental", "customer"],
+      job_sheet_status: [
+        "building",
+        "receiving",
+        "configuring",
+        "ready",
+        "assigned",
+        "complete",
+      ],
       job_status: [
         "draft",
         "provisional",
@@ -1538,7 +1837,8 @@ export const Constants = {
       ],
       pass_fail: ["pass", "fail", "na"],
       qa_status: ["pending", "approved", "rejected"],
-      user_role: ["superadmin", "manager", "engineer"],
+      stock_item_status: ["received", "configured", "installed", "returned"],
+      user_role: ["superadmin", "manager", "engineer", "warehouse"],
     },
   },
 } as const
