@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setStockItemTested } from "./actions";
 
@@ -11,16 +11,22 @@ import { setStockItemTested } from "./actions";
  * `tested` prop: a plain server-bound checkbox snaps back to unchecked
  * the instant it's clicked (React re-renders with the still-stale prop
  * before the save round-trips and router.refresh() delivers the new
- * value), which reads as the click not registering. The effect re-syncs
- * once the server value actually changes; a failed save reverts.
+ * value), which reads as the click not registering. `prevTested` mirrors
+ * React's documented "adjusting state when a prop changes" pattern
+ * (resetting during render, not in a useEffect) so it re-syncs once the
+ * server value actually changes; a failed save reverts immediately.
  */
 export function StockItemTestedControl({ stockItemId, jobSheetId, tested }: { stockItemId: string; jobSheetId: string; tested: boolean }) {
   const router = useRouter();
   const [checked, setChecked] = useState(tested);
+  const [prevTested, setPrevTested] = useState(tested);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  useEffect(() => setChecked(tested), [tested]);
+  if (tested !== prevTested) {
+    setPrevTested(tested);
+    setChecked(tested);
+  }
 
   function handleToggle(next: boolean) {
     setChecked(next);
