@@ -1473,7 +1473,7 @@ export type Database = {
           firmware_update: string | null
           id: string
           image_path: string | null
-          job_sheet_id: string
+          job_sheet_id: string | null
           manufacturer: string | null
           model: string | null
           received_at: string | null
@@ -1491,7 +1491,7 @@ export type Database = {
           firmware_update?: string | null
           id?: string
           image_path?: string | null
-          job_sheet_id: string
+          job_sheet_id?: string | null
           manufacturer?: string | null
           model?: string | null
           received_at?: string | null
@@ -1509,7 +1509,7 @@ export type Database = {
           firmware_update?: string | null
           id?: string
           image_path?: string | null
-          job_sheet_id?: string
+          job_sheet_id?: string | null
           manufacturer?: string | null
           model?: string | null
           received_at?: string | null
