@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { createClient } from "@/lib/supabase/client";
 import {
   showsFixtureType,
   showsJobInformation,
@@ -180,6 +181,7 @@ export function JobDetailsPanel({
           <span className="text-muted-foreground text-xs">Parking permit</span>
           <div className="flex items-center gap-2">
             <span className="text-sm">{jobDetails?.parking_permit_storage_path ? "Attached" : "Not attached"}</span>
+            {jobDetails?.parking_permit_storage_path && <ViewDocumentButton storagePath={jobDetails.parking_permit_storage_path} />}
             <input
               ref={parkingPermitInputRef}
               type="file"
@@ -223,6 +225,7 @@ export function JobDetailsPanel({
               <span className="text-muted-foreground text-xs">RAMS</span>
               <div className="flex items-center gap-2">
                 <span className="text-sm">{jobDetails?.rams_storage_path ? "Attached" : "Not attached"}</span>
+                {jobDetails?.rams_storage_path && <ViewDocumentButton storagePath={jobDetails.rams_storage_path} />}
                 <input ref={ramsInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={() => handleUpload("rams", ramsInputRef.current)} />
                 <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => ramsInputRef.current?.click()}>
                   Upload
@@ -236,6 +239,7 @@ export function JobDetailsPanel({
               <span className="text-muted-foreground text-xs">Site plan</span>
               <div className="flex items-center gap-2">
                 <span className="text-sm">{jobDetails?.site_plan_storage_path ? "Attached" : "Not attached"}</span>
+                {jobDetails?.site_plan_storage_path && <ViewDocumentButton storagePath={jobDetails.site_plan_storage_path} />}
                 <input ref={sitePlanInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={() => handleUpload("site_plan", sitePlanInputRef.current)} />
                 <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => sitePlanInputRef.current?.click()}>
                   Upload
@@ -249,6 +253,7 @@ export function JobDetailsPanel({
               <span className="text-muted-foreground text-xs">Design pack</span>
               <div className="flex items-center gap-2">
                 <span className="text-sm">{jobDetails?.design_pack_storage_path ? "Attached" : "Not attached"}</span>
+                {jobDetails?.design_pack_storage_path && <ViewDocumentButton storagePath={jobDetails.design_pack_storage_path} />}
                 <input ref={designPackInputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={() => handleUpload("design_pack", designPackInputRef.current)} />
                 <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => designPackInputRef.current?.click()}>
                   Upload
@@ -329,5 +334,38 @@ export function JobDetailsPanel({
 
       {message && <p className="text-muted-foreground text-sm">{message}</p>}
     </section>
+  );
+}
+
+/**
+ * Office previously showed "Attached"/"Not attached" with no way to
+ * actually open the file — same gap the field app had (see
+ * job-workflow.tsx's DocumentLink). Same on-demand signed-URL pattern:
+ * fetched only when clicked, not pre-generated on every load.
+ */
+function ViewDocumentButton({ storagePath }: { storagePath: string }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleView() {
+    setIsLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: urlError } = await supabase.storage.from("media").createSignedUrl(storagePath, 3600);
+    setIsLoading(false);
+    if (urlError || !data) {
+      setError("Couldn't open this.");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <span className="flex items-center gap-1">
+      <Button type="button" size="sm" variant="outline" disabled={isLoading} onClick={handleView}>
+        {isLoading ? "Opening…" : "View"}
+      </Button>
+      {error && <span className="text-destructive text-xs">{error}</span>}
+    </span>
   );
 }

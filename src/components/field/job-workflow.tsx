@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { createClient } from "@/lib/supabase/client";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import { db, type ClientSlaReasonRow, type InstallFormRow, type JobDetailsRow, type MediaQueueItem, type StockItemRow } from "@/lib/offline/db";
 import { generateId } from "@/lib/offline/id";
@@ -741,8 +742,8 @@ function JobDetailsSection({
         </p>
         {showsRamsAndDesignPack(jobType) && (
           <>
-            <p className="text-sm">RAMS: {detailsRow?.rams_storage_path ? "Attached — view in office system" : "Not attached"}</p>
-            <p className="text-sm">Design pack: {detailsRow?.design_pack_storage_path ? "Attached — view in office system" : "Not attached"}</p>
+            <DocumentLink label="RAMS" storagePath={detailsRow?.rams_storage_path} />
+            <DocumentLink label="Design pack" storagePath={detailsRow?.design_pack_storage_path} />
           </>
         )}
         {site?.access_notes && (
@@ -752,7 +753,7 @@ function JobDetailsSection({
         )}
         {showsSiteplanAndEquipment(jobType) && (
           <>
-            <p className="text-sm">Site plan: {detailsRow?.site_plan_storage_path ? "Attached — view in office system" : "Not attached"}</p>
+            <DocumentLink label="Site plan" storagePath={detailsRow?.site_plan_storage_path} />
             {equipment.length > 0 && (
               <div className="mt-2">
                 <p className="text-sm font-medium">Equipment list</p>
@@ -820,9 +821,7 @@ function JobDetailsSection({
       <Field label="Parking considerations / restrictions">
         <Textarea value={values.parking_notes} onChange={(e) => setValues((v) => ({ ...v, parking_notes: e.target.value }))} />
       </Field>
-      <p className="text-sm">
-        Parking permit: {detailsRow?.parking_permit_storage_path ? "Attached — view in office system" : "Not attached"}
-      </p>
+      <DocumentLink label="Parking permit" storagePath={detailsRow?.parking_permit_storage_path} />
 
       <Field label="Reported to site manager">
         <YesNoButtons value={values.reported_to_site_manager} onChange={(v) => setValues((prev) => ({ ...prev, reported_to_site_manager: v }))} />
@@ -1031,6 +1030,52 @@ function YesNoButtons({ value, onChange }: { value: boolean; onChange: (value: b
         No
       </Button>
     </div>
+  );
+}
+
+/**
+ * RAMS/site plan/design pack/parking permit — uploaded by Office
+ * (job-details-panel.tsx) straight into the same "media" bucket as job
+ * photos, so the existing media_objects_select RLS policy (readable
+ * wherever the parent job is) already covers an engineer viewing their
+ * own job's paperwork — no migration needed, this was purely a missing
+ * link. Same on-demand signed-URL pattern as the Knowledge Base's own
+ * attachments (knowledge-base-view.tsx): fetched only when actually
+ * opened, not pre-generated for every job detail load.
+ */
+function DocumentLink({ label, storagePath }: { label: string; storagePath: string | null | undefined }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleView() {
+    if (!storagePath) return;
+    setIsLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: urlError } = await supabase.storage.from("media").createSignedUrl(storagePath, 3600);
+    setIsLoading(false);
+    if (urlError || !data) {
+      setError("Couldn't open this — check you're online and try again.");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <p className="text-sm">
+      {label}:{" "}
+      {storagePath ? (
+        <>
+          Attached —{" "}
+          <button type="button" onClick={handleView} disabled={isLoading} className="underline-offset-2 hover:underline">
+            {isLoading ? "Opening…" : "View"}
+          </button>
+          {error && <span className="text-destructive ml-2 text-xs">{error}</span>}
+        </>
+      ) : (
+        "Not attached"
+      )}
+    </p>
   );
 }
 
