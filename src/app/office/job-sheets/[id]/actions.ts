@@ -2,8 +2,30 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
 export type ActionResult = { ok: true } | { ok: false; message: string };
+
+/**
+ * Permanently deletes a Job Sheet and, via on-delete-cascade, every
+ * Stock Item and test result still linked to it — deliberate, per the
+ * product decision that a sheet created ahead of a job that then falls
+ * through (cancelled before any stock arrived, or a duplicate) should be
+ * removable outright, same as deleting a Job removes its own history.
+ * RLS (job_sheets_delete: superadmin/manager) is the real boundary.
+ */
+export async function deleteJobSheetAction(jobSheetId: string): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, message: "Not signed in." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("job_sheets").delete().eq("id", jobSheetId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/office/job-sheets");
+  revalidatePath("/office/stock");
+  return { ok: true };
+}
 
 /**
  * Links a Job Sheet to the job it's actually going out for, and moves it

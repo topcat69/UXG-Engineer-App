@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { humanize } from "@/lib/format/text";
 import { AssignToJobForm } from "./assign-to-job-form";
 import { ReassignStockItemControl } from "./reassign-stock-item-control";
+import { DeleteJobSheetButton } from "./delete-job-sheet-button";
 
 // Matches the TTL other pages use for their own signed URLs (see e.g.
 // office/knowledge-base/[id]/page.tsx) — this page is loaded fresh on every
@@ -83,7 +84,10 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
             {jobSheet.site?.client?.name ?? "—"} · {jobSheet.site?.name ?? "—"} · {jobSheet.project?.name ?? "—"}
           </p>
         </div>
-        <Badge variant="secondary">{humanize(jobSheet.status)}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">{humanize(jobSheet.status)}</Badge>
+          <DeleteJobSheetButton jobSheetId={jobSheet.id} reference={jobSheet.reference} />
+        </div>
       </div>
 
       {jobSheet.job_description && <p className="text-sm">{jobSheet.job_description}</p>}
