@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { BarcodeScanButton } from "@/components/field/barcode-scan-button";
+import { parseStockQrCode } from "@/lib/stock/parse-stock-qr";
 import { addStockItem } from "./actions";
 
 const OTHER = "__other__";
@@ -15,14 +16,16 @@ export function AddStockItemForm({
 }: {
   jobSheetId: string;
   manufacturers: { id: string; name: string }[];
-  models: { id: string; name: string; manufacturer_id: string }[];
+  models: { id: string; name: string; manufacturer_id: string; description: string | null }[];
 }) {
   const router = useRouter();
   const [manufacturerChoice, setManufacturerChoice] = useState("");
   const [manufacturerOther, setManufacturerOther] = useState("");
   const [modelChoice, setModelChoice] = useState("");
   const [modelOther, setModelOther] = useState("");
+  const [description, setDescription] = useState("");
   const [serialNo, setSerialNo] = useState("");
+  const [hwId, setHwId] = useState("");
   const [firmwareUpdate, setFirmwareUpdate] = useState("");
   const [tested, setTested] = useState(false);
   const [damaged, setDamaged] = useState(false);
@@ -41,11 +44,51 @@ export function AddStockItemForm({
     setManufacturerOther("");
     setModelChoice("");
     setModelOther("");
+    setDescription("");
     setSerialNo("");
+    setHwId("");
     setFirmwareUpdate("");
     setTested(false);
     setDamaged(false);
     setDamageNotes("");
+  }
+
+  /**
+   * The label QR on a lot of AV kit packs Model/Serial/H-W ID together
+   * (see parse-stock-qr.ts) — a scan here fills all three, plus looks the
+   * model up against the Stock Catalog already loaded into this form:
+   * matched -> Manufacturer/Model/Description auto-fill from the catalog;
+   * unmatched -> Manufacturer drops to "Other…" and Model is pre-filled
+   * with the scanned text so the warehouse only has to type the
+   * manufacturer (and optionally a description) once — addStockItem then
+   * registers that combination in the catalog for next time. A plain
+   * barcode with no comma-delimited payload just falls back to today's
+   * behaviour: the raw value goes straight into Serial no.
+   */
+  function handleScan(rawValue: string) {
+    const parsed = parseStockQrCode(rawValue);
+    if (!parsed) {
+      setSerialNo(rawValue);
+      return;
+    }
+
+    setSerialNo(parsed.serialNo);
+    setHwId(parsed.hwId);
+
+    const matchedModel = models.find((m) => m.name.trim().toLowerCase() === parsed.model.trim().toLowerCase());
+    if (matchedModel) {
+      const matchedManufacturer = manufacturers.find((m) => m.id === matchedModel.manufacturer_id);
+      setManufacturerChoice(matchedManufacturer?.id ?? OTHER);
+      setModelChoice(matchedModel.id);
+      setModelOther(parsed.model);
+      setDescription(matchedModel.description ?? "");
+    } else {
+      setManufacturerChoice(OTHER);
+      setManufacturerOther("");
+      setModelChoice("");
+      setModelOther(parsed.model);
+      setDescription("");
+    }
   }
 
   function handleAdd() {
@@ -56,7 +99,18 @@ export function AddStockItemForm({
         : (modelsForManufacturer.find((m) => m.id === modelChoice)?.name ?? "");
 
     startTransition(async () => {
-      const result = await addStockItem(jobSheetId, manufacturer, model, serialNo, firmwareUpdate, tested, damaged, damageNotes);
+      const result = await addStockItem(
+        jobSheetId,
+        manufacturer,
+        model,
+        description,
+        serialNo,
+        hwId,
+        firmwareUpdate,
+        tested,
+        damaged,
+        damageNotes,
+      );
       if (result.ok) {
         reset();
         setMessage(null);
@@ -113,7 +167,10 @@ export function AddStockItemForm({
             <>
               <select
                 value={modelChoice}
-                onChange={(e) => setModelChoice(e.target.value)}
+                onChange={(e) => {
+                  setModelChoice(e.target.value);
+                  setDescription(modelsForManufacturer.find((m) => m.id === e.target.value)?.description ?? "");
+                }}
                 disabled={!selectedManufacturer}
                 className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
               >
@@ -138,6 +195,16 @@ export function AddStockItemForm({
           )}
         </div>
         <div className="flex flex-col gap-1">
+          <label className="text-muted-foreground text-xs">Description</label>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="e.g. Sony Bravia 55&quot; 4K Screen"
+            className="border-input h-9 w-56 rounded-md border bg-transparent px-2 text-sm"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
           <label className="text-muted-foreground text-xs">Serial no.</label>
           <div className="flex items-center gap-2">
             <input
@@ -147,8 +214,18 @@ export function AddStockItemForm({
               placeholder="Scan, or type if no barcode"
               className="border-input h-9 w-48 rounded-md border bg-transparent px-2 text-sm"
             />
-            <BarcodeScanButton onScan={(value) => setSerialNo(value)} />
+            <BarcodeScanButton onScan={handleScan} />
           </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-muted-foreground text-xs">H/W ID</label>
+          <input
+            type="text"
+            value={hwId}
+            onChange={(e) => setHwId(e.target.value)}
+            placeholder="Scan, or type"
+            className="border-input h-9 w-40 rounded-md border bg-transparent px-2 text-sm"
+          />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-muted-foreground text-xs">Firmware / update</label>

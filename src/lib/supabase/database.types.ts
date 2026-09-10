@@ -1470,7 +1470,9 @@ export type Database = {
         Row: {
           damage_notes: string | null
           damaged: boolean
+          description: string | null
           firmware_update: string | null
+          hw_id: string | null
           id: string
           image_path: string | null
           job_sheet_id: string | null
@@ -1488,7 +1490,9 @@ export type Database = {
         Insert: {
           damage_notes?: string | null
           damaged?: boolean
+          description?: string | null
           firmware_update?: string | null
+          hw_id?: string | null
           id?: string
           image_path?: string | null
           job_sheet_id?: string | null
@@ -1506,7 +1510,9 @@ export type Database = {
         Update: {
           damage_notes?: string | null
           damaged?: boolean
+          description?: string | null
           firmware_update?: string | null
+          hw_id?: string | null
           id?: string
           image_path?: string | null
           job_sheet_id?: string | null
@@ -1566,18 +1572,21 @@ export type Database = {
       stock_models: {
         Row: {
           created_at: string | null
+          description: string | null
           id: string
           manufacturer_id: string
           name: string
         }
         Insert: {
           created_at?: string | null
+          description?: string | null
           id?: string
           manufacturer_id: string
           name: string
         }
         Update: {
           created_at?: string | null
+          description?: string | null
           id?: string
           manufacturer_id?: string
           name?: string

@@ -44,7 +44,7 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
         .single(),
       supabase
         .from("stock_items")
-        .select("id, manufacturer, model, serial_no, firmware_update, tested, damaged, received_at, image_path")
+        .select("id, manufacturer, model, description, serial_no, hw_id, firmware_update, tested, damaged, received_at, image_path")
         .eq("job_sheet_id", id)
         .order("received_at", { ascending: false }),
       supabase
@@ -53,7 +53,7 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
         .eq("job_sheet_id", id)
         .order("position", { ascending: true }),
       supabase.from("stock_manufacturers").select("id, name").order("name"),
-      supabase.from("stock_models").select("id, name, manufacturer_id").order("name"),
+      supabase.from("stock_models").select("id, name, manufacturer_id, description").order("name"),
     ]);
 
   if (jobSheetError || !jobSheet) notFound();
@@ -93,7 +93,9 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
             <TableRow>
               <TableHead>Manufacturer</TableHead>
               <TableHead>Model</TableHead>
+              <TableHead>Description</TableHead>
               <TableHead>Serial no.</TableHead>
+              <TableHead>H/W ID</TableHead>
               <TableHead>Firmware</TableHead>
               <TableHead>Tested</TableHead>
               <TableHead>Damaged</TableHead>
@@ -104,7 +106,7 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
           <TableBody>
             {stockItemsWithPhotoUrls.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-muted-foreground text-center">
+                <TableCell colSpan={10} className="text-muted-foreground text-center">
                   Nothing scanned in yet.
                 </TableCell>
               </TableRow>
@@ -113,7 +115,9 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
               <TableRow key={item.id}>
                 <TableCell>{item.manufacturer ?? "—"}</TableCell>
                 <TableCell>{item.model ?? "—"}</TableCell>
+                <TableCell>{item.description ?? "—"}</TableCell>
                 <TableCell>{item.serial_no ?? "—"}</TableCell>
+                <TableCell>{item.hw_id ?? "—"}</TableCell>
                 <TableCell>{item.firmware_update ?? "—"}</TableCell>
                 <TableCell>{item.tested ? "Yes" : "No"}</TableCell>
                 <TableCell>{item.damaged ? <Badge variant="destructive">Damaged</Badge> : "No"}</TableCell>

@@ -24,6 +24,60 @@ async function bumpToConfiguring(supabase: SupabaseServerClient, jobSheetId: str
 }
 
 /**
+ * Registers a scanned manufacturer/model combination into the Stock
+ * Catalog when it isn't there yet, so the *next* scan of that same model
+ * auto-fills instead of dropping to "Other…" again (see
+ * add-stock-item-form.tsx's handleScan). Case-insensitive lookup on both
+ * levels — "Sony" and "sony" typed on two different goods-in runs must
+ * resolve to the same catalog row, since stock_manufacturers/stock_models'
+ * own unique constraints are case-sensitive and won't catch that. Only
+ * fills in a model's description if it doesn't have one yet — never
+ * overwrites a description someone's already curated on the Stock
+ * Catalog page with whatever was typed in a rush during goods-in.
+ */
+async function ensureCatalogEntry(
+  supabase: SupabaseServerClient,
+  manufacturer: string,
+  model: string,
+  description: string,
+): Promise<void> {
+  if (!manufacturer || !model) return;
+
+  let manufacturerId: string;
+  const { data: existingManufacturer } = await supabase
+    .from("stock_manufacturers")
+    .select("id")
+    .ilike("name", manufacturer)
+    .maybeSingle();
+  if (existingManufacturer) {
+    manufacturerId = existingManufacturer.id;
+  } else {
+    const { data: created, error } = await supabase.from("stock_manufacturers").insert({ name: manufacturer }).select("id").single();
+    if (error || !created) {
+      // Lost a race with a concurrent insert of the same name — fall back to
+      // whatever's there now rather than failing the whole goods-in scan.
+      const { data: retry } = await supabase.from("stock_manufacturers").select("id").ilike("name", manufacturer).maybeSingle();
+      if (!retry) return;
+      manufacturerId = retry.id;
+    } else {
+      manufacturerId = created.id;
+    }
+  }
+
+  const { data: existingModel } = await supabase
+    .from("stock_models")
+    .select("id, description")
+    .eq("manufacturer_id", manufacturerId)
+    .ilike("name", model)
+    .maybeSingle();
+  if (!existingModel) {
+    await supabase.from("stock_models").insert({ manufacturer_id: manufacturerId, name: model, description: description || null });
+  } else if (!existingModel.description && description) {
+    await supabase.from("stock_models").update({ description }).eq("id", existingModel.id);
+  }
+}
+
+/**
  * One call per unit — a delivery of 10 screens is 10 calls, each landing
  * straight on this Job Sheet (see the proposal's flow diagram). The first
  * item received on a still-"Building" sheet moves it to "Receiving";
@@ -35,7 +89,9 @@ export async function addStockItem(
   jobSheetId: string,
   manufacturer: string,
   model: string,
+  description: string,
   serialNo: string,
+  hwId: string,
   firmwareUpdate: string,
   tested: boolean,
   damaged: boolean,
@@ -46,12 +102,17 @@ export async function addStockItem(
 
   const supabase = await createClient();
   const now = new Date().toISOString();
+  const trimmedManufacturer = manufacturer.trim();
+  const trimmedModel = model.trim();
+  const trimmedDescription = description.trim();
 
   const { error } = await supabase.from("stock_items").insert({
     job_sheet_id: jobSheetId,
-    manufacturer: manufacturer.trim() || null,
-    model: model.trim() || null,
+    manufacturer: trimmedManufacturer || null,
+    model: trimmedModel || null,
+    description: trimmedDescription || null,
     serial_no: serialNo.trim() || null,
+    hw_id: hwId.trim() || null,
     firmware_update: firmwareUpdate.trim() || null,
     tested,
     tested_at: tested ? now : null,
@@ -62,6 +123,8 @@ export async function addStockItem(
     received_at: now,
   });
   if (error) return { ok: false, message: error.message };
+
+  await ensureCatalogEntry(supabase, trimmedManufacturer, trimmedModel, trimmedDescription);
 
   const { data: jobSheet } = await supabase.from("job_sheets").select("status").eq("id", jobSheetId).single();
   if (jobSheet?.status === "building") {
