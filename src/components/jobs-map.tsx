@@ -65,7 +65,7 @@ function JobsMapInner({ markers }: { markers: JobMapMarker[] }) {
     <Map
       defaultCenter={points[0] ?? fallbackCenter}
       defaultZoom={6}
-      style={{ height: 420, width: "100%", borderRadius: "0.5rem" }}
+      style={{ height: 560, width: "100%", borderRadius: "0.5rem" }}
       gestureHandling="greedy"
       disableDefaultUI={false}
     >
@@ -104,7 +104,7 @@ export default function JobsMap({ markers }: { markers: JobMapMarker[] }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     return (
-      <div className="bg-muted flex h-[420px] w-full items-center justify-center rounded-lg p-4 text-center">
+      <div className="bg-muted mx-auto flex h-[560px] w-full max-w-[480px] items-center justify-center rounded-lg p-4 text-center">
         <p className="text-muted-foreground text-sm">
           Map unavailable — set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable Google Maps.
         </p>
@@ -112,9 +112,14 @@ export default function JobsMap({ markers }: { markers: JobMapMarker[] }) {
     );
   }
 
+  // Capped and centered rather than stretched across the full card width —
+  // this is a "where roughly are today's jobs" glance, not a navigable map,
+  // so a taller, narrower box reads better than a short wide strip.
   return (
-    <APIProvider apiKey={apiKey}>
-      <JobsMapInner markers={markers} />
-    </APIProvider>
+    <div className="mx-auto max-w-[480px]">
+      <APIProvider apiKey={apiKey}>
+        <JobsMapInner markers={markers} />
+      </APIProvider>
+    </div>
   );
 }
