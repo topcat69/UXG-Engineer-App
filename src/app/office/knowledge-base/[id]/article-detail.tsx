@@ -267,7 +267,7 @@ export function ArticleDetail({
           </ul>
         )}
         <div className="flex items-center gap-2">
-          <input ref={fileInputRef} type="file" accept="application/pdf,video/*" className="text-sm" />
+          <input ref={fileInputRef} type="file" accept="application/pdf,image/*,video/*" className="text-sm" />
           <Button type="button" size="sm" variant="outline" disabled={isUploading} onClick={handleUpload}>
             {isUploading ? "Uploading…" : "Upload"}
           </Button>
