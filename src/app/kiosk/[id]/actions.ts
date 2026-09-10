@@ -246,6 +246,80 @@ export async function updateClosingChecklist(jobSheetId: string, input: ClosingC
   return { ok: true };
 }
 
+/**
+ * A unit often isn't actually powered on and checked until Configuring,
+ * not at the goods-in scan itself (Decision 7: stages don't lock each
+ * other out) — so Tested has to be editable after the fact, not just a
+ * one-shot checkbox on AddStockItemForm. Ticking it stamps who/when, same
+ * as addStockItem does at insert time; unticking clears both, since an
+ * un-tested item shouldn't keep a stale tester/timestamp around.
+ */
+export async function setStockItemTested(stockItemId: string, jobSheetId: string, tested: boolean): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, message: "Not signed in." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("stock_items")
+    .update({
+      tested,
+      tested_at: tested ? new Date().toISOString() : null,
+      tested_by: tested ? user.id : null,
+    })
+    .eq("id", stockItemId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/kiosk/${jobSheetId}`);
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  return { ok: true };
+}
+
+/**
+ * Corrects a mis-scanned or mis-typed item in place, rather than deleting
+ * and re-adding it — keeps the same row (and its photo/Tested state) intact.
+ * Re-runs ensureCatalogEntry same as addStockItem, so fixing a typo'd
+ * manufacturer/model here also corrects (or extends) the Stock Catalog
+ * entry it registered at goods-in.
+ */
+export async function updateStockItem(
+  stockItemId: string,
+  jobSheetId: string,
+  manufacturer: string,
+  model: string,
+  description: string,
+  serialNo: string,
+  hwId: string,
+  firmwareUpdate: string,
+  damaged: boolean,
+  damageNotes: string,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const trimmedManufacturer = manufacturer.trim();
+  const trimmedModel = model.trim();
+  const trimmedDescription = description.trim();
+
+  const { error } = await supabase
+    .from("stock_items")
+    .update({
+      manufacturer: trimmedManufacturer || null,
+      model: trimmedModel || null,
+      description: trimmedDescription || null,
+      serial_no: serialNo.trim() || null,
+      hw_id: hwId.trim() || null,
+      firmware_update: firmwareUpdate.trim() || null,
+      damaged,
+      damage_notes: damaged ? damageNotes.trim() || null : null,
+    })
+    .eq("id", stockItemId);
+  if (error) return { ok: false, message: error.message };
+
+  await ensureCatalogEntry(supabase, trimmedManufacturer, trimmedModel, trimmedDescription);
+
+  revalidatePath(`/kiosk/${jobSheetId}`);
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  return { ok: true };
+}
+
 export type UploadStockItemPhotoResult = { ok: true; imagePath: string } | { ok: false; message: string };
 
 /**

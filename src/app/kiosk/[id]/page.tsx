@@ -10,7 +10,7 @@ import { SoftwareSetupForm } from "./software-setup-form";
 import { ClosingChecklistForm } from "./closing-checklist-form";
 import { toItem } from "./checklist-item";
 import { SignOffPanel } from "./sign-off-panel";
-import { StockItemPhotoControl } from "./stock-item-photo-control";
+import { StockItemRow } from "./stock-item-row";
 
 // Matches the TTL other pages use for their own signed URLs (see e.g.
 // office/knowledge-base/[id]/page.tsx) — this page is loaded fresh on every
@@ -44,7 +44,9 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
         .single(),
       supabase
         .from("stock_items")
-        .select("id, manufacturer, model, description, serial_no, hw_id, firmware_update, tested, damaged, received_at, image_path")
+        .select(
+          "id, manufacturer, model, description, serial_no, hw_id, firmware_update, tested, damaged, damage_notes, received_at, image_path",
+        )
         .eq("job_sheet_id", id)
         .order("received_at", { ascending: false }),
       supabase
@@ -101,36 +103,19 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
               <TableHead>Damaged</TableHead>
               <TableHead>Received</TableHead>
               <TableHead>Photo</TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {stockItemsWithPhotoUrls.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10} className="text-muted-foreground text-center">
+                <TableCell colSpan={11} className="text-muted-foreground text-center">
                   Nothing scanned in yet.
                 </TableCell>
               </TableRow>
             )}
             {stockItemsWithPhotoUrls.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{item.manufacturer ?? "—"}</TableCell>
-                <TableCell>{item.model ?? "—"}</TableCell>
-                <TableCell>{item.description ?? "—"}</TableCell>
-                <TableCell>{item.serial_no ?? "—"}</TableCell>
-                <TableCell>{item.hw_id ?? "—"}</TableCell>
-                <TableCell>{item.firmware_update ?? "—"}</TableCell>
-                <TableCell>{item.tested ? "Yes" : "No"}</TableCell>
-                <TableCell>{item.damaged ? <Badge variant="destructive">Damaged</Badge> : "No"}</TableCell>
-                <TableCell>{item.received_at ? new Date(item.received_at).toLocaleString() : "—"}</TableCell>
-                <TableCell>
-                  <StockItemPhotoControl
-                    stockItemId={item.id}
-                    jobSheetId={jobSheet.id}
-                    imagePath={item.image_path}
-                    imageUrl={item.imageUrl}
-                  />
-                </TableCell>
-              </TableRow>
+              <StockItemRow key={item.id} item={item} jobSheetId={jobSheet.id} manufacturers={manufacturers ?? []} models={models ?? []} />
             ))}
           </TableBody>
         </Table>
