@@ -17,6 +17,7 @@ export type UserRow = {
   phone: string | null;
   company: string | null;
   max_jobs_per_day: number | null;
+  allow_password_login: boolean;
 };
 export type CreateUserResult = { ok: true; user: UserRow } | { ok: false; message: string };
 export type UpdateUserResult = { ok: true; user: UserRow } | { ok: false; message: string };
@@ -63,7 +64,7 @@ export async function createUser(name: string, email: string, role: UserRole): P
     .from("users")
     .update({ name: trimmedName, role })
     .eq("id", created.user.id)
-    .select("id, name, email, role, active, phone, company, max_jobs_per_day")
+    .select("id, name, email, role, active, phone, company, max_jobs_per_day, allow_password_login")
     .single();
   if (updateError) return { ok: false, message: updateError.message };
 
@@ -82,7 +83,7 @@ export async function setUserActive(userId: string, active: boolean): Promise<Up
     .from("users")
     .update({ active })
     .eq("id", userId)
-    .select("id, name, email, role, active, phone, company, max_jobs_per_day")
+    .select("id, name, email, role, active, phone, company, max_jobs_per_day, allow_password_login")
     .single();
   if (error) return { ok: false, message: error.message };
 
@@ -101,7 +102,57 @@ export async function changeUserRole(userId: string, role: UserRole): Promise<Up
     .from("users")
     .update({ role })
     .eq("id", userId)
-    .select("id, name, email, role, active, phone, company, max_jobs_per_day")
+    .select("id, name, email, role, active, phone, company, max_jobs_per_day, allow_password_login")
+    .single();
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/office/users");
+  return { ok: true, user: updated };
+}
+
+/**
+ * Sets a real Supabase Auth password on the account and flips
+ * allow_password_login on in the same call — a password sitting on an
+ * account that's still opted out of password sign-in (see getCurrentUser)
+ * would just be dead weight, so there's no reason to split these into two
+ * steps. Superadmin only, stricter than canManage's manager-can-touch-
+ * engineers allowance: this is account security, not a profile field.
+ */
+export async function setUserPassword(userId: string, password: string): Promise<UpdateUserResult> {
+  const actor = await getCurrentUser();
+  if (!actor) return { ok: false, message: "Not signed in." };
+  if (actor.role !== "superadmin") return { ok: false, message: "Only a superadmin can set a password." };
+  if (password.length < 8) return { ok: false, message: "Password must be at least 8 characters." };
+
+  const admin = createAdminClient();
+  const { error: authError } = await admin.auth.admin.updateUserById(userId, { password });
+  if (authError) return { ok: false, message: authError.message };
+
+  const supabase = await createClient();
+  const { data: updated, error } = await supabase
+    .from("users")
+    .update({ allow_password_login: true })
+    .eq("id", userId)
+    .select("id, name, email, role, active, phone, company, max_jobs_per_day, allow_password_login")
+    .single();
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/office/users");
+  return { ok: true, user: updated };
+}
+
+/** Revokes password sign-in without touching the password itself — re-enabling later (setUserPassword) requires choosing a new one anyway. Superadmin only, same reasoning as setUserPassword. */
+export async function disablePasswordLogin(userId: string): Promise<UpdateUserResult> {
+  const actor = await getCurrentUser();
+  if (!actor) return { ok: false, message: "Not signed in." };
+  if (actor.role !== "superadmin") return { ok: false, message: "Only a superadmin can change this." };
+
+  const supabase = await createClient();
+  const { data: updated, error } = await supabase
+    .from("users")
+    .update({ allow_password_login: false })
+    .eq("id", userId)
+    .select("id, name, email, role, active, phone, company, max_jobs_per_day, allow_password_login")
     .single();
   if (error) return { ok: false, message: error.message };
 
@@ -216,7 +267,7 @@ export async function updateUser(userId: string, fields: EditableUserFields): Pr
       max_jobs_per_day: fields.max_jobs_per_day,
     })
     .eq("id", userId)
-    .select("id, name, email, role, active, phone, company, max_jobs_per_day")
+    .select("id, name, email, role, active, phone, company, max_jobs_per_day, allow_password_login")
     .single();
   if (updateError) return { ok: false, message: updateError.message };
 

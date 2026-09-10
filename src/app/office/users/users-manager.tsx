@@ -6,7 +6,16 @@ import { Button } from "@/components/ui/button";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import type { Database } from "@/lib/supabase/database.types";
 import { humanize } from "@/lib/format/text";
-import { changeUserRole, createUser, deleteUser, setUserActive, updateUser, type UserRow } from "./actions";
+import {
+  changeUserRole,
+  createUser,
+  deleteUser,
+  disablePasswordLogin,
+  setUserActive,
+  setUserPassword,
+  updateUser,
+  type UserRow,
+} from "./actions";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
 
@@ -42,6 +51,10 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
   const [editPhone, setEditPhone] = useState("");
   const [editCompany, setEditCompany] = useState("");
   const [editMaxJobsPerDay, setEditMaxJobsPerDay] = useState("");
+
+  const [passwordUserId, setPasswordUserId] = useState<string | null>(null);
+  const [passwordValue, setPasswordValue] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
 
   const creatableRoles = currentUser.role === "superadmin" ? ALL_ROLES : (["engineer"] as UserRole[]);
 
@@ -109,6 +122,48 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
     setEditingUserId(null);
   }
 
+  function handleStartPassword(userId: string) {
+    setPasswordUserId(userId);
+    setPasswordValue("");
+    setPasswordConfirm("");
+    setMessage(null);
+  }
+
+  function handleCancelPassword() {
+    setPasswordUserId(null);
+  }
+
+  function handleSavePassword() {
+    if (!passwordUserId) return;
+    if (passwordValue !== passwordConfirm) {
+      setMessage("Passwords don't match.");
+      return;
+    }
+    const userId = passwordUserId;
+    startTransition(async () => {
+      const result = await setUserPassword(userId, passwordValue);
+      if (result.ok) {
+        setUsers((prev) => prev.map((u) => (u.id === userId ? result.user : u)));
+        setPasswordUserId(null);
+        setMessage(`Password set for ${result.user.name} — they can now sign in with email + password.`);
+      } else {
+        setMessage(result.message);
+      }
+    });
+  }
+
+  function handleDisablePassword(u: UserRow) {
+    if (!window.confirm(`Turn off password sign-in for ${u.name}? They'll need Google sign-in (or a new password) to get back in.`)) return;
+    startTransition(async () => {
+      const result = await disablePasswordLogin(u.id);
+      if (result.ok) {
+        setUsers((prev) => prev.map((row) => (row.id === u.id ? result.user : row)));
+      } else {
+        setMessage(result.message);
+      }
+    });
+  }
+
   function handleSaveEdit() {
     if (!editingUserId) return;
     const userId = editingUserId;
@@ -138,6 +193,7 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
             <th className="py-2 font-medium">Email</th>
             <th className="py-2 font-medium">Role</th>
             <th className="py-2 font-medium">Status</th>
+            <th className="py-2 font-medium">Sign-in</th>
             <th className="py-2 font-medium">Actions</th>
           </tr>
         </thead>
@@ -169,6 +225,27 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
                 </td>
                 <td className="py-2">
                   <Badge variant={u.active ? "secondary" : "outline"}>{u.active ? "Active" : "Deactivated"}</Badge>
+                </td>
+                <td className="py-2">
+                  {currentUser.role === "superadmin" ? (
+                    <div className="flex items-center gap-2">
+                      <Badge variant={u.allow_password_login ? "secondary" : "outline"}>
+                        {u.allow_password_login ? "Password" : "Google only"}
+                      </Badge>
+                      <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleStartPassword(u.id)}>
+                        {u.allow_password_login ? "Reset" : "Set password"}
+                      </Button>
+                      {u.allow_password_login && (
+                        <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleDisablePassword(u)}>
+                          Turn off
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <Badge variant={u.allow_password_login ? "secondary" : "outline"}>
+                      {u.allow_password_login ? "Password" : "Google only"}
+                    </Badge>
+                  )}
                 </td>
                 <td className="py-2">
                   {manageable && (
@@ -204,6 +281,44 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
           })}
         </tbody>
       </table>
+
+      {passwordUserId && (
+        <section className="flex flex-col gap-3 rounded-md border p-3">
+          <h2 className="font-medium">Set password for {users.find((u) => u.id === passwordUserId)?.name}</h2>
+          <p className="text-muted-foreground text-xs">
+            For an account with no Google Workspace seat — a 3rd-party contractor, or a shared kiosk login. They&apos;ll
+            sign in with their email and this password instead of Google.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-muted-foreground text-xs">New password</label>
+              <input
+                type="password"
+                value={passwordValue}
+                onChange={(e) => setPasswordValue(e.target.value)}
+                autoComplete="new-password"
+                className="border-input h-9 w-48 rounded-md border bg-transparent px-2 text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-muted-foreground text-xs">Confirm</label>
+              <input
+                type="password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                autoComplete="new-password"
+                className="border-input h-9 w-48 rounded-md border bg-transparent px-2 text-sm"
+              />
+            </div>
+            <Button type="button" disabled={isPending || passwordValue.length < 8} onClick={handleSavePassword}>
+              Save password
+            </Button>
+            <Button type="button" variant="outline" disabled={isPending} onClick={handleCancelPassword}>
+              Cancel
+            </Button>
+          </div>
+        </section>
+      )}
 
       {editingUserId && (
         <section className="flex flex-col gap-3 rounded-md border p-3">

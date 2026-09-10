@@ -1,6 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isSignInAllowedUnderSso } from "@/lib/auth/sso-policy";
 import type { Database } from "@/lib/supabase/database.types";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
@@ -26,7 +27,11 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data, error } = await supabase.from("users").select("id, email, name, role, active, theme").eq("id", user.id).single();
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, email, name, role, active, theme, allow_password_login")
+    .eq("id", user.id)
+    .single();
   // A real query failure (e.g. a column this select expects, like `theme`,
   // missing because a migration hasn't been deployed yet) looks identical
   // to "not signed in" to every caller here — every one of them redirects
@@ -43,7 +48,13 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   // local dev, CI, and any environment without Google OAuth configured in
   // Supabase keep working on magic link for every role). A non-OAuth
   // session on a non-superadmin account is then treated as not signed in,
-  // same as a deactivated account above.
+  // same as a deactivated account above — unless that specific account has
+  // been explicitly opted into password sign-in (users.allow_password_login,
+  // set from /office/users), for someone with no Google Workspace seat at
+  // all: a 3rd-party contractor, or a shared warehouse-kiosk login. That
+  // flag is per-account and defaults false, so it never quietly widens
+  // SSO enforcement for regular staff — only an account a superadmin has
+  // deliberately flagged gets a second way in.
   //
   // user.app_metadata.provider is NOT this session's actual sign-in
   // method — once an account has ever linked Google, it stays "email"
@@ -52,14 +63,14 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   // Google-authenticated session. The JWT's `amr` claim (Authentication
   // Method References) is the one field that reflects how *this* session
   // was actually established — `{ method: "oauth" }` for Google, `{
-  // method: "otp" }` for magic link — confirmed by decoding a real
-  // Google-authenticated session's token during this bug's diagnosis.
+  // method: "otp" }` for magic link, `{ method: "password" }` for a
+  // password sign-in — confirmed by decoding a real Google-authenticated
+  // session's token during this bug's diagnosis.
   const ssoEnforced = process.env.GOOGLE_SSO_ENFORCED === "true";
-  if (ssoEnforced && data.role !== "superadmin") {
+  if (ssoEnforced) {
     const { data: claimsData } = await supabase.auth.getClaims();
     const amr = claimsData?.claims.amr ?? [];
-    const usedOAuth = amr.some((entry) => (typeof entry === "string" ? entry === "oauth" : entry.method === "oauth"));
-    if (!usedOAuth) return null;
+    if (!isSignInAllowedUnderSso(data.role, data.allow_password_login, amr)) return null;
   }
 
   return data;

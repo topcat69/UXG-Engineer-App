@@ -1642,6 +1642,7 @@ export type Database = {
       users: {
         Row: {
           active: boolean
+          allow_password_login: boolean
           company: string | null
           created_at: string | null
           email: string
@@ -1654,6 +1655,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          allow_password_login?: boolean
           company?: string | null
           created_at?: string | null
           email: string
@@ -1666,6 +1668,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          allow_password_login?: boolean
           company?: string | null
           created_at?: string | null
           email?: string
