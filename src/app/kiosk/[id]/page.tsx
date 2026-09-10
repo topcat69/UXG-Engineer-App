@@ -21,8 +21,13 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: jobSheet, error: jobSheetError }, { data: stockItems, error: stockItemsError }, { data: testResults }] =
-    await Promise.all([
+  const [
+    { data: jobSheet, error: jobSheetError },
+    { data: stockItems, error: stockItemsError },
+    { data: testResults },
+    { data: manufacturers },
+    { data: models },
+  ] = await Promise.all([
       supabase
         .from("job_sheets")
         .select(
@@ -47,6 +52,8 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
         .select("id, item_description, ir_bud, wifi_cable, tested, outcome, notes")
         .eq("job_sheet_id", id)
         .order("position", { ascending: true }),
+      supabase.from("stock_manufacturers").select("id, name").order("name"),
+      supabase.from("stock_models").select("id, name, manufacturer_id").order("name"),
     ]);
 
   if (jobSheetError || !jobSheet) notFound();
@@ -80,7 +87,7 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
 
       <section className="flex flex-col gap-2">
         <h2 className="font-medium">Goods-in</h2>
-        <AddStockItemForm jobSheetId={jobSheet.id} />
+        <AddStockItemForm jobSheetId={jobSheet.id} manufacturers={manufacturers ?? []} models={models ?? []} />
         <Table>
           <TableHeader>
             <TableRow>

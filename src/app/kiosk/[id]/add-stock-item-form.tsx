@@ -1,15 +1,27 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { BarcodeScanButton } from "@/components/field/barcode-scan-button";
 import { addStockItem } from "./actions";
 
-export function AddStockItemForm({ jobSheetId }: { jobSheetId: string }) {
+const OTHER = "__other__";
+
+export function AddStockItemForm({
+  jobSheetId,
+  manufacturers,
+  models,
+}: {
+  jobSheetId: string;
+  manufacturers: { id: string; name: string }[];
+  models: { id: string; name: string; manufacturer_id: string }[];
+}) {
   const router = useRouter();
-  const [manufacturer, setManufacturer] = useState("");
-  const [model, setModel] = useState("");
+  const [manufacturerChoice, setManufacturerChoice] = useState("");
+  const [manufacturerOther, setManufacturerOther] = useState("");
+  const [modelChoice, setModelChoice] = useState("");
+  const [modelOther, setModelOther] = useState("");
   const [serialNo, setSerialNo] = useState("");
   const [firmwareUpdate, setFirmwareUpdate] = useState("");
   const [tested, setTested] = useState(false);
@@ -18,9 +30,17 @@ export function AddStockItemForm({ jobSheetId }: { jobSheetId: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const selectedManufacturer = manufacturers.find((m) => m.id === manufacturerChoice);
+  const modelsForManufacturer = useMemo(
+    () => (selectedManufacturer ? models.filter((m) => m.manufacturer_id === selectedManufacturer.id) : []),
+    [models, selectedManufacturer],
+  );
+
   function reset() {
-    setManufacturer("");
-    setModel("");
+    setManufacturerChoice("");
+    setManufacturerOther("");
+    setModelChoice("");
+    setModelOther("");
     setSerialNo("");
     setFirmwareUpdate("");
     setTested(false);
@@ -29,6 +49,12 @@ export function AddStockItemForm({ jobSheetId }: { jobSheetId: string }) {
   }
 
   function handleAdd() {
+    const manufacturer = manufacturerChoice === OTHER ? manufacturerOther : (selectedManufacturer?.name ?? "");
+    const model =
+      manufacturerChoice === OTHER || modelChoice === OTHER
+        ? modelOther
+        : (modelsForManufacturer.find((m) => m.id === modelChoice)?.name ?? "");
+
     startTransition(async () => {
       const result = await addStockItem(jobSheetId, manufacturer, model, serialNo, firmwareUpdate, tested, damaged, damageNotes);
       if (result.ok) {
@@ -46,21 +72,70 @@ export function AddStockItemForm({ jobSheetId }: { jobSheetId: string }) {
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex flex-col gap-1">
           <label className="text-muted-foreground text-xs">Manufacturer</label>
-          <input
-            type="text"
-            value={manufacturer}
-            onChange={(e) => setManufacturer(e.target.value)}
+          <select
+            value={manufacturerChoice}
+            onChange={(e) => {
+              setManufacturerChoice(e.target.value);
+              setModelChoice("");
+              setModelOther("");
+            }}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-          />
+          >
+            <option value="">Select…</option>
+            {manufacturers.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+            <option value={OTHER}>Other…</option>
+          </select>
+          {manufacturerChoice === OTHER && (
+            <input
+              type="text"
+              value={manufacturerOther}
+              onChange={(e) => setManufacturerOther(e.target.value)}
+              placeholder="Manufacturer name"
+              className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+            />
+          )}
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-muted-foreground text-xs">Model</label>
-          <input
-            type="text"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
-          />
+          {manufacturerChoice === OTHER ? (
+            <input
+              type="text"
+              value={modelOther}
+              onChange={(e) => setModelOther(e.target.value)}
+              placeholder="Model name"
+              className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+            />
+          ) : (
+            <>
+              <select
+                value={modelChoice}
+                onChange={(e) => setModelChoice(e.target.value)}
+                disabled={!selectedManufacturer}
+                className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+              >
+                <option value="">{selectedManufacturer ? "Select…" : "Pick a manufacturer first"}</option>
+                {modelsForManufacturer.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+                {selectedManufacturer && <option value={OTHER}>Other…</option>}
+              </select>
+              {modelChoice === OTHER && (
+                <input
+                  type="text"
+                  value={modelOther}
+                  onChange={(e) => setModelOther(e.target.value)}
+                  placeholder="Model name"
+                  className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+                />
+              )}
+            </>
+          )}
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-muted-foreground text-xs">Serial no.</label>

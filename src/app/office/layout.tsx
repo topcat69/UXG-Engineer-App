@@ -25,6 +25,7 @@ const ADMIN_TOOLS_NAV = [
   { href: "/office/import", label: "Import" },
   { href: "/office/templates", label: "Templates" },
   { href: "/office/knowledge-base", label: "Knowledge Base" },
+  { href: "/office/stock-catalog", label: "Stock Catalog" },
   { href: "/office/users", label: "Users" },
 ];
 

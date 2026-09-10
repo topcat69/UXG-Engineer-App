@@ -1545,6 +1545,53 @@ export type Database = {
           },
         ]
       }
+      stock_manufacturers: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      stock_models: {
+        Row: {
+          created_at: string | null
+          id: string
+          manufacturer_id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          manufacturer_id: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          manufacturer_id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_models_manufacturer_id_fkey"
+            columns: ["manufacturer_id"]
+            isOneToOne: false
+            referencedRelation: "stock_manufacturers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       survey_forms: {
         Row: {
           access_restrictions: string | null
