@@ -219,18 +219,21 @@ function ModelSection({
   onDeleted: (id: string) => void;
 }) {
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
 
   function handleCreate() {
     if (!manufacturer) return;
     startTransition(async () => {
-      const result = await createModel(manufacturer.id, name);
+      const result = await createModel(manufacturer.id, name, description);
       if (result.ok) {
         onCreated(result.item);
         setName("");
+        setDescription("");
         setMessage(null);
       } else {
         setMessage(result.message);
@@ -240,7 +243,7 @@ function ModelSection({
 
   function handleSaveEdit(id: string) {
     startTransition(async () => {
-      const result = await updateModel(id, editName);
+      const result = await updateModel(id, editName, editDescription);
       if (result.ok) {
         onUpdated(result.item);
         setEditingId(null);
@@ -286,6 +289,15 @@ function ModelSection({
                   <input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Name"
+                    className="border-input h-8 w-full rounded-md border bg-transparent px-2 text-sm"
+                  />
+                </td>
+                <td className="py-2">
+                  <input
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="Description"
                     className="border-input h-8 w-full rounded-md border bg-transparent px-2 text-sm"
                   />
                 </td>
@@ -303,6 +315,7 @@ function ModelSection({
             ) : (
               <tr key={item.id} className="border-b">
                 <td className="py-2">{item.name}</td>
+                <td className="text-muted-foreground py-2">{item.description ?? "—"}</td>
                 <td className="py-2 text-right">
                   <div className="flex justify-end gap-2">
                     <Button
@@ -313,6 +326,7 @@ function ModelSection({
                       onClick={() => {
                         setEditingId(item.id);
                         setEditName(item.name);
+                        setEditDescription(item.description ?? "");
                         setMessage(null);
                       }}
                     >
@@ -328,7 +342,7 @@ function ModelSection({
           )}
           {models.length === 0 && (
             <tr>
-              <td colSpan={2} className="text-muted-foreground py-4 text-center">
+              <td colSpan={3} className="text-muted-foreground py-4 text-center">
                 None yet.
               </td>
             </tr>
@@ -344,6 +358,15 @@ function ModelSection({
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-muted-foreground text-xs">Description</label>
+          <input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="e.g. Sony Bravia 55&quot; 4K Screen"
+            className="border-input h-9 w-56 rounded-md border bg-transparent px-2 text-sm"
           />
         </div>
         <Button type="button" size="sm" disabled={isPending || !name.trim()} onClick={handleCreate}>

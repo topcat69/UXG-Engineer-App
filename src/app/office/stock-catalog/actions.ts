@@ -50,18 +50,25 @@ export async function deleteManufacturer(id: string): Promise<DeleteResult> {
   return { ok: true };
 }
 
-export type StockModelRow = { id: string; name: string; manufacturer_id: string };
+export type StockModelRow = { id: string; name: string; manufacturer_id: string; description: string | null };
 type ModelResult = { ok: true; item: StockModelRow } | { ok: false; message: string };
 
-export async function createModel(manufacturerId: string, name: string): Promise<ModelResult> {
+/**
+ * Description can be set here, or picked up automatically from a kiosk
+ * goods-in scan (see ensureCatalogEntry in kiosk/[id]/actions.ts, which
+ * only fills a blank description and never overwrites one curated here) —
+ * either way it's the same stock_models.description column, so it shows
+ * up everywhere a Model dropdown reads the catalog.
+ */
+export async function createModel(manufacturerId: string, name: string, description: string): Promise<ModelResult> {
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, message: "Name is required." };
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("stock_models")
-    .insert({ manufacturer_id: manufacturerId, name: trimmed })
-    .select("id, name, manufacturer_id")
+    .insert({ manufacturer_id: manufacturerId, name: trimmed, description: description.trim() || null })
+    .select("id, name, manufacturer_id, description")
     .single();
   if (error) {
     if (error.code === "23505") return { ok: false, message: "That model already exists for this manufacturer." };
@@ -72,12 +79,17 @@ export async function createModel(manufacturerId: string, name: string): Promise
   return { ok: true, item: data };
 }
 
-export async function updateModel(id: string, name: string): Promise<ModelResult> {
+export async function updateModel(id: string, name: string, description: string): Promise<ModelResult> {
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, message: "Name is required." };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from("stock_models").update({ name: trimmed }).eq("id", id).select("id, name, manufacturer_id").single();
+  const { data, error } = await supabase
+    .from("stock_models")
+    .update({ name: trimmed, description: description.trim() || null })
+    .eq("id", id)
+    .select("id, name, manufacturer_id, description")
+    .single();
   if (error) {
     if (error.code === "23505") return { ok: false, message: "That model already exists for this manufacturer." };
     return { ok: false, message: error.message };

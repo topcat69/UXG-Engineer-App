@@ -12,7 +12,7 @@ export default async function StockCatalogPage() {
 
   const [{ data: manufacturers, error }, { data: models }] = await Promise.all([
     supabase.from("stock_manufacturers").select("id, name").order("name"),
-    supabase.from("stock_models").select("id, name, manufacturer_id").order("name"),
+    supabase.from("stock_models").select("id, name, manufacturer_id, description").order("name"),
   ]);
 
   if (error) {

@@ -125,7 +125,10 @@ export function StockItemRow({
                 <select
                   value={fields.manufacturerChoice}
                   onChange={(e) =>
-                    setFields((f) => ({ ...f, manufacturerChoice: e.target.value, modelChoice: OTHER, modelOther: "" }))
+                    // Never wipe modelOther on a manufacturer switch — see
+                    // add-stock-item-form.tsx's onChange for why that's the
+                    // exact bug that dropped a scanned model on submit.
+                    setFields((f) => ({ ...f, manufacturerChoice: e.target.value, modelChoice: f.modelOther ? OTHER : "" }))
                   }
                   className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
                 >

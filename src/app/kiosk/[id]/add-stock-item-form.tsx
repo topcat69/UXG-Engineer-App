@@ -129,9 +129,14 @@ export function AddStockItemForm({
           <select
             value={manufacturerChoice}
             onChange={(e) => {
+              // Switching manufacturer invalidates the *selected* model (it
+              // belonged to the old manufacturer's list) but must never
+              // wipe modelOther — a scanned model name is often typed here
+              // before the manufacturer gets corrected to a real catalog
+              // entry, and losing it silently on that correction is exactly
+              // what caused Model to end up blank on submit.
               setManufacturerChoice(e.target.value);
-              setModelChoice("");
-              setModelOther("");
+              setModelChoice(modelOther ? OTHER : "");
             }}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           >
