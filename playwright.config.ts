@@ -21,9 +21,16 @@ export default defineConfig({
       : {},
   },
   webServer: {
-    command: "pnpm dev",
+    // A production build, not `next dev`: the offline-workflow suite relies
+    // on the service worker replaying a cached navigation while the network
+    // is down, and Next's own guidance is explicit that dev mode isn't a
+    // reliable reference for that — Turbopack's dev-mode module wiring
+    // isn't stable across a cached-then-replayed reload the way a real
+    // build's static output is. Confirmed: this suite is flaky under
+    // `next dev` and consistently green under `next build && next start`.
+    command: "pnpm build && pnpm start",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
+    timeout: 180_000,
   },
 });
