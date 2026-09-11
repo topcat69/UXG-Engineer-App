@@ -54,7 +54,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const [{ data: jobs, count, error }, { data: projects }, { data: engineers }, { data: sites }] =
     await Promise.all([
       query,
-      supabase.from("projects").select("id, name, client_id").order("name"),
+      supabase.from("projects").select("id, name, client_id, client:clients(name)").order("name"),
       supabase.from("users").select("id, name").in("role", ["engineer", "manager", "superadmin"]).eq("active", true).order("name"),
       supabase.from("sites").select("id, name, client_id").order("name"),
     ]);
