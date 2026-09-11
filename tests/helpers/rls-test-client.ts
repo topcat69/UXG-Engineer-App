@@ -18,6 +18,12 @@ export function adminClient(): SupabaseClient<Database> {
   });
 }
 
+export function anonClient(): SupabaseClient<Database> {
+  return createClient<Database>(env("NEXT_PUBLIC_SUPABASE_URL"), env("NEXT_PUBLIC_SUPABASE_ANON_KEY"), {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
 /**
  * Returns a Supabase client authenticated as the given seeded user, via a
  * real GoTrue session — not a mock. Uses the admin `generateLink` API to

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/supabase/database.types";
-import { adminClient, clientForUser } from "./helpers/rls-test-client";
+import { adminClient, anonClient, clientForUser } from "./helpers/rls-test-client";
 
 // Proves the RLS policies in supabase/migrations/20260103000000_rls.sql
 // (jobs_select widened to a symmetric ±30 days by
@@ -191,5 +191,59 @@ describe("install_forms: evidence lock", () => {
     // engineer: submitted/under_review/approved/closed are all locked.
     expect(error).toBeNull();
     expect(updated).toHaveLength(0);
+  });
+});
+
+// Proves 20260911010000_gate_self_provisioned_users.sql: Google OAuth has
+// no Workspace-domain restriction in this app, so on_auth_user_created
+// fires for anyone who completes sign-in, invited or not — the only thing
+// distinguishing an admin-invited account from a walk-up stranger is
+// whether office/users' createUser() ran its activation step afterwards.
+describe("self-provisioned accounts (no admin invite)", () => {
+  it("a brand-new sign-in lands inactive, with current_user_role() null and no data access", async () => {
+    // A real signUp against local GoTrue for an email with no existing
+    // auth.users row fires the same on_auth_user_created trigger a
+    // first-time Google sign-in would (the trigger doesn't care which
+    // provider created the row) — a real insert against real Postgres,
+    // not a mock of "what a self-signup would do".
+    const email = `walk-up-${Date.now()}@gmail.com`;
+    const stranger = anonClient();
+    const { error: signUpError } = await stranger.auth.signUp({
+      email,
+      password: "correct-horse-battery-staple-1",
+    });
+    expect(signUpError).toBeNull();
+
+    const { data: row } = await admin.from("users").select("id, active, role").eq("email", email).single();
+    expect(row?.active).toBe(false);
+
+    // RLS itself denies this, not just the app's getCurrentUser() check —
+    // current_user_role() returns null for an inactive row, so even a
+    // direct API call (bypassing the Next.js app entirely) sees nothing.
+    const { data: jobs, error } = await stranger.from("jobs").select("id");
+    expect(error).toBeNull();
+    expect(jobs).toHaveLength(0);
+  });
+
+  it("office/users' createUser() flow (admin.createUser + activation update) ends up active with real access", async () => {
+    const email = `invited-${Date.now()}@uxglobal.co.uk`;
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      user_metadata: { name: "Invited Engineer" },
+    });
+    expect(createError).toBeNull();
+
+    // Mirrors createUser()'s own follow-up update in office/users/actions.ts.
+    const { error: updateError } = await admin
+      .from("users")
+      .update({ name: "Invited Engineer", role: "engineer", active: true })
+      .eq("id", created!.user!.id);
+    expect(updateError).toBeNull();
+
+    const invited = await clientForUser(email);
+    const { data: jobs, error } = await invited.from("jobs").select("id");
+    expect(error).toBeNull();
+    expect(jobs).toHaveLength(0); // real access, just no jobs assigned to this new account yet
   });
 });

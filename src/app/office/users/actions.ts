@@ -62,7 +62,11 @@ export async function createUser(name: string, email: string, role: UserRole): P
   const supabase = await createClient();
   const { data: updated, error: updateError } = await supabase
     .from("users")
-    .update({ name: trimmedName, role })
+    // on_auth_user_created inserts this row inactive by default (see
+    // gate_self_provisioned_users migration) — an admin explicitly
+    // creating the account here is exactly the invite this app requires,
+    // so activate it immediately.
+    .update({ name: trimmedName, role, active: true })
     .eq("id", created.user.id)
     .select("id, name, email, role, active, phone, company, max_jobs_per_day, allow_password_login")
     .single();
