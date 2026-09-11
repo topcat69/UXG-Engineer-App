@@ -23,7 +23,7 @@ export default async function StockPage() {
         .from("stock_items")
         .select(
           `manufacturer, model,
-           job_sheet:job_sheets!inner(id, reference, status, site:sites(name), linked_job:jobs(job_number))`,
+           job_sheet:job_sheets!inner(id, reference, status, site:sites(name, client:clients(name)), linked_job:jobs(job_number))`,
         )
         .not("job_sheet_id", "is", null),
       supabase.from("stock_items").select("manufacturer, model").is("job_sheet_id", null),
@@ -43,6 +43,7 @@ export default async function StockPage() {
     jobSheetStatus: r.job_sheet.status,
     jobNumber: r.job_sheet.linked_job?.job_number ?? null,
     siteName: r.job_sheet.site?.name ?? null,
+    clientName: r.job_sheet.site?.client?.name ?? null,
   }));
   const shelfRows: ShelfStockRow[] = (shelfRaw ?? []).map((r) => ({ manufacturer: r.manufacturer, model: r.model }));
 
@@ -82,6 +83,7 @@ export default async function StockPage() {
             <TableRow>
               <TableHead>Item</TableHead>
               <TableHead>Job</TableHead>
+              <TableHead>Client</TableHead>
               <TableHead>Job sheet status</TableHead>
               <TableHead className="text-right">Qty</TableHead>
             </TableRow>
@@ -89,7 +91,7 @@ export default async function StockPage() {
           <TableBody>
             {earmarkedGroups.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground text-center">
+                <TableCell colSpan={5} className="text-muted-foreground text-center">
                   Nothing earmarked yet.
                 </TableCell>
               </TableRow>
@@ -106,6 +108,7 @@ export default async function StockPage() {
                   {g.jobNumber && <span className="text-muted-foreground"> · {g.jobNumber}</span>}
                   {g.siteName && <div className="text-muted-foreground text-xs">{g.siteName}</div>}
                 </TableCell>
+                <TableCell>{g.clientName ?? "—"}</TableCell>
                 <TableCell>
                   <Badge variant="secondary">{humanize(g.jobSheetStatus)}</Badge>
                 </TableCell>

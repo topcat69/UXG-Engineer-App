@@ -12,6 +12,7 @@ describe("groupEarmarkedStock", () => {
         jobSheetStatus: "configuring",
         jobNumber: "UXG-2026-0031",
         siteName: "Merrow Retail Park",
+        clientName: "Acme Retail",
       },
       {
         manufacturer: "Philips",
@@ -21,6 +22,7 @@ describe("groupEarmarkedStock", () => {
         jobSheetStatus: "configuring",
         jobNumber: "UXG-2026-0031",
         siteName: "Merrow Retail Park",
+        clientName: "Acme Retail",
       },
       {
         manufacturer: "Philips",
@@ -30,6 +32,7 @@ describe("groupEarmarkedStock", () => {
         jobSheetStatus: "ready",
         jobNumber: "UXG-2026-0045",
         siteName: "Oxford Street",
+        clientName: "Acme Retail",
       },
     ];
 
@@ -47,6 +50,7 @@ describe("groupEarmarkedStock", () => {
       jobSheetStatus: "assigned",
       jobNumber: null,
       siteName: null,
+      clientName: null,
     };
     const rows: EarmarkedStockRow[] = [
       { ...base, jobSheetId: "a", jobSheetReference: "A" },
@@ -66,6 +70,7 @@ describe("groupEarmarkedStock", () => {
         jobSheetStatus: "receiving",
         jobNumber: null,
         siteName: null,
+        clientName: null,
       },
       {
         manufacturer: "LG",
@@ -75,6 +80,7 @@ describe("groupEarmarkedStock", () => {
         jobSheetStatus: "receiving",
         jobNumber: null,
         siteName: null,
+        clientName: null,
       },
     ];
 
