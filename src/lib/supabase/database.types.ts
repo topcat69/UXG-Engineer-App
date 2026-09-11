@@ -184,7 +184,9 @@ export type Database = {
           content_displaying: Database["public"]["Enums"]["pass_fail"] | null
           created_at: string | null
           engineer_notes: string | null
-          equipment_damage: Database["public"]["Enums"]["equipment_damage_status"] | null
+          equipment_damage:
+            | Database["public"]["Enums"]["equipment_damage_status"]
+            | null
           id: string
           issue_detail: string | null
           issues_found: boolean | null
@@ -204,7 +206,9 @@ export type Database = {
           content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
           created_at?: string | null
           engineer_notes?: string | null
-          equipment_damage?: Database["public"]["Enums"]["equipment_damage_status"] | null
+          equipment_damage?:
+            | Database["public"]["Enums"]["equipment_damage_status"]
+            | null
           id?: string
           issue_detail?: string | null
           issues_found?: boolean | null
@@ -224,7 +228,9 @@ export type Database = {
           content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
           created_at?: string | null
           engineer_notes?: string | null
-          equipment_damage?: Database["public"]["Enums"]["equipment_damage_status"] | null
+          equipment_damage?:
+            | Database["public"]["Enums"]["equipment_damage_status"]
+            | null
           id?: string
           issue_detail?: string | null
           issues_found?: boolean | null
@@ -329,7 +335,9 @@ export type Database = {
           created_at: string | null
           design_pack_storage_path: string | null
           engineer_notes: string | null
-          equipment_damage: Database["public"]["Enums"]["equipment_damage_status"] | null
+          equipment_damage:
+            | Database["public"]["Enums"]["equipment_damage_status"]
+            | null
           fixture_type_id: string | null
           id: string
           issue_detail: string | null
@@ -362,7 +370,9 @@ export type Database = {
           created_at?: string | null
           design_pack_storage_path?: string | null
           engineer_notes?: string | null
-          equipment_damage?: Database["public"]["Enums"]["equipment_damage_status"] | null
+          equipment_damage?:
+            | Database["public"]["Enums"]["equipment_damage_status"]
+            | null
           fixture_type_id?: string | null
           id?: string
           issue_detail?: string | null
@@ -395,7 +405,9 @@ export type Database = {
           created_at?: string | null
           design_pack_storage_path?: string | null
           engineer_notes?: string | null
-          equipment_damage?: Database["public"]["Enums"]["equipment_damage_status"] | null
+          equipment_damage?:
+            | Database["public"]["Enums"]["equipment_damage_status"]
+            | null
           fixture_type_id?: string | null
           id?: string
           issue_detail?: string | null
@@ -425,17 +437,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "job_details_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: true
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "job_details_fixture_type_id_fkey"
             columns: ["fixture_type_id"]
             isOneToOne: false
             referencedRelation: "client_sla_fixture_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_details_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
           {
@@ -1616,6 +1628,24 @@ export type Database = {
           },
         ]
       }
+      stock_software_providers: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       survey_forms: {
         Row: {
           access_restrictions: string | null
@@ -1718,14 +1748,10 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
-      set_own_theme: {
-        Args: { new_theme: string }
-        Returns: undefined
-      }
+      set_own_theme: { Args: { new_theme: string }; Returns: undefined }
     }
     Enums: {
       equipment_damage_status: "na" | "yes" | "accidental" | "customer"
-      kb_article_status: "draft" | "pending_review" | "published" | "declined"
       job_sheet_status:
         | "building"
         | "receiving"
@@ -1749,6 +1775,7 @@ export type Database = {
         | "on_hold"
         | "cancelled"
         | "revisit"
+      kb_article_status: "draft" | "pending_review" | "published" | "declined"
       pass_fail: "pass" | "fail" | "na"
       qa_status: "pending" | "approved" | "rejected"
       stock_item_status: "received" | "configured" | "installed" | "returned"
@@ -1909,6 +1936,7 @@ export const Constants = {
         "cancelled",
         "revisit",
       ],
+      kb_article_status: ["draft", "pending_review", "published", "declined"],
       pass_fail: ["pass", "fail", "na"],
       qa_status: ["pending", "approved", "rejected"],
       stock_item_status: ["received", "configured", "installed", "returned"],

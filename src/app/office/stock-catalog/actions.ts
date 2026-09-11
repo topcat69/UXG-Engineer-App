@@ -107,3 +107,48 @@ export async function deleteModel(id: string): Promise<DeleteResult> {
   revalidatePath("/office/stock-catalog");
   return { ok: true };
 }
+
+/** Flat picklist, same shape as Manufacturers — no second level underneath it. */
+export async function createSoftwareProvider(name: string): Promise<ItemResult> {
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, message: "Name is required." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("stock_software_providers").insert({ name: trimmed }).select("id, name").single();
+  if (error) {
+    if (error.code === "23505") return { ok: false, message: "That software provider already exists." };
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath("/office/stock-catalog");
+  return { ok: true, item: data };
+}
+
+export async function updateSoftwareProvider(id: string, name: string): Promise<ItemResult> {
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, message: "Name is required." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("stock_software_providers")
+    .update({ name: trimmed })
+    .eq("id", id)
+    .select("id, name")
+    .single();
+  if (error) {
+    if (error.code === "23505") return { ok: false, message: "That software provider already exists." };
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath("/office/stock-catalog");
+  return { ok: true, item: data };
+}
+
+export async function deleteSoftwareProvider(id: string): Promise<DeleteResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("stock_software_providers").delete().eq("id", id);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/office/stock-catalog");
+  return { ok: true };
+}
