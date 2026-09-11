@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { updateClosingChecklist, type ClosingChecklistInput } from "./actions";
+import { ChecklistPhotoControl } from "./checklist-photo-control";
 import type { ChecklistItem, ChecklistKey } from "./checklist-item";
 
 const ITEMS: { key: ChecklistKey; label: string }[] = [
@@ -18,10 +19,12 @@ export function ClosingChecklistForm({
   jobSheetId,
   initial,
   workAreaTidy,
+  photos,
 }: {
   jobSheetId: string;
   initial: Record<ChecklistKey, ChecklistItem>;
   workAreaTidy: boolean | null;
+  photos: Record<ChecklistKey, { photoPath: string | null; imageUrl: string | null }>;
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
@@ -62,15 +65,12 @@ export function ClosingChecklistForm({
             placeholder="Detail"
             className="border-input h-9 w-56 rounded-md border bg-transparent px-2 text-sm"
           />
-          <label className="flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={items[key].photo}
-              onChange={(e) => updateItem(key, { photo: e.target.checked })}
-              className="h-4 w-4"
-            />
-            Photo taken
-          </label>
+          <ChecklistPhotoControl
+            jobSheetId={jobSheetId}
+            checklistKey={key}
+            photoPath={photos[key].photoPath}
+            imageUrl={photos[key].imageUrl}
+          />
         </div>
       ))}
       <label className="flex items-center gap-2 text-sm">

@@ -577,6 +577,7 @@ export type Database = {
           defects: boolean | null
           defects_detail: string | null
           defects_photo: boolean | null
+          defects_photo_path: string | null
           id: string
           job_description: string | null
           licence_added: boolean | null
@@ -584,15 +585,19 @@ export type Database = {
           missing_items: boolean | null
           missing_items_detail: string | null
           missing_items_photo: boolean | null
+          missing_items_photo_path: string | null
           other_issues: boolean | null
           other_issues_detail: string | null
           other_issues_photo: boolean | null
+          other_issues_photo_path: string | null
           other_parts_used: boolean | null
           other_parts_used_detail: string | null
           other_parts_used_photo: boolean | null
+          other_parts_used_photo_path: string | null
           packed_correctly: boolean | null
           packed_correctly_detail: string | null
           packed_correctly_photo: boolean | null
+          packed_correctly_photo_path: string | null
           project_id: string | null
           proposed_install_date: string | null
           reference: string
@@ -613,6 +618,7 @@ export type Database = {
           defects?: boolean | null
           defects_detail?: string | null
           defects_photo?: boolean | null
+          defects_photo_path?: string | null
           id?: string
           job_description?: string | null
           licence_added?: boolean | null
@@ -620,15 +626,19 @@ export type Database = {
           missing_items?: boolean | null
           missing_items_detail?: string | null
           missing_items_photo?: boolean | null
+          missing_items_photo_path?: string | null
           other_issues?: boolean | null
           other_issues_detail?: string | null
           other_issues_photo?: boolean | null
+          other_issues_photo_path?: string | null
           other_parts_used?: boolean | null
           other_parts_used_detail?: string | null
           other_parts_used_photo?: boolean | null
+          other_parts_used_photo_path?: string | null
           packed_correctly?: boolean | null
           packed_correctly_detail?: string | null
           packed_correctly_photo?: boolean | null
+          packed_correctly_photo_path?: string | null
           project_id?: string | null
           proposed_install_date?: string | null
           reference: string
@@ -649,6 +659,7 @@ export type Database = {
           defects?: boolean | null
           defects_detail?: string | null
           defects_photo?: boolean | null
+          defects_photo_path?: string | null
           id?: string
           job_description?: string | null
           licence_added?: boolean | null
@@ -656,15 +667,19 @@ export type Database = {
           missing_items?: boolean | null
           missing_items_detail?: string | null
           missing_items_photo?: boolean | null
+          missing_items_photo_path?: string | null
           other_issues?: boolean | null
           other_issues_detail?: string | null
           other_issues_photo?: boolean | null
+          other_issues_photo_path?: string | null
           other_parts_used?: boolean | null
           other_parts_used_detail?: string | null
           other_parts_used_photo?: boolean | null
+          other_parts_used_photo_path?: string | null
           packed_correctly?: boolean | null
           packed_correctly_detail?: string | null
           packed_correctly_photo?: boolean | null
+          packed_correctly_photo_path?: string | null
           project_id?: string | null
           proposed_install_date?: string | null
           reference?: string

@@ -8,7 +8,7 @@ import { AddStockItemForm } from "./add-stock-item-form";
 import { AddTestResultForm } from "./add-test-result-form";
 import { SoftwareSetupForm } from "./software-setup-form";
 import { ClosingChecklistForm } from "./closing-checklist-form";
-import { toItem } from "./checklist-item";
+import { toItem, type ChecklistKey } from "./checklist-item";
 import { SignOffPanel } from "./sign-off-panel";
 import { StockItemRow } from "./stock-item-row";
 
@@ -33,11 +33,11 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
         .select(
           `id, reference, status, site:sites(name, client:clients(name)),
            cms_name, licence_added, teamviewer_added, added_to_uxg_account, software_notes,
-           defects, defects_detail, defects_photo,
-           missing_items, missing_items_detail, missing_items_photo,
-           packed_correctly, packed_correctly_detail, packed_correctly_photo,
-           other_parts_used, other_parts_used_detail, other_parts_used_photo,
-           other_issues, other_issues_detail, other_issues_photo,
+           defects, defects_detail, defects_photo_path,
+           missing_items, missing_items_detail, missing_items_photo_path,
+           packed_correctly, packed_correctly_detail, packed_correctly_photo_path,
+           other_parts_used, other_parts_used_detail, other_parts_used_photo_path,
+           other_issues, other_issues_detail, other_issues_photo_path,
            work_area_tidy, signed_off_at, signed_off_user:users!job_sheets_signed_off_by_fkey(name)`,
         )
         .eq("id", id)
@@ -70,6 +70,23 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
       return { ...item, imageUrl: data?.signedUrl ?? null };
     }),
   );
+
+  const checklistPhotoPaths: Record<ChecklistKey, string | null> = {
+    defects: jobSheet.defects_photo_path,
+    missingItems: jobSheet.missing_items_photo_path,
+    packedCorrectly: jobSheet.packed_correctly_photo_path,
+    otherPartsUsed: jobSheet.other_parts_used_photo_path,
+    otherIssues: jobSheet.other_issues_photo_path,
+  };
+  const checklistPhotos = Object.fromEntries(
+    await Promise.all(
+      Object.entries(checklistPhotoPaths).map(async ([key, path]) => {
+        if (!path) return [key, { photoPath: null, imageUrl: null }] as const;
+        const { data } = await supabase.storage.from("stock-item-photos").createSignedUrl(path, PHOTO_SIGNED_URL_TTL_SECONDS);
+        return [key, { photoPath: path, imageUrl: data?.signedUrl ?? null }] as const;
+      }),
+    ),
+  ) as Record<ChecklistKey, { photoPath: string | null; imageUrl: string | null }>;
 
   return (
     <div className="flex flex-col gap-6">
@@ -175,12 +192,13 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
           jobSheetId={jobSheet.id}
           workAreaTidy={jobSheet.work_area_tidy}
           initial={{
-            defects: toItem(jobSheet.defects, jobSheet.defects_detail, jobSheet.defects_photo),
-            missingItems: toItem(jobSheet.missing_items, jobSheet.missing_items_detail, jobSheet.missing_items_photo),
-            packedCorrectly: toItem(jobSheet.packed_correctly, jobSheet.packed_correctly_detail, jobSheet.packed_correctly_photo),
-            otherPartsUsed: toItem(jobSheet.other_parts_used, jobSheet.other_parts_used_detail, jobSheet.other_parts_used_photo),
-            otherIssues: toItem(jobSheet.other_issues, jobSheet.other_issues_detail, jobSheet.other_issues_photo),
+            defects: toItem(jobSheet.defects, jobSheet.defects_detail),
+            missingItems: toItem(jobSheet.missing_items, jobSheet.missing_items_detail),
+            packedCorrectly: toItem(jobSheet.packed_correctly, jobSheet.packed_correctly_detail),
+            otherPartsUsed: toItem(jobSheet.other_parts_used, jobSheet.other_parts_used_detail),
+            otherIssues: toItem(jobSheet.other_issues, jobSheet.other_issues_detail),
           }}
+          photos={checklistPhotos}
         />
       </section>
 

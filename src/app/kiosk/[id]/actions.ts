@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import type { Database } from "@/lib/supabase/database.types";
+import type { ChecklistKey } from "./checklist-item";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -206,7 +207,7 @@ export async function updateSoftwareSetup(jobSheetId: string, input: SoftwareSet
   return { ok: true };
 }
 
-type ChecklistItemInput = { flag: boolean; detail: string; photo: boolean };
+type ChecklistItemInput = { flag: boolean; detail: string };
 
 export type ClosingChecklistInput = {
   defects: ChecklistItemInput;
@@ -217,25 +218,26 @@ export type ClosingChecklistInput = {
   workAreaTidy: boolean;
 };
 
+/**
+ * The *_photo flags themselves are no longer touched here — they're
+ * managed exclusively by uploadChecklistPhoto/deleteChecklistPhoto below,
+ * driven by whether a real photo actually exists, not a manually ticked
+ * box this Save could otherwise silently reset or fake.
+ */
 export async function updateClosingChecklist(jobSheetId: string, input: ClosingChecklistInput): Promise<ActionResult> {
   const supabase = await createClient();
 
   const update: Database["public"]["Tables"]["job_sheets"]["Update"] = {
     defects: input.defects.flag,
     defects_detail: input.defects.detail.trim() || null,
-    defects_photo: input.defects.photo,
     missing_items: input.missingItems.flag,
     missing_items_detail: input.missingItems.detail.trim() || null,
-    missing_items_photo: input.missingItems.photo,
     packed_correctly: input.packedCorrectly.flag,
     packed_correctly_detail: input.packedCorrectly.detail.trim() || null,
-    packed_correctly_photo: input.packedCorrectly.photo,
     other_parts_used: input.otherPartsUsed.flag,
     other_parts_used_detail: input.otherPartsUsed.detail.trim() || null,
-    other_parts_used_photo: input.otherPartsUsed.photo,
     other_issues: input.otherIssues.flag,
     other_issues_detail: input.otherIssues.detail.trim() || null,
-    other_issues_photo: input.otherIssues.photo,
     work_area_tidy: input.workAreaTidy,
   };
 
@@ -358,6 +360,74 @@ export async function deleteStockItemPhoto(stockItemId: string, jobSheetId: stri
   if (removeError) return { ok: false, message: removeError.message };
 
   const { error } = await supabase.from("stock_items").update({ image_path: null }).eq("id", stockItemId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/kiosk/${jobSheetId}`);
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  return { ok: true };
+}
+
+/**
+ * Builds the typed job_sheets update for one checklist item's photo —
+ * kept as an explicit switch rather than a dynamic `{[col]: value}` so
+ * every column name stays checked against the generated Database type
+ * instead of accepted as a bare string.
+ */
+function checklistPhotoUpdate(
+  key: ChecklistKey,
+  photoPath: string | null,
+): Database["public"]["Tables"]["job_sheets"]["Update"] {
+  switch (key) {
+    case "defects":
+      return { defects_photo_path: photoPath, defects_photo: photoPath !== null };
+    case "missingItems":
+      return { missing_items_photo_path: photoPath, missing_items_photo: photoPath !== null };
+    case "packedCorrectly":
+      return { packed_correctly_photo_path: photoPath, packed_correctly_photo: photoPath !== null };
+    case "otherPartsUsed":
+      return { other_parts_used_photo_path: photoPath, other_parts_used_photo: photoPath !== null };
+    case "otherIssues":
+      return { other_issues_photo_path: photoPath, other_issues_photo: photoPath !== null };
+  }
+}
+
+export type UploadChecklistPhotoResult = { ok: true; imagePath: string } | { ok: false; message: string };
+
+/**
+ * The closing checklist's "Photo taken" checkbox used to be just that —
+ * a manual assertion with nothing behind it. Reuses the stock-item-photos
+ * bucket (its RLS already scopes by job_sheet_id as the path's first
+ * segment, which this satisfies identically) rather than a separate one.
+ */
+export async function uploadChecklistPhoto(
+  jobSheetId: string,
+  key: ChecklistKey,
+  formData: FormData,
+): Promise<UploadChecklistPhotoResult> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose a file first." };
+
+  const supabase = await createClient();
+  const storagePath = `${jobSheetId}/checklist-${key}-${Date.now()}-${file.name}`;
+  const { error: uploadError } = await supabase.storage.from("stock-item-photos").upload(storagePath, file, {
+    contentType: file.type || undefined,
+  });
+  if (uploadError) return { ok: false, message: uploadError.message };
+
+  const { error } = await supabase.from("job_sheets").update(checklistPhotoUpdate(key, storagePath)).eq("id", jobSheetId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/kiosk/${jobSheetId}`);
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  return { ok: true, imagePath: storagePath };
+}
+
+export async function deleteChecklistPhoto(jobSheetId: string, key: ChecklistKey, photoPath: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error: removeError } = await supabase.storage.from("stock-item-photos").remove([photoPath]);
+  if (removeError) return { ok: false, message: removeError.message };
+
+  const { error } = await supabase.from("job_sheets").update(checklistPhotoUpdate(key, null)).eq("id", jobSheetId);
   if (error) return { ok: false, message: error.message };
 
   revalidatePath(`/kiosk/${jobSheetId}`);
