@@ -8,6 +8,7 @@ import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
 import { sendJobAssignedEmail, sendJobScheduledEmail } from "@/lib/email/send-job-emails";
 import { nextJobNumber } from "@/lib/jobs/job-number";
 import { maxJobSequenceForYear } from "@/lib/jobs/next-job-number";
+import { assignJobSheetToJob } from "../job-sheets/[id]/actions";
 
 export type ActionResult = { ok: true; message: string } | { ok: false; message: string };
 
@@ -37,8 +38,13 @@ export type CreateJobResult = { ok: true; jobId: string } | { ok: false; message
  * site_id: a job's client is always derivable via site_id -> sites.client_id
  * rather than stored redundantly on the job itself (see
  * 20260116000000_clients.sql).
+ *
+ * jobSheetId is optional — most jobs don't have kit prepared ahead of time.
+ * When given, links it the same way AssignToJobForm does after the fact
+ * (assignJobSheetToJob), just at creation time instead of a separate trip
+ * to the Job Sheet's own page.
  */
-export async function createJob(projectId: string, siteId: string, jobType: string): Promise<CreateJobResult> {
+export async function createJob(projectId: string, siteId: string, jobType: string, jobSheetId?: string): Promise<CreateJobResult> {
   if (!projectId) return { ok: false, message: "Select a project." };
   if (!siteId) return { ok: false, message: "Select a site." };
   if (!jobType) return { ok: false, message: "Select a job type." };
@@ -56,6 +62,11 @@ export async function createJob(projectId: string, siteId: string, jobType: stri
     return { ok: false, message: "That site doesn't belong to this project's customer." };
   }
 
+  if (jobSheetId) {
+    const { data: jobSheet } = await supabase.from("job_sheets").select("site_id").eq("id", jobSheetId).single();
+    if (jobSheet?.site_id !== siteId) return { ok: false, message: "That job sheet belongs to a different site." };
+  }
+
   const year = new Date().getFullYear();
   const maxSeq = await maxJobSequenceForYear(supabase, year);
 
@@ -71,6 +82,11 @@ export async function createJob(projectId: string, siteId: string, jobType: stri
     .select("id")
     .single();
   if (error) return { ok: false, message: error.message };
+
+  if (jobSheetId) {
+    const linkResult = await assignJobSheetToJob(jobSheetId, data.id);
+    if (!linkResult.ok) return { ok: false, message: `Job created, but failed to link the job sheet: ${linkResult.message}` };
+  }
 
   revalidatePath("/office/jobs");
   return { ok: true, jobId: data.id };

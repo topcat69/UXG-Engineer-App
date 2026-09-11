@@ -9,25 +9,31 @@ export function CreateSlaForm({
   clients,
   sites,
   fixtureTypes,
+  jobSheets,
 }: {
   clients: { id: string; name: string }[];
   sites: { id: string; name: string; client_id: string }[];
   fixtureTypes: { id: string; name: string; client_id: string }[];
+  jobSheets: { id: string; reference: string; site_id: string }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [clientId, setClientId] = useState("");
   const [siteId, setSiteId] = useState("");
   const [fixtureTypeId, setFixtureTypeId] = useState("");
+  const [jobSheetId, setJobSheetId] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const clientSites = useMemo(() => sites.filter((s) => s.client_id === clientId), [sites, clientId]);
   const clientFixtureTypes = useMemo(() => fixtureTypes.filter((f) => f.client_id === clientId), [fixtureTypes, clientId]);
+  // Same reasoning as the New Job form: only sheets already prepared for
+  // the chosen site are ever the right one to link.
+  const siteJobSheets = useMemo(() => (siteId ? jobSheets.filter((js) => js.site_id === siteId) : []), [jobSheets, siteId]);
 
   function handleCreate() {
     startTransition(async () => {
-      const result = await createSlaJob(clientId, siteId, fixtureTypeId);
+      const result = await createSlaJob(clientId, siteId, fixtureTypeId, jobSheetId);
       if (result.ok) {
         router.push(`/office/jobs/${result.jobId}`);
       } else {
@@ -70,7 +76,10 @@ export function CreateSlaForm({
           <label className="text-muted-foreground text-xs">Site</label>
           <select
             value={siteId}
-            onChange={(e) => setSiteId(e.target.value)}
+            onChange={(e) => {
+              setSiteId(e.target.value);
+              setJobSheetId("");
+            }}
             disabled={!clientId}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           >
@@ -78,6 +87,22 @@ export function CreateSlaForm({
             {clientSites.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-muted-foreground text-xs">Job sheet (optional)</label>
+          <select
+            value={jobSheetId}
+            onChange={(e) => setJobSheetId(e.target.value)}
+            disabled={!siteId}
+            className="border-input h-9 w-56 rounded-md border bg-transparent px-2 text-sm"
+          >
+            <option value="">{siteId ? "None" : "Pick a site first"}</option>
+            {siteJobSheets.map((js) => (
+              <option key={js.id} value={js.id}>
+                {js.reference}
               </option>
             ))}
           </select>

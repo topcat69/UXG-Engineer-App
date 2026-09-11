@@ -9,15 +9,18 @@ import { createJob } from "./actions";
 export function CreateJobForm({
   projects,
   sites,
+  jobSheets,
 }: {
   projects: { id: string; name: string; client_id: string | null; client: { name: string } | null }[];
   sites: { id: string; name: string; client_id: string }[];
+  jobSheets: { id: string; reference: string; site_id: string }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [projectId, setProjectId] = useState("");
   const [siteId, setSiteId] = useState("");
   const [jobType, setJobType] = useState("");
+  const [jobSheetId, setJobSheetId] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -26,10 +29,13 @@ export function CreateJobForm({
     () => (selectedProject?.client_id ? sites.filter((s) => s.client_id === selectedProject.client_id) : []),
     [sites, selectedProject],
   );
+  // Only sheets already prepared for the chosen site — a sheet for a
+  // different site is never the one this job wants.
+  const siteJobSheets = useMemo(() => (siteId ? jobSheets.filter((js) => js.site_id === siteId) : []), [jobSheets, siteId]);
 
   function handleCreate() {
     startTransition(async () => {
-      const result = await createJob(projectId, siteId, jobType);
+      const result = await createJob(projectId, siteId, jobType, jobSheetId);
       if (result.ok) {
         router.push(`/office/jobs/${result.jobId}`);
       } else {
@@ -72,7 +78,10 @@ export function CreateJobForm({
           <label className="text-muted-foreground text-xs">Site</label>
           <select
             value={siteId}
-            onChange={(e) => setSiteId(e.target.value)}
+            onChange={(e) => {
+              setSiteId(e.target.value);
+              setJobSheetId("");
+            }}
             disabled={!selectedProject?.client_id}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           >
@@ -80,6 +89,22 @@ export function CreateJobForm({
             {projectSites.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-muted-foreground text-xs">Job sheet (optional)</label>
+          <select
+            value={jobSheetId}
+            onChange={(e) => setJobSheetId(e.target.value)}
+            disabled={!siteId}
+            className="border-input h-9 w-56 rounded-md border bg-transparent px-2 text-sm"
+          >
+            <option value="">{siteId ? "None" : "Pick a site first"}</option>
+            {siteJobSheets.map((js) => (
+              <option key={js.id} value={js.id}>
+                {js.reference}
               </option>
             ))}
           </select>

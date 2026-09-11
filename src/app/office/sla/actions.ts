@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { nextJobNumber } from "@/lib/jobs/job-number";
 import { maxJobSequenceForYear } from "@/lib/jobs/next-job-number";
+import { assignJobSheetToJob } from "../job-sheets/[id]/actions";
 
 export type CreateSlaJobResult = { ok: true; jobId: string } | { ok: false; message: string };
 
@@ -16,8 +17,17 @@ export type CreateSlaJobResult = { ok: true; jobId: string } | { ok: false; mess
  * — the only real difference is that fixture_type_id is set on job_details
  * right away, since (unlike every other job type) the office already knows
  * what broke before the job exists at all.
+ *
+ * jobSheetId is optional, same as createJob's — an SLA callout sometimes
+ * already has a replacement unit prepared on a Job Sheet, so it can be
+ * linked right here instead of a separate trip to assign it afterward.
  */
-export async function createSlaJob(clientId: string, siteId: string, fixtureTypeId: string): Promise<CreateSlaJobResult> {
+export async function createSlaJob(
+  clientId: string,
+  siteId: string,
+  fixtureTypeId: string,
+  jobSheetId?: string,
+): Promise<CreateSlaJobResult> {
   if (!clientId) return { ok: false, message: "Select a customer." };
   if (!siteId) return { ok: false, message: "Select a site." };
   if (!fixtureTypeId) return { ok: false, message: "Select a fixture type." };
@@ -34,6 +44,11 @@ export async function createSlaJob(clientId: string, siteId: string, fixtureType
   ]);
   if (site?.client_id !== clientId) return { ok: false, message: "That site doesn't belong to this customer." };
   if (fixtureType?.client_id !== clientId) return { ok: false, message: "That fixture type doesn't belong to this customer." };
+
+  if (jobSheetId) {
+    const { data: jobSheet } = await supabase.from("job_sheets").select("site_id").eq("id", jobSheetId).single();
+    if (jobSheet?.site_id !== siteId) return { ok: false, message: "That job sheet belongs to a different site." };
+  }
 
   const year = new Date().getFullYear();
   const maxSeq = await maxJobSequenceForYear(supabase, year);
@@ -55,6 +70,11 @@ export async function createSlaJob(clientId: string, siteId: string, fixtureType
     .from("job_details")
     .upsert({ job_id: job.id, fixture_type_id: fixtureTypeId }, { onConflict: "job_id" });
   if (detailsError) return { ok: false, message: detailsError.message };
+
+  if (jobSheetId) {
+    const linkResult = await assignJobSheetToJob(jobSheetId, job.id);
+    if (!linkResult.ok) return { ok: false, message: `SLA created, but failed to link the job sheet: ${linkResult.message}` };
+  }
 
   revalidatePath("/office/sla");
   return { ok: true, jobId: job.id };

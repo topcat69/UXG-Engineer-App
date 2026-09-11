@@ -51,12 +51,15 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     filters,
   );
 
-  const [{ data: jobs, count, error }, { data: projects }, { data: engineers }, { data: sites }] =
+  const [{ data: jobs, count, error }, { data: projects }, { data: engineers }, { data: sites }, { data: jobSheets }] =
     await Promise.all([
       query,
       supabase.from("projects").select("id, name, client_id, client:clients(name)").order("name"),
       supabase.from("users").select("id, name").in("role", ["engineer", "manager", "superadmin"]).eq("active", true).order("name"),
       supabase.from("sites").select("id, name, client_id").order("name"),
+      // Only sheets not already linked elsewhere — same "assigned" meaning
+      // AssignToJobForm gives linked_job_id on the job-sheet side.
+      supabase.from("job_sheets").select("id, reference, site_id").is("linked_job_id", null).order("reference"),
     ]);
 
   if (error) {
@@ -83,7 +86,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         </div>
       </div>
 
-      <CreateJobForm projects={projects ?? []} sites={sites ?? []} />
+      <CreateJobForm projects={projects ?? []} sites={sites ?? []} jobSheets={jobSheets ?? []} />
 
       <form className="flex flex-wrap items-end gap-2" method="get">
         <div className="flex flex-col gap-1">

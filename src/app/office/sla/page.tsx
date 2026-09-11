@@ -15,7 +15,7 @@ const PAGE_SIZE = 50;
 export default async function SlaJobsPage() {
   const supabase = await createClient();
 
-  const [{ data: jobs, count, error }, { data: clients }, { data: sites }, { data: fixtureTypes }, { data: engineers }] =
+  const [{ data: jobs, count, error }, { data: clients }, { data: sites }, { data: fixtureTypes }, { data: engineers }, { data: jobSheets }] =
     await Promise.all([
       supabase
         .from("jobs")
@@ -30,6 +30,8 @@ export default async function SlaJobsPage() {
       supabase.from("sites").select("id, name, client_id").order("name"),
       supabase.from("client_sla_fixture_types").select("id, name, client_id").order("name"),
       supabase.from("users").select("id, name").in("role", ["engineer", "manager", "superadmin"]).eq("active", true).order("name"),
+      // Same "not already linked elsewhere" pool the New Job form offers.
+      supabase.from("job_sheets").select("id, reference, site_id").is("linked_job_id", null).order("reference"),
     ]);
 
   if (error) {
@@ -48,7 +50,7 @@ export default async function SlaJobsPage() {
         <span className="text-muted-foreground text-sm">{count ?? 0} total</span>
       </div>
 
-      <CreateSlaForm clients={clients ?? []} sites={sites ?? []} fixtureTypes={fixtureTypes ?? []} />
+      <CreateSlaForm clients={clients ?? []} sites={sites ?? []} fixtureTypes={fixtureTypes ?? []} jobSheets={jobSheets ?? []} />
 
       <JobsTable jobs={(jobs ?? []) as unknown as JobRow[]} engineers={engineers ?? []} />
     </div>
