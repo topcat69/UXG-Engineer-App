@@ -30,7 +30,7 @@ test("superadmin and manager have different user-management reach, per the users
     .locator("section", { hasText: "Add a user" })
     .locator("select option")
     .allTextContents();
-  expect(superadminRoles.sort()).toEqual(["Engineer", "Manager", "Superadmin", "Warehouse"].sort());
+  expect(superadminRoles.sort()).toEqual(["Standard User", "Manager", "Superadmin", "Warehouse"].sort());
 
   const managerEmail = `${tag.toLowerCase()}-manager@gmail.com`;
   const createForm = page.locator("section", { hasText: "Add a user" });
@@ -50,7 +50,7 @@ test("superadmin and manager have different user-management reach, per the users
     .locator("section", { hasText: "Add a user" })
     .locator("select option")
     .allTextContents();
-  expect(managerRoles).toEqual(["Engineer"]);
+  expect(managerRoles).toEqual(["Standard User"]);
 
   const superadminRow = managerPage.locator("tr", { hasText: "admin@opoc.test" });
   await expect(superadminRow.getByRole("button", { name: /Deactivate|Reactivate/ })).toHaveCount(0);
