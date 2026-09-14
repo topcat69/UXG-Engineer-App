@@ -37,7 +37,15 @@ function canManage(actorRole: UserRole, targetRole: UserRole): boolean {
  * long that refresh took. revalidatePath in each server action already
  * keeps other tabs/next-visits consistent, so it's not load-bearing here.
  */
-export function UsersManager({ currentUser, users: initialUsers }: { currentUser: CurrentUser; users: UserRow[] }) {
+export function UsersManager({
+  currentUser,
+  users: initialUsers,
+  lastSignInByUserId,
+}: {
+  currentUser: CurrentUser;
+  users: UserRow[];
+  lastSignInByUserId: Record<string, string | null>;
+}) {
   const [users, setUsers] = useState(initialUsers);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -194,6 +202,7 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
             <th className="py-2 font-medium">Role</th>
             <th className="py-2 font-medium">Status</th>
             <th className="py-2 font-medium">Sign-in</th>
+            <th className="py-2 font-medium">Last login</th>
             <th className="py-2 font-medium">Actions</th>
           </tr>
         </thead>
@@ -246,6 +255,9 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
                       {u.allow_password_login ? "Password" : "Google only"}
                     </Badge>
                   )}
+                </td>
+                <td className="py-2 text-muted-foreground">
+                  {lastSignInByUserId[u.id] ? new Date(lastSignInByUserId[u.id]!).toLocaleString() : "Never"}
                 </td>
                 <td className="py-2">
                   {manageable && (
