@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import type { Database } from "@/lib/supabase/database.types";
-import { humanize } from "@/lib/format/text";
+import { roleLabel } from "@/lib/format/text";
 import {
   changeUserRole,
   createUser,
@@ -215,12 +215,12 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
                     >
                       {ALL_ROLES.map((r) => (
                         <option key={r} value={r}>
-                          {humanize(r)}
+                          {roleLabel(r)}
                         </option>
                       ))}
                     </select>
                   ) : (
-                    <Badge variant="secondary">{humanize(u.role)}</Badge>
+                    <Badge variant="secondary">{roleLabel(u.role)}</Badge>
                   )}
                 </td>
                 <td className="py-2">
@@ -410,7 +410,7 @@ export function UsersManager({ currentUser, users: initialUsers }: { currentUser
             >
               {creatableRoles.map((r) => (
                 <option key={r} value={r}>
-                  {humanize(r)}
+                  {roleLabel(r)}
                 </option>
               ))}
             </select>

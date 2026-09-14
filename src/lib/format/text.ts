@@ -32,3 +32,14 @@ export function humanize(value: string): string {
 export function titleCase(value: string): string {
   return value.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+/**
+ * Display label for a `user_role` value. Same as humanize() for every role
+ * except "engineer", which is shown to users as "Standard User" — the
+ * database enum value and every permission check stay "engineer"; this is
+ * a display-only rename.
+ */
+export function roleLabel(role: string): string {
+  if (role === "engineer") return "Standard User";
+  return humanize(role);
+}

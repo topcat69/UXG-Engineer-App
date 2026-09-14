@@ -1,6 +1,6 @@
 import { requireWarehouseUser } from "@/lib/auth/current-user";
 import { signOut } from "@/lib/auth/actions";
-import { humanize } from "@/lib/format/text";
+import { roleLabel } from "@/lib/format/text";
 import { UxgLogo } from "@/components/branding/uxg-logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 
@@ -19,7 +19,7 @@ export default async function KioskLayout({ children }: { children: React.ReactN
         <UxgLogo className="h-6 w-auto" />
         <div className="flex items-center gap-3 text-sm">
           <span className="text-muted-foreground">
-            {user.name} · {humanize(user.role)}
+            {user.name} · {roleLabel(user.role)}
           </span>
           <ThemeSwitcher currentTheme={user.theme} />
           <form action={signOut}>

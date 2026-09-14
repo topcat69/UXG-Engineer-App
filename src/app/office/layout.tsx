@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireOfficeUser } from "@/lib/auth/current-user";
 import { signOut } from "@/lib/auth/actions";
-import { humanize } from "@/lib/format/text";
+import { roleLabel } from "@/lib/format/text";
 import { UxgLogo } from "@/components/branding/uxg-logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { AdminToolsNav } from "@/components/office/admin-tools-nav";
@@ -57,7 +57,7 @@ export default async function OfficeLayout({ children }: { children: React.React
             />
           </form>
           <span className="text-muted-foreground">
-            {user.name} · {humanize(user.role)}
+            {user.name} · {roleLabel(user.role)}
           </span>
           <Link href="/my-jobs" className="text-muted-foreground hover:text-foreground underline">
             My Jobs (field app)
