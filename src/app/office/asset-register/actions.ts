@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { buildCategoryLookup, buildSiteLookup, parseAssetRegisterCsv, resolveAssetRegisterRows } from "@/lib/csv/asset-register";
 import type { Database } from "@/lib/supabase/database.types";
 import type { NamedItemResult, NamedDeleteResult } from "@/components/office/flat-list-section";
 
@@ -182,4 +183,93 @@ export async function deleteAssetRegisterRow(id: string): Promise<ActionResult> 
 
   revalidatePath("/office/asset-register");
   return { ok: true };
+}
+
+// --- Phase 2: bulk CSV import ---
+
+export type ImportedAssetRow = AssetRegisterRow & {
+  category: { name: string } | null;
+  site: { name: string; client: { name: string } | null } | null;
+};
+
+export type ImportAssetRegisterResult =
+  | { ok: true; message: string; insertedAssets: ImportedAssetRow[]; newCategories: { id: string; name: string }[] }
+  | { ok: false; message: string };
+
+/**
+ * Bulk-imports legacy/pre-existing assets that never went through
+ * goods-in — the fourth entry door, alongside goods-in, manual add, and
+ * (in principle) a future integration. A category name in the file that
+ * doesn't already exist is created on the fly (categories are just a
+ * curated picklist — no reason to make someone pre-create every one by
+ * hand before a big import); sites are never created here, since a site
+ * carries far more detail than this file has room for — an unknown site
+ * name is always a row error.
+ */
+export async function importAssetRegisterCsv(formData: FormData): Promise<ImportAssetRegisterResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, message: "Not signed in." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, message: "Choose a CSV file first." };
+  }
+
+  const text = await file.text();
+  const { rows: parsedRows, errors: parseErrors } = parseAssetRegisterCsv(text);
+  if (parsedRows.length === 0) {
+    return { ok: false, message: parseErrors[0] ?? "No valid rows found." };
+  }
+
+  const supabase = await createClient();
+
+  const { data: existingCategories } = await supabase.from("asset_categories").select("id, name");
+  const categoryLookup = buildCategoryLookup(existingCategories ?? []);
+
+  const namesToCreate = new Map<string, string>();
+  for (const row of parsedRows) {
+    const name = row.categoryName;
+    if (!name) continue;
+    const key = name.trim().toLowerCase();
+    if (!categoryLookup.has(key) && !namesToCreate.has(key)) namesToCreate.set(key, name.trim());
+  }
+
+  const newCategories: { id: string; name: string }[] = [];
+  if (namesToCreate.size > 0) {
+    const { data: created, error: createError } = await supabase
+      .from("asset_categories")
+      .insert([...namesToCreate.values()].map((name) => ({ name })))
+      .select("id, name");
+    if (createError) return { ok: false, message: `Failed to create new categories: ${createError.message}` };
+    for (const c of created ?? []) {
+      categoryLookup.set(c.name.trim().toLowerCase(), c.id);
+      newCategories.push(c);
+    }
+  }
+
+  const { data: sites } = await supabase.from("sites").select("id, name, client:clients(name)");
+  const siteLookup = buildSiteLookup((sites ?? []).map((s) => ({ id: s.id, name: s.name, clientName: s.client?.name ?? null })));
+
+  const { rows: resolvedRows, errors: resolveErrors } = resolveAssetRegisterRows(parsedRows, categoryLookup, siteLookup);
+  const errors = [...parseErrors, ...resolveErrors];
+
+  if (resolvedRows.length === 0) {
+    return { ok: false, message: errors[0] ?? "No valid rows found." };
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("asset_register")
+    .insert(resolvedRows.map((row) => ({ ...row, created_by: user.id, updated_by: user.id })))
+    .select(`${ASSET_SELECT}, category:asset_categories(name), site:sites(name, client:clients(name))`);
+  if (insertError) return { ok: false, message: insertError.message };
+
+  revalidatePath("/office/asset-register");
+
+  const suffix = errors.length > 0 ? ` (${errors.length} row(s) skipped: ${errors.slice(0, 3).join("; ")})` : "";
+  return {
+    ok: true,
+    message: `Imported ${inserted.length} asset(s).${suffix}`,
+    insertedAssets: inserted,
+    newCategories,
+  };
 }

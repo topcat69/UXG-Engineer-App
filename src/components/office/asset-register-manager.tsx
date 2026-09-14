@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FlatListSection, type NamedListRow } from "@/components/office/flat-list-section";
@@ -11,6 +11,7 @@ import {
   createAssetManually,
   deleteAssetCategory,
   deleteAssetRegisterRow,
+  importAssetRegisterCsv,
   updateAssetCategory,
   updateAssetRegister,
   type AssetFieldsInput,
@@ -93,7 +94,9 @@ function assetLabel(asset: AssetWithJoins): string {
  * requireFinanceUser). canManageCategories/canDelete default true for the
  * office page; /finance passes both false, matching the RLS grants in
  * 20260914040000_finance_asset_register_access.sql (Finance can view,
- * add, and edit — not delete rows or curate the category picklist).
+ * add, and edit — not delete rows, curate the category picklist, or run
+ * a bulk import — canImport also defaults true for the office page and
+ * false for /finance, same reasoning as the other two flags).
  */
 export function AssetRegisterManager({
   initialAssets,
@@ -101,18 +104,24 @@ export function AssetRegisterManager({
   sites,
   canManageCategories = true,
   canDelete = true,
+  canImport = true,
 }: {
   initialAssets: AssetWithJoins[];
   categories: NamedListRow[];
   sites: SiteOption[];
   canManageCategories?: boolean;
   canDelete?: boolean;
+  canImport?: boolean;
 }) {
   const [assets, setAssets] = useState(initialAssets);
   const [categories, setCategories] = useState(initialCategories);
   const [needsReviewOnly, setNeedsReviewOnly] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [isImporting, startImportTransition] = useTransition();
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFields, setEditFields] = useState<AssetFieldsInput>(EMPTY_FIELDS);
@@ -173,6 +182,20 @@ export function AssetRegisterManager({
         setMessage(null);
       } else {
         setMessage(result.message);
+      }
+    });
+  }
+
+  function handleImport(formData: FormData) {
+    startImportTransition(async () => {
+      const result = await importAssetRegisterCsv(formData);
+      setImportMessage(result.message);
+      if (result.ok) {
+        setAssets((prev) => [...result.insertedAssets, ...prev]);
+        if (result.newCategories.length > 0) {
+          setCategories((prev) => [...prev, ...result.newCategories].sort((a, b) => a.name.localeCompare(b.name)));
+        }
+        if (importFileInputRef.current) importFileInputRef.current.value = "";
       }
     });
   }
@@ -302,6 +325,30 @@ export function AssetRegisterManager({
           onDeleted={(id) => setCategories((prev) => prev.filter((c) => c.id !== id))}
           confirmDeleteText="Delete this category? Assets using it fall back to uncategorised — this can't be undone."
         />
+      )}
+
+      {canImport && (
+        <section className="flex flex-col gap-3 rounded-md border p-3">
+          <h2 className="font-medium">Import assets from CSV</h2>
+          <p className="text-muted-foreground text-xs">
+            For legacy assets that never went through goods-in. Columns: <code>category</code>, <code>manufacturer</code>,{" "}
+            <code>model</code>, <code>serial_number</code>, <code>site</code>, <code>client</code> (only needed if two sites
+            share a name), <code>purchase_date</code>, <code>supplier</code>, <code>po_or_invoice_number</code>,{" "}
+            <code>purchase_cost</code>, <code>depreciation_method</code>, <code>useful_life_years</code>,{" "}
+            <code>residual_value</code>, <code>warranty_start</code>, <code>warranty_end</code>, <code>warranty_provider</code>,{" "}
+            <code>support_contract_ref</code>, <code>support_sla</code>, <code>status</code> (defaults to Spare),{" "}
+            <code>expected_replacement_date</code>, <code>decommission_date</code>, <code>disposal_date</code>,{" "}
+            <code>weee_reference</code>. All optional except site, which is required unless status is Spare. A category
+            that doesn&apos;t exist yet is created automatically; an unrecognised site is a row error, not a new site.
+          </p>
+          <form action={handleImport} className="flex flex-wrap items-center gap-2">
+            <input ref={importFileInputRef} type="file" name="file" accept=".csv,text/csv" required className="text-sm" />
+            <Button type="submit" size="sm" disabled={isImporting}>
+              {isImporting ? "Importing…" : "Import"}
+            </Button>
+          </form>
+          {importMessage && <p className="text-sm">{importMessage}</p>}
+        </section>
       )}
 
       <div className="flex items-center justify-between">
