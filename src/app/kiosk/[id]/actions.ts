@@ -86,6 +86,15 @@ async function ensureCatalogEntry(
  * lock stages" — Warehouse can keep adding after Configurator has
  * started, and this never regresses a sheet that's moved further on.
  */
+/** Next `position` for a new job_sheet_tests row — shared by every path that adds one. */
+async function nextTestPosition(supabase: SupabaseServerClient, jobSheetId: string): Promise<number> {
+  const { count } = await supabase
+    .from("job_sheet_tests")
+    .select("id", { count: "exact", head: true })
+    .eq("job_sheet_id", jobSheetId);
+  return (count ?? 0) + 1;
+}
+
 export async function addStockItem(
   jobSheetId: string,
   manufacturer: string,
@@ -107,25 +116,39 @@ export async function addStockItem(
   const trimmedModel = model.trim();
   const trimmedDescription = description.trim();
 
-  const { error } = await supabase.from("stock_items").insert({
-    job_sheet_id: jobSheetId,
-    manufacturer: trimmedManufacturer || null,
-    model: trimmedModel || null,
-    description: trimmedDescription || null,
-    serial_no: serialNo.trim() || null,
-    hw_id: hwId.trim() || null,
-    firmware_update: firmwareUpdate.trim() || null,
-    tested,
-    tested_at: tested ? now : null,
-    tested_by: tested ? user.id : null,
-    damaged,
-    damage_notes: damaged ? damageNotes.trim() || null : null,
-    received_by: user.id,
-    received_at: now,
-  });
+  const { data: stockItem, error } = await supabase
+    .from("stock_items")
+    .insert({
+      job_sheet_id: jobSheetId,
+      manufacturer: trimmedManufacturer || null,
+      model: trimmedModel || null,
+      description: trimmedDescription || null,
+      serial_no: serialNo.trim() || null,
+      hw_id: hwId.trim() || null,
+      firmware_update: firmwareUpdate.trim() || null,
+      tested,
+      tested_at: tested ? now : null,
+      tested_by: tested ? user.id : null,
+      damaged,
+      damage_notes: damaged ? damageNotes.trim() || null : null,
+      received_by: user.id,
+      received_at: now,
+    })
+    .select("id")
+    .single();
   if (error) return { ok: false, message: error.message };
 
   await ensureCatalogEntry(supabase, trimmedManufacturer, trimmedModel, trimmedDescription);
+
+  // Every scanned-in item is something to configure — give it a
+  // Configuration row automatically, so nobody has to re-type what's
+  // already on the Stock Items table. Best-effort: a failure here shouldn't
+  // block the goods-in scan that already succeeded above.
+  await supabase.from("job_sheet_tests").insert({
+    job_sheet_id: jobSheetId,
+    position: await nextTestPosition(supabase, jobSheetId),
+    stock_item_id: stockItem.id,
+  });
 
   const { data: jobSheet } = await supabase.from("job_sheets").select("status").eq("id", jobSheetId).single();
   if (jobSheet?.status === "building") {
@@ -139,36 +162,25 @@ export async function addStockItem(
 
 export type ActionResult = { ok: true } | { ok: false; message: string };
 
-/** One row per functional test — the "all players etc tested" grid, separate from a Stock Item's own receipt-time tested flag. */
-export async function addTestResult(
-  jobSheetId: string,
-  itemDescription: string,
-  irBud: boolean,
-  wifiCable: string,
-  tested: boolean,
-  outcome: string,
-  notes: string,
-): Promise<ActionResult> {
+/**
+ * For an item that's part of this job but never went through goods-in
+ * (e.g. hardware already on site) — every goods-in scan gets its own
+ * Configuration row automatically instead (see addStockItem). Everything
+ * else about the row — Wi-Fi Dongle, Tested, Licence/TeamViewer/Philips
+ * Wave/UXG account, Outcome, Notes — is filled in afterward via the row
+ * itself, not at creation, same as a goods-in row starts blank too.
+ */
+export async function addTestResult(jobSheetId: string, itemDescription: string): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Not signed in." };
+  if (!itemDescription.trim()) return { ok: false, message: "Item description is required." };
 
   const supabase = await createClient();
 
-  const { count } = await supabase
-    .from("job_sheet_tests")
-    .select("id", { count: "exact", head: true })
-    .eq("job_sheet_id", jobSheetId);
-
   const { error } = await supabase.from("job_sheet_tests").insert({
     job_sheet_id: jobSheetId,
-    position: (count ?? 0) + 1,
-    item_description: itemDescription.trim() || null,
-    ir_bud: irBud,
-    wifi_cable: wifiCable.trim() || null,
-    tested,
-    tested_by: tested ? user.id : null,
-    outcome: outcome.trim() || null,
-    notes: notes.trim() || null,
+    position: await nextTestPosition(supabase, jobSheetId),
+    item_description: itemDescription.trim(),
   });
   if (error) return { ok: false, message: error.message };
 
@@ -178,14 +190,103 @@ export async function addTestResult(
   return { ok: true };
 }
 
+export type TestResultFlagKey =
+  | "tested"
+  | "licence_added"
+  | "teamviewer_added"
+  | "philips_wave_added"
+  | "added_to_uxg_account";
+
+/**
+ * One checkbox at a time, same optimistic-toggle pattern as
+ * setStockItemTested — explicit switch (not a dynamic `{[field]: value}`)
+ * so every column name stays checked against the generated Database type.
+ */
+export async function updateTestResultFlag(
+  testId: string,
+  jobSheetId: string,
+  field: TestResultFlagKey,
+  value: boolean,
+): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, message: "Not signed in." };
+
+  const supabase = await createClient();
+  let update: Database["public"]["Tables"]["job_sheet_tests"]["Update"];
+  switch (field) {
+    case "tested":
+      update = { tested: value, tested_by: value ? user.id : null };
+      break;
+    case "licence_added":
+      update = { licence_added: value };
+      break;
+    case "teamviewer_added":
+      update = { teamviewer_added: value };
+      break;
+    case "philips_wave_added":
+      update = { philips_wave_added: value };
+      break;
+    case "added_to_uxg_account":
+      update = { added_to_uxg_account: value };
+      break;
+  }
+
+  const { error } = await supabase.from("job_sheet_tests").update(update).eq("id", testId);
+  if (error) return { ok: false, message: error.message };
+
+  await bumpToConfiguring(supabase, jobSheetId);
+
+  revalidatePath(`/kiosk/${jobSheetId}`);
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  return { ok: true };
+}
+
+/** "" clears it back to unanswered — Yes/No/N/A are the only real answers, matching what the kiosk's dropdown offers. */
+export async function updateTestResultWifiDongle(testId: string, jobSheetId: string, value: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("job_sheet_tests")
+    .update({ wifi_dongle: value || null })
+    .eq("id", testId);
+  if (error) return { ok: false, message: error.message };
+
+  await bumpToConfiguring(supabase, jobSheetId);
+
+  revalidatePath(`/kiosk/${jobSheetId}`);
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  return { ok: true };
+}
+
+export type TestResultDetailsInput = { outcome: string; notes: string };
+
+/** Outcome/Notes — free text, so these get an explicit Save rather than the checkboxes'/dropdown's save-on-change. */
+export async function updateTestResultDetails(
+  testId: string,
+  jobSheetId: string,
+  input: TestResultDetailsInput,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("job_sheet_tests")
+    .update({ outcome: input.outcome.trim() || null, notes: input.notes.trim() || null })
+    .eq("id", testId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/kiosk/${jobSheetId}`);
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  return { ok: true };
+}
+
 export type SoftwareSetupInput = {
   cmsName: string;
-  licenceAdded: boolean;
-  teamviewerAdded: boolean;
-  addedToUxgAccount: boolean;
   softwareNotes: string;
 };
 
+/**
+ * Licence/TeamViewer/UXG account moved to per-item Configuration rows —
+ * see updateTestResultFlag — since each item needs its own answer, not
+ * one shared for the whole sheet.
+ */
 export async function updateSoftwareSetup(jobSheetId: string, input: SoftwareSetupInput): Promise<ActionResult> {
   const supabase = await createClient();
 
@@ -193,9 +294,6 @@ export async function updateSoftwareSetup(jobSheetId: string, input: SoftwareSet
     .from("job_sheets")
     .update({
       cms_name: input.cmsName.trim() || null,
-      licence_added: input.licenceAdded,
-      teamviewer_added: input.teamviewerAdded,
-      added_to_uxg_account: input.addedToUxgAccount,
       software_notes: input.softwareNotes.trim() || null,
     })
     .eq("id", jobSheetId);

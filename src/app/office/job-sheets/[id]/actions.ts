@@ -64,6 +64,11 @@ export async function reassignStockItem(stockItemId: string, fromJobSheetId: str
   const { error } = await supabase.from("stock_items").update({ job_sheet_id: toJobSheetId }).eq("id", stockItemId);
   if (error) return { ok: false, message: error.message };
 
+  // Its Configuration row (see addStockItem in kiosk/[id]/actions.ts)
+  // moves with it — otherwise it'd keep showing up on the sheet the item
+  // just left.
+  await supabase.from("job_sheet_tests").update({ job_sheet_id: toJobSheetId }).eq("stock_item_id", stockItemId);
+
   revalidatePath(`/office/job-sheets/${fromJobSheetId}`);
   revalidatePath(`/office/job-sheets/${toJobSheetId}`);
   revalidatePath("/office/job-sheets");

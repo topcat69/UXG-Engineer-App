@@ -528,43 +528,55 @@ export type Database = {
       }
       job_sheet_tests: {
         Row: {
+          added_to_uxg_account: boolean | null
           created_at: string | null
           id: string
-          ir_bud: boolean | null
           item_description: string | null
           job_sheet_id: string
+          licence_added: boolean | null
           notes: string | null
           outcome: string | null
+          philips_wave_added: boolean | null
           position: number
+          stock_item_id: string | null
+          teamviewer_added: boolean | null
           tested: boolean | null
           tested_by: string | null
-          wifi_cable: string | null
+          wifi_dongle: string | null
         }
         Insert: {
+          added_to_uxg_account?: boolean | null
           created_at?: string | null
           id?: string
-          ir_bud?: boolean | null
           item_description?: string | null
           job_sheet_id: string
+          licence_added?: boolean | null
           notes?: string | null
           outcome?: string | null
+          philips_wave_added?: boolean | null
           position: number
+          stock_item_id?: string | null
+          teamviewer_added?: boolean | null
           tested?: boolean | null
           tested_by?: string | null
-          wifi_cable?: string | null
+          wifi_dongle?: string | null
         }
         Update: {
+          added_to_uxg_account?: boolean | null
           created_at?: string | null
           id?: string
-          ir_bud?: boolean | null
           item_description?: string | null
           job_sheet_id?: string
+          licence_added?: boolean | null
           notes?: string | null
           outcome?: string | null
+          philips_wave_added?: boolean | null
           position?: number
+          stock_item_id?: string | null
+          teamviewer_added?: boolean | null
           tested?: boolean | null
           tested_by?: string | null
-          wifi_cable?: string | null
+          wifi_dongle?: string | null
         }
         Relationships: [
           {
@@ -572,6 +584,13 @@ export type Database = {
             columns: ["job_sheet_id"]
             isOneToOne: false
             referencedRelation: "job_sheets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheet_tests_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
             referencedColumns: ["id"]
           },
           {
@@ -585,7 +604,6 @@ export type Database = {
       }
       job_sheets: {
         Row: {
-          added_to_uxg_account: boolean | null
           cms_name: string | null
           created_at: string | null
           created_by: string | null
@@ -595,7 +613,6 @@ export type Database = {
           defects_photo_path: string | null
           id: string
           job_description: string | null
-          licence_added: boolean | null
           linked_job_id: string | null
           missing_items: boolean | null
           missing_items_detail: string | null
@@ -621,12 +638,10 @@ export type Database = {
           site_id: string
           software_notes: string | null
           status: Database["public"]["Enums"]["job_sheet_status"]
-          teamviewer_added: boolean | null
           updated_at: string | null
           work_area_tidy: boolean | null
         }
         Insert: {
-          added_to_uxg_account?: boolean | null
           cms_name?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -636,7 +651,6 @@ export type Database = {
           defects_photo_path?: string | null
           id?: string
           job_description?: string | null
-          licence_added?: boolean | null
           linked_job_id?: string | null
           missing_items?: boolean | null
           missing_items_detail?: string | null
@@ -662,12 +676,10 @@ export type Database = {
           site_id: string
           software_notes?: string | null
           status?: Database["public"]["Enums"]["job_sheet_status"]
-          teamviewer_added?: boolean | null
           updated_at?: string | null
           work_area_tidy?: boolean | null
         }
         Update: {
-          added_to_uxg_account?: boolean | null
           cms_name?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -677,7 +689,6 @@ export type Database = {
           defects_photo_path?: string | null
           id?: string
           job_description?: string | null
-          licence_added?: boolean | null
           linked_job_id?: string | null
           missing_items?: boolean | null
           missing_items_detail?: string | null
@@ -703,7 +714,6 @@ export type Database = {
           site_id?: string
           software_notes?: string | null
           status?: Database["public"]["Enums"]["job_sheet_status"]
-          teamviewer_added?: boolean | null
           updated_at?: string | null
           work_area_tidy?: boolean | null
         }

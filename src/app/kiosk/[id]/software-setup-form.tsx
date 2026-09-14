@@ -5,35 +5,46 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { updateSoftwareSetup } from "./actions";
 
+const OTHER = "__other__";
+const NA = "N/A";
+
+function initialChoice(cmsName: string | null, providerNames: string[]): { choice: string; other: string } {
+  if (!cmsName) return { choice: "", other: "" };
+  if (cmsName === NA || providerNames.includes(cmsName)) return { choice: cmsName, other: "" };
+  return { choice: OTHER, other: cmsName };
+}
+
+/**
+ * Licence added/TeamViewer added/Added to UXG account moved to
+ * Configuration (see test-result-row.tsx) — this is just the CMS
+ * provider itself plus notes now. Same Other-fallback pattern as the
+ * Manufacturer/Model selects on AddStockItemForm: cms_name is still a
+ * plain text column, the dropdown is just curated convenience over it.
+ */
 export function SoftwareSetupForm({
   jobSheetId,
   cmsName,
-  licenceAdded,
-  teamviewerAdded,
-  addedToUxgAccount,
   softwareNotes,
+  softwareProviders,
 }: {
   jobSheetId: string;
   cmsName: string | null;
-  licenceAdded: boolean | null;
-  teamviewerAdded: boolean | null;
-  addedToUxgAccount: boolean | null;
   softwareNotes: string | null;
+  softwareProviders: { id: string; name: string }[];
 }) {
   const router = useRouter();
-  const [state, setState] = useState({
-    cmsName: cmsName ?? "",
-    licenceAdded: licenceAdded ?? false,
-    teamviewerAdded: teamviewerAdded ?? false,
-    addedToUxgAccount: addedToUxgAccount ?? false,
-    softwareNotes: softwareNotes ?? "",
-  });
+  const providerNames = softwareProviders.map((p) => p.name);
+  const initial = initialChoice(cmsName, providerNames);
+  const [choice, setChoice] = useState(initial.choice);
+  const [other, setOther] = useState(initial.other);
+  const [softwareNotesValue, setSoftwareNotesValue] = useState(softwareNotes ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSave() {
+    const resolvedCmsName = choice === OTHER ? other : choice;
     startTransition(async () => {
-      const result = await updateSoftwareSetup(jobSheetId, state);
+      const result = await updateSoftwareSetup(jobSheetId, { cmsName: resolvedCmsName, softwareNotes: softwareNotesValue });
       setMessage(result.ok ? "Saved." : result.message);
       if (result.ok) router.refresh();
     });
@@ -43,52 +54,40 @@ export function SoftwareSetupForm({
     <div className="flex flex-col gap-3 rounded-md border bg-muted/40 p-3">
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex flex-col gap-1">
-          <label className="text-muted-foreground text-xs">CMS name</label>
-          <input
-            type="text"
-            value={state.cmsName}
-            onChange={(e) => setState((s) => ({ ...s, cmsName: e.target.value }))}
+          <label className="text-muted-foreground text-xs">CMS provider</label>
+          <select
+            value={choice}
+            onChange={(e) => setChoice(e.target.value)}
             className="border-input h-9 w-48 rounded-md border bg-transparent px-2 text-sm"
-          />
+          >
+            <option value="">Select…</option>
+            {softwareProviders.map((p) => (
+              <option key={p.id} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+            <option value={OTHER}>Other…</option>
+            <option value={NA}>N/A</option>
+          </select>
+          {choice === OTHER && (
+            <input
+              type="text"
+              value={other}
+              onChange={(e) => setOther(e.target.value)}
+              placeholder="CMS provider name"
+              className="border-input h-9 w-48 rounded-md border bg-transparent px-2 text-sm"
+            />
+          )}
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-muted-foreground text-xs">Notes</label>
           <input
             type="text"
-            value={state.softwareNotes}
-            onChange={(e) => setState((s) => ({ ...s, softwareNotes: e.target.value }))}
+            value={softwareNotesValue}
+            onChange={(e) => setSoftwareNotesValue(e.target.value)}
             className="border-input h-9 w-64 rounded-md border bg-transparent px-2 text-sm"
           />
         </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={state.licenceAdded}
-            onChange={(e) => setState((s) => ({ ...s, licenceAdded: e.target.checked }))}
-            className="h-4 w-4"
-          />
-          Licence added
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={state.teamviewerAdded}
-            onChange={(e) => setState((s) => ({ ...s, teamviewerAdded: e.target.checked }))}
-            className="h-4 w-4"
-          />
-          TeamViewer added
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={state.addedToUxgAccount}
-            onChange={(e) => setState((s) => ({ ...s, addedToUxgAccount: e.target.checked }))}
-            className="h-4 w-4"
-          />
-          Added to UXG account
-        </label>
         <Button type="button" size="sm" disabled={isPending} onClick={handleSave}>
           {isPending ? "Saving…" : "Save"}
         </Button>

@@ -29,7 +29,7 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
       .select(
         `id, reference, status, proposed_install_date, job_description,
          site:sites(id, name, client:clients(name)), project:projects(name),
-         cms_name, licence_added, teamviewer_added, added_to_uxg_account, software_notes,
+         cms_name, software_notes,
          defects, missing_items, packed_correctly, other_parts_used, other_issues, work_area_tidy,
          signed_off_at, signed_off_user:users!job_sheets_signed_off_by_fkey(name),
          linked_job:jobs(id, job_number)`,
@@ -41,7 +41,14 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
       .select("id, manufacturer, model, serial_no, tested, damaged, image_path")
       .eq("job_sheet_id", id)
       .order("received_at", { ascending: false }),
-    supabase.from("job_sheet_tests").select("id, item_description, tested, outcome").eq("job_sheet_id", id).order("position"),
+    supabase
+      .from("job_sheet_tests")
+      .select(
+        `id, item_description, wifi_dongle, tested, licence_added, teamviewer_added, philips_wave_added,
+         added_to_uxg_account, outcome, stock_item:stock_items(manufacturer, model, serial_no)`,
+      )
+      .eq("job_sheet_id", id)
+      .order("position"),
   ]);
 
   if (jobSheetError || !jobSheet) notFound();
@@ -140,28 +147,38 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="font-medium">Testing ({(testResults ?? []).length})</h2>
+        <h2 className="font-medium">Configuration ({(testResults ?? []).length})</h2>
         {(testResults ?? []).length === 0 ? (
-          <p className="text-muted-foreground text-sm">No test results yet.</p>
+          <p className="text-muted-foreground text-sm">Nothing to configure yet.</p>
         ) : (
           <ul className="flex flex-col gap-1 text-sm">
-            {(testResults ?? []).map((t) => (
-              <li key={t.id}>
-                {t.item_description ?? "—"} — {t.tested ? "Tested" : "Not tested"}
-                {t.outcome ? ` (${t.outcome})` : ""}
-              </li>
-            ))}
+            {(testResults ?? []).map((t) => {
+              const label = t.stock_item
+                ? [t.stock_item.manufacturer, t.stock_item.model].filter(Boolean).join(" ") +
+                  (t.stock_item.serial_no ? ` — ${t.stock_item.serial_no}` : "")
+                : t.item_description ?? "—";
+              const done = [
+                t.licence_added && "Licence",
+                t.teamviewer_added && "TeamViewer",
+                t.philips_wave_added && "Philips Wave",
+                t.added_to_uxg_account && "UXG account",
+              ].filter(Boolean);
+              return (
+                <li key={t.id}>
+                  {label || "—"} — {t.tested ? "Tested" : "Not tested"}
+                  {t.wifi_dongle ? ` · Wi-Fi Dongle: ${humanize(t.wifi_dongle)}` : ""}
+                  {done.length > 0 ? ` · ${done.join(", ")}` : ""}
+                  {t.outcome ? ` (${t.outcome})` : ""}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
 
       <section className="flex flex-col gap-2">
         <h2 className="font-medium">Software / CMS setup</h2>
-        <p className="text-sm">
-          {jobSheet.cms_name ?? "No CMS set"} · Licence {jobSheet.licence_added ? "added" : "not added"} · TeamViewer{" "}
-          {jobSheet.teamviewer_added ? "added" : "not added"} · UXG account{" "}
-          {jobSheet.added_to_uxg_account ? "added" : "not added"}
-        </p>
+        <p className="text-sm">{jobSheet.cms_name ?? "No CMS set"}</p>
         {jobSheet.software_notes && <p className="text-muted-foreground text-sm">{jobSheet.software_notes}</p>}
       </section>
 

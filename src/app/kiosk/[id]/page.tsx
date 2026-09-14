@@ -11,6 +11,7 @@ import { ClosingChecklistForm } from "./closing-checklist-form";
 import { toItem, type ChecklistKey } from "./checklist-item";
 import { SignOffPanel } from "./sign-off-panel";
 import { StockItemRow } from "./stock-item-row";
+import { TestResultRow } from "./test-result-row";
 
 // Matches the TTL other pages use for their own signed URLs (see e.g.
 // office/knowledge-base/[id]/page.tsx) — this page is loaded fresh on every
@@ -27,12 +28,13 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
     { data: testResults },
     { data: manufacturers },
     { data: models },
+    { data: softwareProviders },
   ] = await Promise.all([
       supabase
         .from("job_sheets")
         .select(
           `id, reference, status, site:sites(name, client:clients(name)),
-           cms_name, licence_added, teamviewer_added, added_to_uxg_account, software_notes,
+           cms_name, software_notes,
            defects, defects_detail, defects_photo_path,
            missing_items, missing_items_detail, missing_items_photo_path,
            packed_correctly, packed_correctly_detail, packed_correctly_photo_path,
@@ -51,11 +53,15 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
         .order("received_at", { ascending: false }),
       supabase
         .from("job_sheet_tests")
-        .select("id, item_description, ir_bud, wifi_cable, tested, outcome, notes")
+        .select(
+          `id, item_description, wifi_dongle, tested, licence_added, teamviewer_added, philips_wave_added,
+           added_to_uxg_account, outcome, notes, stock_item:stock_items(manufacturer, model, serial_no)`,
+        )
         .eq("job_sheet_id", id)
         .order("position", { ascending: true }),
       supabase.from("stock_manufacturers").select("id, name").order("name"),
       supabase.from("stock_models").select("id, name, manufacturer_id, description").order("name"),
+      supabase.from("stock_software_providers").select("id, name").order("name"),
     ]);
 
   if (jobSheetError || !jobSheet) notFound();
@@ -139,15 +145,21 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="font-medium">Testing</h2>
+        <h2 className="font-medium">Configuration</h2>
+        <p className="text-muted-foreground text-sm">
+          Every item scanned in above gets a row here automatically — add one manually only for
+          something that&apos;s part of this job but never went through goods-in.
+        </p>
         <AddTestResultForm jobSheetId={jobSheet.id} />
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Item</TableHead>
-              <TableHead>IR bud</TableHead>
-              <TableHead>Wifi/cable</TableHead>
+              <TableHead>Wi-Fi Dongle</TableHead>
               <TableHead>Tested</TableHead>
+              <TableHead>Licence</TableHead>
+              <TableHead>TeamViewer / Philips Wave</TableHead>
+              <TableHead>UXG account</TableHead>
               <TableHead>Outcome</TableHead>
               <TableHead>Notes</TableHead>
             </TableRow>
@@ -155,20 +167,13 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
           <TableBody>
             {(testResults ?? []).length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground text-center">
-                  No test results yet.
+                <TableCell colSpan={8} className="text-muted-foreground text-center">
+                  Nothing to configure yet.
                 </TableCell>
               </TableRow>
             )}
             {(testResults ?? []).map((t) => (
-              <TableRow key={t.id}>
-                <TableCell>{t.item_description ?? "—"}</TableCell>
-                <TableCell>{t.ir_bud ? "Yes" : "No"}</TableCell>
-                <TableCell>{t.wifi_cable ?? "—"}</TableCell>
-                <TableCell>{t.tested ? "Yes" : "No"}</TableCell>
-                <TableCell>{t.outcome ?? "—"}</TableCell>
-                <TableCell>{t.notes ?? "—"}</TableCell>
-              </TableRow>
+              <TestResultRow key={t.id} jobSheetId={jobSheet.id} testResult={t} />
             ))}
           </TableBody>
         </Table>
@@ -179,10 +184,8 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
         <SoftwareSetupForm
           jobSheetId={jobSheet.id}
           cmsName={jobSheet.cms_name}
-          licenceAdded={jobSheet.licence_added}
-          teamviewerAdded={jobSheet.teamviewer_added}
-          addedToUxgAccount={jobSheet.added_to_uxg_account}
           softwareNotes={jobSheet.software_notes}
+          softwareProviders={softwareProviders ?? []}
         />
       </section>
 
