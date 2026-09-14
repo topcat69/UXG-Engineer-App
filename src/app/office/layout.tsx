@@ -11,7 +11,6 @@ const NAV = [
   { href: "/office/jobs", label: "Jobs" },
   { href: "/office/sla", label: "SLA" },
   { href: "/office/job-sheets", label: "Job Sheets" },
-  { href: "/office/stock", label: "Stock" },
   { href: "/office/scheduler", label: "Scheduler" },
   { href: "/office/qa", label: "Job Review" },
   { href: "/office/issues", label: "Issues" },
@@ -26,7 +25,10 @@ const ADMIN_TOOLS_NAV = [
   { href: "/office/import", label: "Import" },
   { href: "/office/templates", label: "Templates" },
   { href: "/office/knowledge-base", label: "Knowledge Base" },
+  { href: "/office/stock", label: "Stock" },
   { href: "/office/stock-catalog", label: "Stock Catalog" },
+  { href: "/office/asset-register", label: "Asset Register" },
+  { href: "/office/timesheets", label: "Timesheets" },
   { href: "/office/users", label: "Users" },
 ];
 
