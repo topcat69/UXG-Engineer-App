@@ -34,7 +34,7 @@ export type GeoPoint = { latitude: number; longitude: number };
  * write + status_event for the audit trail) but with no geofence check,
  * since the engineer isn't at the site yet.
  */
-export async function startTravelling(jobId: string, point: GeoPoint): Promise<void> {
+export async function startTravelling(jobId: string, point: GeoPoint, userId: string): Promise<void> {
   const job = await db.jobs.get(jobId);
   if (!job) throw new Error("Job not found locally");
   const now = new Date();
@@ -67,6 +67,7 @@ export async function startTravelling(jobId: string, point: GeoPoint): Promise<v
       jobId,
       fromStatus: job.status,
       toStatus: "travelling",
+      userId,
       reason: "Started travelling",
       occurredAt: nowIso,
       latitude: point.latitude,
@@ -88,6 +89,7 @@ export async function checkIn(
   jobId: string,
   geofenceVarianceM: number | null,
   point: GeoPoint | null,
+  userId: string,
 ): Promise<void> {
   const job = await db.jobs.get(jobId);
   if (!job) throw new Error("Job not found locally");
@@ -123,6 +125,7 @@ export async function checkIn(
       jobId,
       fromStatus: job.status,
       toStatus: "in_progress",
+      userId,
       reason: "Checked in",
       occurredAt: nowIso,
       latitude: point?.latitude,
@@ -147,7 +150,7 @@ export async function checkIn(
  * how the actual hours-worked figure is computed back out of the
  * resulting status_events history.
  */
-export async function pauseJob(jobId: string, reason: string): Promise<void> {
+export async function pauseJob(jobId: string, reason: string, userId: string): Promise<void> {
   const job = await db.jobs.get(jobId);
   if (!job) throw new Error("Job not found locally");
   const nowIso = new Date().toISOString();
@@ -160,6 +163,7 @@ export async function pauseJob(jobId: string, reason: string): Promise<void> {
       jobId,
       fromStatus: job.status,
       toStatus: "on_hold",
+      userId,
       reason,
       occurredAt: nowIso,
       createdAt: nowIso,
@@ -169,7 +173,7 @@ export async function pauseJob(jobId: string, reason: string): Promise<void> {
 }
 
 /** The other half of pauseJob — resumes a paused job back to in_progress, opening a fresh worked-duration interval. */
-export async function resumeJob(jobId: string): Promise<void> {
+export async function resumeJob(jobId: string, userId: string): Promise<void> {
   const job = await db.jobs.get(jobId);
   if (!job) throw new Error("Job not found locally");
   const nowIso = new Date().toISOString();
@@ -182,6 +186,7 @@ export async function resumeJob(jobId: string): Promise<void> {
       jobId,
       fromStatus: job.status,
       toStatus: "in_progress",
+      userId,
       reason: "Resumed",
       occurredAt: nowIso,
       createdAt: nowIso,
@@ -327,6 +332,7 @@ export async function submitJob(
       jobId,
       fromStatus: job.status,
       toStatus: "submitted",
+      userId: raisedBy,
       reason: "Submitted from field",
       occurredAt: nowIso,
       latitude: point?.latitude,
@@ -416,6 +422,7 @@ export async function submitJobDetails(
       jobId,
       fromStatus: job.status,
       toStatus: "submitted",
+      userId: raisedBy,
       reason: "Submitted from field",
       occurredAt: nowIso,
       latitude: point?.latitude,

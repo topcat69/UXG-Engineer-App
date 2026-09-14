@@ -39,6 +39,7 @@ export type OutboxOperation = OutboxBase &
         jobId: string;
         fromStatus: JobStatus | null;
         toStatus: JobStatus;
+        userId: string;
         reason?: string;
         occurredAt: string;
         latitude?: number;

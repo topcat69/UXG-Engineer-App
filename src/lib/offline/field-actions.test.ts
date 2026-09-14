@@ -228,7 +228,7 @@ describe("pauseJob / resumeJob", () => {
 
   it("sets the job on_hold locally and queues a status_event carrying the required reason", async () => {
     await db.jobs.put(jobRow({ status: "in_progress" }));
-    await pauseJob("job-1", "Waiting on parts");
+    await pauseJob("job-1", "Waiting on parts", "engineer-1");
 
     const job = await db.jobs.get("job-1");
     expect(job?.status).toBe("on_hold");
@@ -240,13 +240,14 @@ describe("pauseJob / resumeJob", () => {
       jobId: "job-1",
       fromStatus: "in_progress",
       toStatus: "on_hold",
+      userId: "engineer-1",
       reason: "Waiting on parts",
     });
   });
 
   it("resumes a paused job back to in_progress, queuing a matching status_event", async () => {
     await db.jobs.put(jobRow({ status: "on_hold" }));
-    await resumeJob("job-1");
+    await resumeJob("job-1", "engineer-1");
 
     const job = await db.jobs.get("job-1");
     expect(job?.status).toBe("in_progress");
@@ -258,11 +259,12 @@ describe("pauseJob / resumeJob", () => {
       jobId: "job-1",
       fromStatus: "on_hold",
       toStatus: "in_progress",
+      userId: "engineer-1",
     });
   });
 
   it("throws rather than silently no-op-ing when the job isn't in Dexie yet", async () => {
-    await expect(pauseJob("missing-job", "Reason")).rejects.toThrow("Job not found locally");
-    await expect(resumeJob("missing-job")).rejects.toThrow("Job not found locally");
+    await expect(pauseJob("missing-job", "Reason", "engineer-1")).rejects.toThrow("Job not found locally");
+    await expect(resumeJob("missing-job", "engineer-1")).rejects.toThrow("Job not found locally");
   });
 });

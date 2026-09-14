@@ -64,6 +64,7 @@ describe("offline db", () => {
       jobId: "job-1",
       fromStatus: "dispatched",
       toStatus: "on_site",
+      userId: "engineer-1",
       occurredAt: "2026-08-05T09:00:01Z",
       createdAt: "2026-08-05T09:00:01Z",
       attempts: 0,

@@ -114,6 +114,7 @@ async function applyOperation(supabase: ReturnType<typeof createClient>, op: Out
         job_id: op.jobId,
         from_status: op.fromStatus,
         to_status: op.toStatus,
+        user_id: op.userId,
         reason: op.reason,
         occurred_at: op.occurredAt,
         latitude: op.latitude,

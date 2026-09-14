@@ -264,7 +264,7 @@ export function JobWorkflow({
         );
         return;
       }
-      await startTravelling(jobId, point);
+      await startTravelling(jobId, point, currentUser.id);
       onMutated?.();
     } catch (err) {
       setTravelError(err instanceof Error ? err.message : "Something went wrong starting travel — please try again.");
@@ -297,7 +297,7 @@ export function JobWorkflow({
         );
         return;
       }
-      await checkIn(jobId, geofenceVarianceM, point);
+      await checkIn(jobId, geofenceVarianceM, point, currentUser.id);
       onMutated?.();
     } catch (err) {
       setCheckInError(err instanceof Error ? err.message : "Something went wrong checking in — please try again.");
@@ -310,7 +310,7 @@ export function JobWorkflow({
     if (!pauseReason.trim()) return;
     setIsPausing(true);
     try {
-      await pauseJob(jobId, pauseReason.trim());
+      await pauseJob(jobId, pauseReason.trim(), currentUser.id);
       setPauseReason("");
       setConfirmingPause(false);
       onMutated?.();
@@ -324,7 +324,7 @@ export function JobWorkflow({
   async function handleResume() {
     setIsResuming(true);
     try {
-      await resumeJob(jobId);
+      await resumeJob(jobId, currentUser.id);
       onMutated?.();
     } catch {
       // best-effort UI feedback only — resumeJob's own outbox op retries automatically, same as every other field action
