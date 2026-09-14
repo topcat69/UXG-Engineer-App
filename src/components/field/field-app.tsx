@@ -11,12 +11,13 @@ import type { CurrentUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/offline/db";
 import { summarizeOutbox } from "@/lib/offline/outbox";
 import { useSyncEngine } from "@/lib/offline/use-sync-engine";
+import { HelpView } from "./help-view";
 import { JobList } from "./job-list";
 import { JobWorkflow } from "./job-workflow";
 import { KnowledgeBaseView } from "./knowledge-base-view";
 import { OutboxScreen } from "./outbox-screen";
 
-type View = { screen: "list" } | { screen: "job"; jobId: string } | { screen: "outbox" } | { screen: "kb" };
+type View = { screen: "list" } | { screen: "job"; jobId: string } | { screen: "outbox" } | { screen: "kb" } | { screen: "help" };
 
 export function FieldApp({ user }: { user: CurrentUser }) {
   const [view, setView] = useState<View>({ screen: "list" });
@@ -50,9 +51,9 @@ export function FieldApp({ user }: { user: CurrentUser }) {
           <button type="button" onClick={() => setView({ screen: "kb" })} className="text-muted-foreground underline">
             Knowledge Base
           </button>
-          <Link href="/help" className="text-muted-foreground underline">
+          <button type="button" onClick={() => setView({ screen: "help" })} className="text-muted-foreground underline">
             Help
-          </Link>
+          </button>
           <span className="text-muted-foreground">{user.name}</span>
           <ThemeSwitcher currentTheme={user.theme} />
           {/* Managers/superadmins can be assigned jobs too, so they can reach this
@@ -81,6 +82,7 @@ export function FieldApp({ user }: { user: CurrentUser }) {
           <OutboxScreen onBack={() => setView({ screen: "list" })} onRetry={runSync} />
         )}
         {view.screen === "kb" && <KnowledgeBaseView currentUser={user} onBack={() => setView({ screen: "list" })} />}
+        {view.screen === "help" && <HelpView onBack={() => setView({ screen: "list" })} />}
       </main>
 
       <StorageOnboarding />

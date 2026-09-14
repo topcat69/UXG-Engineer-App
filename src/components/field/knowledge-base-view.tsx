@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CategoryPicker } from "@/components/kb/category-picker";
 import { createClient } from "@/lib/supabase/client";
 import { humanize } from "@/lib/format/text";
+import { useIsOnline } from "@/lib/offline/use-is-online";
 import { resubmitArticle, submitArticle, type KbArticleRow } from "@/lib/kb/actions";
 import type { CurrentUser } from "@/lib/auth/current-user";
 import type { Database } from "@/lib/supabase/database.types";
@@ -31,25 +32,6 @@ type View =
   | { screen: "article"; articleId: string }
   | { screen: "submit" }
   | { screen: "resubmit"; article: ArticleDetailRow };
-
-function subscribeToOnlineStatus(callback: () => void) {
-  window.addEventListener("online", callback);
-  window.addEventListener("offline", callback);
-  return () => {
-    window.removeEventListener("online", callback);
-    window.removeEventListener("offline", callback);
-  };
-}
-function getOnlineSnapshot() {
-  return navigator.onLine;
-}
-/** SSR has no navigator — "online" is the safe default, corrected immediately on hydration (same pattern as install-prompt.tsx's useIsStandalone/useIsIOS). */
-function getServerOnlineSnapshot() {
-  return true;
-}
-function useIsOnline(): boolean {
-  return useSyncExternalStore(subscribeToOnlineStatus, getOnlineSnapshot, getServerOnlineSnapshot);
-}
 
 function breadcrumb(article: { category: { name: string } | null; manufacturer: { name: string } | null; model_range: { name: string } | null }) {
   return [article.category?.name, article.manufacturer?.name, article.model_range?.name].filter(Boolean).join(" > ") || "Uncategorized";
