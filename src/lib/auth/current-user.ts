@@ -97,3 +97,19 @@ export async function requireWarehouseUser(): Promise<CurrentUser> {
   if (user.role !== "superadmin" && user.role !== "warehouse") redirect("/");
   return user;
 }
+
+/**
+ * Redirects to /login if not signed in, or to / if signed in but not
+ * superadmin/finance. Manager isn't included here, same reasoning as
+ * requireWarehouseUser above — manager already reaches the Asset
+ * Register through the full office UI at /office/asset-register; this
+ * gate is for Finance's own stripped-down surface at /finance, which
+ * has no access to anything else in the app (see the Asset Register
+ * RLS grants in 20260914040000_finance_asset_register_access.sql).
+ */
+export async function requireFinanceUser(): Promise<CurrentUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.role !== "superadmin" && user.role !== "finance") redirect("/");
+  return user;
+}

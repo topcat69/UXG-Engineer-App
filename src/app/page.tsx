@@ -6,6 +6,7 @@ export default async function Home() {
   if (!user) redirect("/login");
   if (user.role === "superadmin" || user.role === "manager") redirect("/office/dashboard");
   if (user.role === "warehouse") redirect("/kiosk");
+  if (user.role === "finance") redirect("/finance");
   // Engineer: the field PWA lands here in Phase 3.
   redirect("/my-jobs");
 }

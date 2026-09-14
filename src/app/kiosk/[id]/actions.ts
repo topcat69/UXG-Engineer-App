@@ -131,7 +131,11 @@ async function registerGoodsInAsset(
   if (error) return;
 
   const admin = createAdminClient();
-  const { data: managers } = await admin.from("users").select("email").in("role", ["superadmin", "manager"]).eq("active", true);
+  const { data: managers } = await admin
+    .from("users")
+    .select("email")
+    .in("role", ["superadmin", "manager", "finance"])
+    .eq("active", true);
   await Promise.all((managers ?? []).map((m) => sendAssetNeedsReviewEmail(admin, assetId, m.email)));
 }
 

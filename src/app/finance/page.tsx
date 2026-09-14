@@ -2,15 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { AssetRegisterManager } from "@/components/office/asset-register-manager";
 
 /**
- * Phase 1 of the Asset Register (see the "Asset Register Scope" design
- * doc) — a durable, site-linked register of physical AV assets. Goods-in
- * auto-creates a row per scanned item (see kiosk/[id]/actions.ts's
- * addStockItem); this page is where a manager fills in the rest —
- * category, procurement, warranty — and manages the Asset Categories
- * picklist and manual entries for anything that never went through
- * goods-in.
+ * Finance's whole app surface — the Asset Register, minus category
+ * management and delete (see 20260914040000_finance_asset_register_access.sql
+ * for the RLS grants this mirrors).
  */
-export default async function AssetRegisterPage() {
+export default async function FinancePage() {
   const supabase = await createClient();
 
   const [{ data: assets, error }, { data: categories }, { data: sites }] = await Promise.all([
@@ -38,12 +34,17 @@ export default async function AssetRegisterPage() {
       <div>
         <h1 className="text-xl font-semibold">Asset Register</h1>
         <p className="text-muted-foreground text-sm">
-          Every item scanned in through goods-in gets a row here automatically, flagged for review until its category,
-          procurement, and warranty details are filled in. Install date is set automatically once the job it&apos;s part
-          of is actually completed — it&apos;s never typed in.
+          Fill in financial and warranty details for each asset. Categories and asset deletion are managed by the
+          office team.
         </p>
       </div>
-      <AssetRegisterManager initialAssets={assets ?? []} categories={categories ?? []} sites={sites ?? []} />
+      <AssetRegisterManager
+        initialAssets={assets ?? []}
+        categories={categories ?? []}
+        sites={sites ?? []}
+        canManageCategories={false}
+        canDelete={false}
+      />
     </div>
   );
 }

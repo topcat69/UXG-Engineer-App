@@ -15,7 +15,7 @@ import {
   updateAssetRegister,
   type AssetFieldsInput,
   type AssetRegisterRow,
-} from "./actions";
+} from "@/app/office/asset-register/actions";
 
 type AssetStatus = Database["public"]["Enums"]["asset_status"];
 const ASSET_STATUSES: AssetStatus[] = ["spare", "in_use", "faulty", "in_repair", "retired"];
@@ -87,14 +87,26 @@ function assetLabel(asset: AssetWithJoins): string {
   return withSerial;
 }
 
+/**
+ * Shared between /office/asset-register (superadmin/manager, full access)
+ * and /finance (the Finance role's own stripped-down surface — see
+ * requireFinanceUser). canManageCategories/canDelete default true for the
+ * office page; /finance passes both false, matching the RLS grants in
+ * 20260914040000_finance_asset_register_access.sql (Finance can view,
+ * add, and edit — not delete rows or curate the category picklist).
+ */
 export function AssetRegisterManager({
   initialAssets,
   categories: initialCategories,
   sites,
+  canManageCategories = true,
+  canDelete = true,
 }: {
   initialAssets: AssetWithJoins[];
   categories: NamedListRow[];
   sites: SiteOption[];
+  canManageCategories?: boolean;
+  canDelete?: boolean;
 }) {
   const [assets, setAssets] = useState(initialAssets);
   const [categories, setCategories] = useState(initialCategories);
@@ -277,18 +289,20 @@ export function AssetRegisterManager({
 
   return (
     <div className="flex flex-col gap-6">
-      <FlatListSection
-        title="Asset Categories"
-        helperText="Display, media player, mount, bracket, PSU, cabling, etc. — picked when filling in an asset's details."
-        items={categories}
-        create={createAssetCategory}
-        update={updateAssetCategory}
-        remove={deleteAssetCategory}
-        onCreated={(item) => setCategories((prev) => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)))}
-        onUpdated={(item) => setCategories((prev) => prev.map((c) => (c.id === item.id ? item : c)).sort((a, b) => a.name.localeCompare(b.name)))}
-        onDeleted={(id) => setCategories((prev) => prev.filter((c) => c.id !== id))}
-        confirmDeleteText="Delete this category? Assets using it fall back to uncategorised — this can't be undone."
-      />
+      {canManageCategories && (
+        <FlatListSection
+          title="Asset Categories"
+          helperText="Display, media player, mount, bracket, PSU, cabling, etc. — picked when filling in an asset's details."
+          items={categories}
+          create={createAssetCategory}
+          update={updateAssetCategory}
+          remove={deleteAssetCategory}
+          onCreated={(item) => setCategories((prev) => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)))}
+          onUpdated={(item) => setCategories((prev) => prev.map((c) => (c.id === item.id ? item : c)).sort((a, b) => a.name.localeCompare(b.name)))}
+          onDeleted={(id) => setCategories((prev) => prev.filter((c) => c.id !== id))}
+          confirmDeleteText="Delete this category? Assets using it fall back to uncategorised — this can't be undone."
+        />
+      )}
 
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-sm">
@@ -378,9 +392,11 @@ export function AssetRegisterManager({
                   <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleStartEdit(asset)}>
                     Edit
                   </Button>
-                  <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleDelete(asset.id)}>
-                    Delete
-                  </Button>
+                  {canDelete && (
+                    <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleDelete(asset.id)}>
+                      Delete
+                    </Button>
+                  )}
                 </div>
               </td>
             </tr>

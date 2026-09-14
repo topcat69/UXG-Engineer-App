@@ -19,7 +19,7 @@ import {
 
 type UserRole = Database["public"]["Enums"]["user_role"];
 
-const ALL_ROLES: UserRole[] = ["superadmin", "manager", "engineer", "warehouse"];
+const ALL_ROLES: UserRole[] = ["superadmin", "manager", "engineer", "warehouse", "finance"];
 
 /** Mirrors the users_write RLS policy client-side, purely to decide what controls to show — the database enforces the real boundary. */
 function canManage(actorRole: UserRole, targetRole: UserRole): boolean {
