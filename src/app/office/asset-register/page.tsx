@@ -45,9 +45,17 @@ export default async function AssetRegisterPage() {
             part of is actually completed — it&apos;s never typed in.
           </p>
         </div>
-        <Link href="/office/asset-register/depreciation" className="text-sm whitespace-nowrap underline-offset-2 hover:underline">
-          Depreciation report
-        </Link>
+        <div className="flex flex-wrap gap-3 text-sm whitespace-nowrap">
+          <Link href="/office/asset-register/financial" className="underline-offset-2 hover:underline">
+            Financial report
+          </Link>
+          <Link href="/office/asset-register/warranty" className="underline-offset-2 hover:underline">
+            Warranty report
+          </Link>
+          <Link href="/office/asset-register/depreciation" className="underline-offset-2 hover:underline">
+            Depreciation report
+          </Link>
+        </div>
       </div>
       <AssetRegisterManager initialAssets={assets ?? []} categories={categories ?? []} sites={sites ?? []} />
     </div>

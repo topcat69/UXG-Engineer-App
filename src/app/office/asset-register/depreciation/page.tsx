@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { StatTile } from "@/components/office/stat-tile";
 import { createClient } from "@/lib/supabase/server";
 import { computeStraightLineDepreciation } from "@/lib/asset-register/depreciation";
 import { formatGbp } from "@/lib/format/currency";
@@ -130,8 +131,8 @@ export default async function DepreciationReportPage({
 
       <div className="flex flex-wrap gap-4">
         <StatTile label="Purchase cost" value={formatGbp(totalPurchaseCost)} detail={`${calculable.length} asset(s)`} />
-        <StatTile label="Accumulated depreciation" value={formatGbp(totalAccumulatedDepreciation)} detail=" " />
-        <StatTile label="Net book value" value={formatGbp(totalBookValue)} detail=" " />
+        <StatTile label="Accumulated depreciation" value={formatGbp(totalAccumulatedDepreciation)} />
+        <StatTile label="Net book value" value={formatGbp(totalBookValue)} />
       </div>
 
       <table className="w-full text-sm">
@@ -201,16 +202,6 @@ export default async function DepreciationReportPage({
           in the totals.
         </p>
       )}
-    </div>
-  );
-}
-
-function StatTile({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-md border p-4">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-2xl font-semibold tabular-nums">{value}</span>
-      <span className="text-muted-foreground text-xs">{detail}</span>
     </div>
   );
 }
