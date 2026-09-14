@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { AssetRegisterManager } from "@/components/office/asset-register-manager";
 
@@ -35,13 +36,18 @@ export default async function AssetRegisterPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold">Asset Register</h1>
-        <p className="text-muted-foreground text-sm">
-          Every item scanned in through goods-in gets a row here automatically, flagged for review until its category,
-          procurement, and warranty details are filled in. Install date is set automatically once the job it&apos;s part
-          of is actually completed — it&apos;s never typed in.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Asset Register</h1>
+          <p className="text-muted-foreground text-sm">
+            Every item scanned in through goods-in gets a row here automatically, flagged for review until its category,
+            procurement, and warranty details are filled in. Install date is set automatically once the job it&apos;s
+            part of is actually completed — it&apos;s never typed in.
+          </p>
+        </div>
+        <Link href="/office/asset-register/depreciation" className="text-sm whitespace-nowrap underline-offset-2 hover:underline">
+          Depreciation report
+        </Link>
       </div>
       <AssetRegisterManager initialAssets={assets ?? []} categories={categories ?? []} sites={sites ?? []} />
     </div>
