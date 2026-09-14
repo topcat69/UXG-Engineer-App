@@ -63,6 +63,7 @@ function jobDetailsRow(overrides: Partial<JobDetailsRow> = {}): JobDetailsRow {
     parking_permit_storage_path: null,
     site_manager_name: null,
     site_manager_phone: null,
+    arrival_notes: null,
     reported_to_site_manager: null,
     revisit_required: null,
     issues_found: null,

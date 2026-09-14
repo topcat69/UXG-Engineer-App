@@ -55,6 +55,7 @@ test("manager pulls a job's PDF and zip report from /office/reports", async ({ p
   await page.getByRole("button", { name: /Check In/ }).click();
   await expect(page.getByText("In Progress")).toBeVisible();
 
+  await page.locator("label", { hasText: "State of affairs on arrival" }).locator("textarea").fill("Site tidy, no visible damage on arrival.");
   await page.locator("label", { hasText: "Player serial" }).locator("input").fill("PLR-REPORT-1");
   await page.locator("label", { hasText: "Screen serial" }).locator("input").fill("SCR-REPORT-1");
   async function selectByLabel(labelText: string, optionText: string) {

@@ -29,6 +29,7 @@ function jobDetailsRow(overrides: Partial<JobDetailsRow> = {}): JobDetailsRow {
     parking_notified: true,
     site_manager_name: "Sam Okafor",
     site_manager_phone: "01234 567890",
+    arrival_notes: "Existing bracket already damaged on arrival",
     reported_to_site_manager: true,
     revisit_required: false,
     issues_found: true,
@@ -78,6 +79,7 @@ describe("cloneJobDetailsForRevisit", () => {
       "engineer_notes",
       "submitted_at",
       "reason_id",
+      "arrival_notes",
     ];
     for (const field of outcomeFields) {
       expect(result).not.toHaveProperty(field);

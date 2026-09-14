@@ -331,6 +331,7 @@ export type Database = {
       }
       job_details: {
         Row: {
+          arrival_notes: string | null
           content_displaying: Database["public"]["Enums"]["pass_fail"] | null
           created_at: string | null
           design_pack_storage_path: string | null
@@ -366,6 +367,7 @@ export type Database = {
           wifi_signal: string | null
         }
         Insert: {
+          arrival_notes?: string | null
           content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
           created_at?: string | null
           design_pack_storage_path?: string | null
@@ -401,6 +403,7 @@ export type Database = {
           wifi_signal?: string | null
         }
         Update: {
+          arrival_notes?: string | null
           content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
           created_at?: string | null
           design_pack_storage_path?: string | null

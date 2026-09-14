@@ -50,6 +50,8 @@ export type JobDetailsValues = {
   reported_to_site_manager: boolean;
   site_manager_name: string;
   site_manager_phone: string;
+  /** What the engineer found on arrival, before any work starts — alongside the arrival photos (see earlyPhotoSlotsFor). */
+  arrival_notes: string;
   revisit_required: string; // "" | "yes" | "no" — tri-state so an unanswered question is distinguishable from "no"
   issues_found: boolean;
   issue_detail: string;
@@ -83,6 +85,7 @@ export const EMPTY_JOB_DETAILS: JobDetailsValues = {
   reported_to_site_manager: false,
   site_manager_name: "",
   site_manager_phone: "",
+  arrival_notes: "",
   revisit_required: "",
   issues_found: false,
   issue_detail: "",
@@ -155,6 +158,25 @@ export function photoSlotsFor(jobType: JobDetailsType): readonly string[] {
 }
 
 /**
+ * The "before" and "equipment in situ" photos, captured on arrival before
+ * any work starts — records the site's actual condition so a later dispute
+ * over fault (customer-caused vs. equipment failure) has evidence from the
+ * moment the engineer walked in. Only for job types with an AV-fields
+ * diagnose-and-fix workflow (install/sla/maintenance) — delivery has no
+ * "arrival to diagnose" moment (it's dropping off stock), so it keeps all
+ * its photos together in one place instead of splitting them here.
+ */
+export function earlyPhotoSlotsFor(jobType: JobDetailsType): readonly string[] {
+  return showsAvFields(jobType) ? ["photo_before", "photo_equipment_in_situ"] : [];
+}
+
+/** Whatever photoSlotsFor doesn't put in earlyPhotoSlotsFor — for delivery, that's every slot, unsplit. */
+export function latePhotoSlotsFor(jobType: JobDetailsType): readonly string[] {
+  const early = new Set(earlyPhotoSlotsFor(jobType));
+  return photoSlotsFor(jobType).filter((slot) => !early.has(slot));
+}
+
+/**
  * Keys a manager can mark optional for one specific job (see
  * job_optional_fields, 20260122000000_job_optional_fields.sql) — exactly
  * the set validateJobDetails below checks, kept as one list so the office
@@ -163,6 +185,7 @@ export function photoSlotsFor(jobType: JobDetailsType): readonly string[] {
  * stay mandatory regardless of this override.
  */
 export type RequirableFieldKey =
+  | "arrival_notes"
   | "player_serial"
   | "screen_serial"
   | "mount_type"
@@ -185,6 +208,7 @@ export function requirableFieldsFor(jobType: JobDetailsType): RequirableField[] 
   const fields: RequirableField[] = [];
   if (showsAvFields(jobType)) {
     fields.push(
+      { key: "arrival_notes", label: "State of affairs on arrival" },
       { key: "player_serial", label: "Player serial" },
       { key: "screen_serial", label: "Screen serial" },
       { key: "mount_type", label: "Mount type" },
@@ -236,6 +260,7 @@ export function jobDetailsRowToValues(row: JobDetailsRow | undefined): JobDetail
     reported_to_site_manager: row.reported_to_site_manager ?? false,
     site_manager_name: row.site_manager_name ?? "",
     site_manager_phone: row.site_manager_phone ?? "",
+    arrival_notes: row.arrival_notes ?? "",
     revisit_required: row.revisit_required === null ? "" : row.revisit_required ? "yes" : "no",
     issues_found: row.issues_found ?? false,
     issue_detail: row.issue_detail ?? "",
@@ -293,6 +318,9 @@ export function validateJobDetails(
   const requires = (key: RequirableFieldKey) => !optionalFields.has(key);
 
   if (showsAvFields(jobType)) {
+    if (requires("arrival_notes") && !values.arrival_notes.trim()) {
+      errors.push("State of affairs on arrival is required.");
+    }
     if (requires("player_serial") && !values.player_serial.trim()) errors.push("Player serial is required.");
     if (requires("screen_serial") && !values.screen_serial.trim()) errors.push("Screen serial is required.");
     if (requires("mount_type") && !values.mount_type) errors.push("Mount type is required.");

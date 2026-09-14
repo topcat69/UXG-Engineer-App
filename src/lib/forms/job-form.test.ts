@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   EMPTY_JOB_DETAILS,
   detectAutoIssues,
+  earlyPhotoSlotsFor,
+  latePhotoSlotsFor,
   photoSlotsFor,
   requirableFieldsFor,
   showIssueDetail,
@@ -33,6 +35,7 @@ const completeAvValues: JobDetailsValues = {
   content_displaying: "pass",
   reported_to_site_manager: true,
   equipment_damage: "na",
+  arrival_notes: "Site tidy, no visible damage on arrival.",
 };
 
 describe("usesJobDetails", () => {
@@ -110,6 +113,26 @@ describe("per-type section visibility", () => {
     expect(photoSlotsFor("delivery")).toEqual(["photo_before_packing", "photo_completed", "photo_equipment_in_situ"]);
     expect(photoSlotsFor("install")).toEqual(["photo_before", "photo_completed", "photo_equipment_in_situ"]);
   });
+
+  it("splits before/equipment-in-situ out early for install/sla/maintenance (AV-fields types), leaving just completion for later", () => {
+    for (const jobType of ["install", "sla", "maintenance"] as const) {
+      expect(earlyPhotoSlotsFor(jobType)).toEqual(["photo_before", "photo_equipment_in_situ"]);
+      expect(latePhotoSlotsFor(jobType)).toEqual(["photo_completed"]);
+    }
+  });
+
+  it("doesn't split delivery — it has no arrival-to-diagnose step, so every slot stays together", () => {
+    expect(earlyPhotoSlotsFor("delivery")).toEqual([]);
+    expect(latePhotoSlotsFor("delivery")).toEqual(photoSlotsFor("delivery"));
+  });
+
+  it("early + late slots always add up to exactly photoSlotsFor, for every job_details type", () => {
+    for (const jobType of ["install", "sla", "maintenance", "delivery"] as const) {
+      const combined = [...earlyPhotoSlotsFor(jobType), ...latePhotoSlotsFor(jobType)];
+      expect(new Set(combined)).toEqual(new Set(photoSlotsFor(jobType)));
+      expect(combined).toHaveLength(photoSlotsFor(jobType).length);
+    }
+  });
 });
 
 describe("showWifiSignal / showIssueDetail", () => {
@@ -141,6 +164,16 @@ describe("validateJobDetails", () => {
   it("does not require AV fields or revisit for delivery", () => {
     const values = { ...EMPTY_JOB_DETAILS, reported_to_site_manager: true, equipment_damage: "na" };
     expect(validateJobDetails("delivery", values, deliverySlots, true)).toEqual([]);
+  });
+
+  it("requires arrival_notes wherever AV fields show, but not for delivery", () => {
+    const values = { ...completeAvValues, revisit_required: "no", arrival_notes: "" };
+    expect(validateJobDetails("install", values, avSlots, true)).toContain("State of affairs on arrival is required.");
+
+    const deliveryValues = { ...EMPTY_JOB_DETAILS, reported_to_site_manager: true, equipment_damage: "na" };
+    expect(validateJobDetails("delivery", deliveryValues, deliverySlots, true)).not.toContain(
+      "State of affairs on arrival is required.",
+    );
   });
 
   it("requires equipment_damage to be answered wherever the issues section shows", () => {
@@ -201,6 +234,7 @@ describe("validateJobDetails", () => {
 describe("requirableFieldsFor", () => {
   it("includes AV fields plus reported-to-site-manager and revisit for install", () => {
     const keys = requirableFieldsFor("install").map((f) => f.key);
+    expect(keys).toContain("arrival_notes");
     expect(keys).toContain("player_serial");
     expect(keys).toContain("network_port");
     expect(keys).toContain("reported_to_site_manager");

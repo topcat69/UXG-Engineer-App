@@ -84,6 +84,7 @@ test("engineer completes a job entirely offline, survives a reload mid-form, and
   await expect(page.locator("label", { hasText: "Screen serial" }).locator("input")).toHaveValue("SCR-OFFLINE-1");
 
   // Finish the form.
+  await page.locator("label", { hasText: "State of affairs on arrival" }).locator("textarea").fill("Site tidy, no visible damage on arrival.");
   async function selectByLabel(labelText: string, optionText: string) {
     await page.locator("label", { hasText: labelText }).locator("select").selectOption({ label: optionText });
   }

@@ -97,6 +97,7 @@ test.fixme("template application, submit gating on incomplete tasks, and job dup
   const taskCheckboxes = fieldPage.locator('ul:has-text("Verify screen mount") input[type="checkbox"]');
   await expect(taskCheckboxes).toHaveCount(2);
 
+  await fieldPage.locator("label", { hasText: "State of affairs on arrival" }).locator("textarea").fill("Site tidy, no visible damage on arrival.");
   await fieldPage.locator("label", { hasText: "Player serial" }).locator("input").fill(`PLR-${tag}`);
   await fieldPage.locator("label", { hasText: "Screen serial" }).locator("input").fill(`SCR-${tag}`);
   async function selectByLabel(labelText: string, optionText: string) {

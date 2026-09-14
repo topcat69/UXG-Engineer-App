@@ -15,7 +15,14 @@ import { JobDetailsPanel } from "./job-details-panel";
 import { RequiredFieldsPanel } from "./required-fields-panel";
 import { AssignSchedulePanel } from "./assign-schedule-panel";
 import { EditJobPanel } from "./edit-job-panel";
-import { showsAvFields, usesJobDetails, photoSlotsFor, type JobDetailsType, type RequirableFieldKey } from "@/lib/forms/job-form";
+import {
+  earlyPhotoSlotsFor,
+  latePhotoSlotsFor,
+  showsAvFields,
+  usesJobDetails,
+  type JobDetailsType,
+  type RequirableFieldKey,
+} from "@/lib/forms/job-form";
 import { humanize } from "@/lib/format/text";
 import { formatDurationBetween } from "@/lib/format/duration";
 
@@ -284,6 +291,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <FormField label="Reported to site manager" value={jobDetails.reported_to_site_manager ? "Yes" : "No"} />
               <FormField label="Site manager name" value={jobDetails.site_manager_name} />
               <FormField label="Site manager contact number" value={jobDetails.site_manager_phone} />
+              {usesJobDetails(job.job_type) && showsAvFields(job.job_type) && (
+                <FormField label="State of affairs on arrival" value={jobDetails.arrival_notes} />
+              )}
               {jobDetails.revisit_required !== null && (
                 <FormField label="Revisit required" value={jobDetails.revisit_required ? "Yes" : "No"} />
               )}
@@ -310,6 +320,18 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         fixtureTypes={fixtureTypes ?? []}
       />
 
+      {usesJobDetails(job.job_type) && earlyPhotoSlotsFor(job.job_type as JobDetailsType).length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="font-medium">Arrival: State of Affairs</h2>
+          <p className="text-muted-foreground text-sm">
+            What the engineer found on arrival, before any work started — evidence for fault-finding (customer-caused
+            vs. equipment failure, etc).
+          </p>
+          <p className="text-sm">{jobDetails?.arrival_notes || "Not recorded yet."}</p>
+          <PhotoThumbnailGrid slots={earlyPhotoSlotsFor(job.job_type as JobDetailsType)} mediaBySlot={mediaBySlot} />
+        </section>
+      )}
+
       <RequiredFieldsPanel
         jobId={job.id}
         jobType={job.job_type}
@@ -321,24 +343,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       <section className="flex flex-col gap-2">
         <h2 className="font-medium">Media</h2>
         {usesJobDetails(job.job_type) ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {photoSlotsFor(job.job_type as JobDetailsType).map((slot) => {
-              const asset = mediaBySlot.get(slot);
-              return (
-                <div key={slot} className="flex flex-col gap-1 rounded-md border p-2 text-xs">
-                  <MediaThumbnail asset={asset ?? null} />
-                  <span className="font-medium">{humanize(slot.replace("photo_", ""))}</span>
-                  {asset ? (
-                    <span className="text-muted-foreground">
-                      {new Date(asset.captured_at).toLocaleDateString()}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">Not captured</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <PhotoThumbnailGrid slots={latePhotoSlotsFor(job.job_type as JobDetailsType)} mediaBySlot={mediaBySlot} />
         ) : mediaWithUrls.length === 0 ? (
           <p className="text-muted-foreground text-sm">No media captured yet.</p>
         ) : (
@@ -417,6 +422,33 @@ function FormField({ label, value }: { label: string; value: string | null | und
  * been captured for this slot at all) falls back to a plain placeholder —
  * never a broken image.
  */
+function PhotoThumbnailGrid({
+  slots,
+  mediaBySlot,
+}: {
+  slots: readonly string[];
+  mediaBySlot: Map<string, { media_type: string; url: string | null; captured_at: string }>;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      {slots.map((slot) => {
+        const asset = mediaBySlot.get(slot);
+        return (
+          <div key={slot} className="flex flex-col gap-1 rounded-md border p-2 text-xs">
+            <MediaThumbnail asset={asset ?? null} />
+            <span className="font-medium">{humanize(slot.replace("photo_", ""))}</span>
+            {asset ? (
+              <span className="text-muted-foreground">{new Date(asset.captured_at).toLocaleDateString()}</span>
+            ) : (
+              <span className="text-muted-foreground">Not captured</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function MediaThumbnail({ asset }: { asset: { media_type: string; url: string | null } | null }) {
   if (!asset || !asset.url) {
     return (

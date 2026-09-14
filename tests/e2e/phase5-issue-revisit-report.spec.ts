@@ -61,6 +61,7 @@ test.fixme("a failed check produces a blocking issue, a linked revisit job, and 
   await page.getByRole("button", { name: /Check In/ }).click();
   await expect(page.getByText("In Progress")).toBeVisible();
 
+  await page.locator("label", { hasText: "State of affairs on arrival" }).locator("textarea").fill("Site tidy, no visible damage on arrival.");
   await page.locator("label", { hasText: "Player serial" }).locator("input").fill("PLR-P5-1");
   await page.locator("label", { hasText: "Screen serial" }).locator("input").fill("SCR-P5-1");
   async function selectByLabel(labelText: string, optionText: string) {

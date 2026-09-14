@@ -42,8 +42,9 @@ import {
 import {
   EMPTY_JOB_DETAILS,
   JOB_TYPE_LABELS,
+  earlyPhotoSlotsFor,
   jobDetailsRowToValues,
-  photoSlotsFor,
+  latePhotoSlotsFor,
   showIssueDetail as showIssueDetailJobDetails,
   showNetworkPort as showNetworkPortJobDetails,
   showWifiSignal as showWifiSignalJobDetails,
@@ -214,6 +215,7 @@ export function JobWorkflow({
       reported_to_site_manager: detailsValues.reported_to_site_manager,
       site_manager_name: detailsValues.site_manager_name || null,
       site_manager_phone: detailsValues.site_manager_phone || null,
+      arrival_notes: detailsValues.arrival_notes || null,
       revisit_required: detailsValues.revisit_required === "" ? null : detailsValues.revisit_required === "yes",
       issues_found: detailsValues.issues_found,
       issue_detail: detailsValues.issue_detail || null,
@@ -728,7 +730,8 @@ function JobDetailsSection({
   isSubmitting: boolean;
   onSubmit: () => void;
 }) {
-  const slots = photoSlotsFor(jobType);
+  const earlySlots = earlyPhotoSlotsFor(jobType);
+  const lateSlots = latePhotoSlotsFor(jobType);
 
   return (
     <div className="flex flex-col gap-4">
@@ -842,6 +845,27 @@ function JobDetailsSection({
       </Field>
 
       {showsAvFields(jobType) && (
+        <Field label="State of affairs on arrival">
+          <Textarea
+            value={values.arrival_notes}
+            onChange={(e) => setValues((v) => ({ ...v, arrival_notes: e.target.value }))}
+            placeholder="What did you find on arrival, before starting any work? e.g. existing damage, customer's own equipment, site condition."
+          />
+        </Field>
+      )}
+
+      {earlySlots.length > 0 && (
+        <PhotoGrid
+          jobId={jobId}
+          slots={earlySlots}
+          currentUser={currentUser}
+          mediaBySlot={mediaBySlot}
+          onMutated={onMutated}
+          title="Arrival photos"
+        />
+      )}
+
+      {showsAvFields(jobType) && (
         <>
           <Field label="Player serial">
             <div className="flex gap-2">
@@ -895,7 +919,14 @@ function JobDetailsSection({
         </>
       )}
 
-      <PhotoGrid jobId={jobId} slots={slots} currentUser={currentUser} mediaBySlot={mediaBySlot} onMutated={onMutated} />
+      <PhotoGrid
+        jobId={jobId}
+        slots={lateSlots}
+        currentUser={currentUser}
+        mediaBySlot={mediaBySlot}
+        onMutated={onMutated}
+        title={earlySlots.length > 0 ? "Completion photo" : "Photos"}
+      />
 
       {showsIssuesSection(jobType) && (
         <>
@@ -981,16 +1012,18 @@ function PhotoGrid({
   currentUser,
   mediaBySlot,
   onMutated,
+  title = "Photos",
 }: {
   jobId: string;
   slots: readonly string[];
   currentUser: CurrentUser;
   mediaBySlot: Map<string, MediaQueueItem[]>;
   onMutated?: () => void;
+  title?: string;
 }) {
   return (
     <div>
-      <p className="mb-2 text-sm font-medium">Photos</p>
+      <p className="mb-2 text-sm font-medium">{title}</p>
       <div className="grid grid-cols-3 gap-3">
         {slots.map((slot) => (
           <PhotoSlot key={slot} jobId={jobId} slot={slot} label={humanize(slot.replace("photo_", ""))} capturedBy={currentUser.id} items={mediaBySlot.get(slot) ?? []} onCaptured={onMutated} />
