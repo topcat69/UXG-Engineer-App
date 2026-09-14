@@ -69,6 +69,13 @@ export async function reassignStockItem(stockItemId: string, fromJobSheetId: str
   // just left.
   await supabase.from("job_sheet_tests").update({ job_sheet_id: toJobSheetId }).eq("stock_item_id", stockItemId);
 
+  // Its Asset Register row (see registerGoodsInAsset in
+  // kiosk/[id]/actions.ts) moves site with it too, same reasoning.
+  const { data: toJobSheet } = await supabase.from("job_sheets").select("site_id").eq("id", toJobSheetId).single();
+  if (toJobSheet) {
+    await supabase.from("asset_register").update({ site_id: toJobSheet.site_id }).eq("stock_item_id", stockItemId);
+  }
+
   revalidatePath(`/office/job-sheets/${fromJobSheetId}`);
   revalidatePath(`/office/job-sheets/${toJobSheetId}`);
   revalidatePath("/office/job-sheets");

@@ -208,6 +208,23 @@ export function buildKbArticleSubmittedEmail(input: KbArticleSubmittedEmailInput
   return { subject: `KB article for review — ${input.articleTitle}`, html, text };
 }
 
+export type AssetNeedsReviewEmailInput = {
+  assetLabel: string;
+  siteName: string | null;
+  deepLink: string;
+};
+
+/** "New asset needs review" — sent to every active superadmin/manager when goods-in auto-creates an Asset Register row, per decision 9 of the Asset Register scope. */
+export function buildAssetNeedsReviewEmail(input: AssetNeedsReviewEmailInput): EmailContent {
+  const { html, text } = wrap([
+    `A new asset was added to the Asset Register and needs review:`,
+    input.siteName ? `${input.assetLabel} — ${input.siteName}` : input.assetLabel,
+    `It came in through goods-in, so its category, procurement, and warranty details still need filling in.`,
+    `Review it: ${input.deepLink}`,
+  ]);
+  return { subject: `Asset Register — new asset needs review — ${input.assetLabel}`, html, text };
+}
+
 export type WeeklySummaryEmailInput = {
   projectName: string;
   weekLabel: string;

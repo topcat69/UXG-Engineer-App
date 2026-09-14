@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import type { Database } from "@/lib/supabase/database.types";
+import { sendAssetNeedsReviewEmail } from "@/lib/email/send-asset-register-emails";
 import type { ChecklistKey } from "./checklist-item";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -86,6 +88,53 @@ async function ensureCatalogEntry(
  * lock stages" — Warehouse can keep adding after Configurator has
  * started, and this never regresses a sheet that's moved further on.
  */
+/**
+ * Every scanned-in item becomes an Asset Register row too (see the Asset
+ * Register Scope's decisions 2 and 9) — a *copy* of manufacturer/model/
+ * serial/site, not a live join, since a job sheet (and everything scanned
+ * into it) can be deleted today; stock_item_id is kept only as a soft,
+ * nullable traceability link. Flagged needs_review since goods-in has no
+ * way to know the asset's category, procurement, or warranty details.
+ * Best-effort, same as job_sheet_tests below — a failure here shouldn't
+ * block the goods-in scan that already succeeded. Recipient lookup uses
+ * the admin client since the warehouse session itself can't select other
+ * users' rows under RLS; the insert itself still runs on the ordinary
+ * session client, so RLS's warehouse-can-insert policy is the real gate.
+ */
+async function registerGoodsInAsset(
+  supabase: SupabaseServerClient,
+  stockItemId: string,
+  jobSheetId: string,
+  manufacturer: string,
+  model: string,
+  serialNo: string,
+): Promise<void> {
+  const { data: jobSheet } = await supabase.from("job_sheets").select("site_id").eq("id", jobSheetId).single();
+
+  // No .select() here on purpose: warehouse can insert but, per decision 7,
+  // can't select asset_register at all — chaining .select().single() would
+  // make PostgREST try to read the row straight back under that same
+  // SELECT policy and fail with a misleading RLS error, even though the
+  // insert itself is allowed. Generating the id here means the rest of
+  // this function (which runs on the admin client) never needs it read back.
+  const assetId = crypto.randomUUID();
+  const { error } = await supabase.from("asset_register").insert({
+    id: assetId,
+    manufacturer: manufacturer || null,
+    model: model || null,
+    serial_number: serialNo.trim() || null,
+    site_id: jobSheet?.site_id ?? null,
+    stock_item_id: stockItemId,
+    source: "goods_in",
+    needs_review: true,
+  });
+  if (error) return;
+
+  const admin = createAdminClient();
+  const { data: managers } = await admin.from("users").select("email").in("role", ["superadmin", "manager"]).eq("active", true);
+  await Promise.all((managers ?? []).map((m) => sendAssetNeedsReviewEmail(admin, assetId, m.email)));
+}
+
 /** Next `position` for a new job_sheet_tests row — shared by every path that adds one. */
 async function nextTestPosition(supabase: SupabaseServerClient, jobSheetId: string): Promise<number> {
   const { count } = await supabase
@@ -149,6 +198,8 @@ export async function addStockItem(
     position: await nextTestPosition(supabase, jobSheetId),
     stock_item_id: stockItem.id,
   });
+
+  await registerGoodsInAsset(supabase, stockItem.id, jobSheetId, trimmedManufacturer, trimmedModel, serialNo);
 
   const { data: jobSheet } = await supabase.from("job_sheets").select("status").eq("id", jobSheetId).single();
   if (jobSheet?.status === "building") {

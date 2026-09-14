@@ -49,6 +49,162 @@ export type Database = {
         }
         Relationships: []
       }
+      asset_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      asset_register: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          decommission_date: string | null
+          depreciation_method: string | null
+          disposal_date: string | null
+          expected_replacement_date: string | null
+          id: string
+          install_date: string | null
+          manufacturer: string | null
+          model: string | null
+          needs_review: boolean
+          po_or_invoice_number: string | null
+          purchase_cost: number | null
+          purchase_date: string | null
+          residual_value: number | null
+          serial_number: string | null
+          site_id: string | null
+          source: Database["public"]["Enums"]["asset_source"]
+          status: Database["public"]["Enums"]["asset_status"]
+          stock_item_id: string | null
+          supplier: string | null
+          support_contract_ref: string | null
+          support_sla: string | null
+          updated_at: string
+          updated_by: string | null
+          useful_life_years: number | null
+          warranty_end: string | null
+          warranty_provider: string | null
+          warranty_start: string | null
+          weee_reference: string | null
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          decommission_date?: string | null
+          depreciation_method?: string | null
+          disposal_date?: string | null
+          expected_replacement_date?: string | null
+          id?: string
+          install_date?: string | null
+          manufacturer?: string | null
+          model?: string | null
+          needs_review?: boolean
+          po_or_invoice_number?: string | null
+          purchase_cost?: number | null
+          purchase_date?: string | null
+          residual_value?: number | null
+          serial_number?: string | null
+          site_id?: string | null
+          source: Database["public"]["Enums"]["asset_source"]
+          status?: Database["public"]["Enums"]["asset_status"]
+          stock_item_id?: string | null
+          supplier?: string | null
+          support_contract_ref?: string | null
+          support_sla?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          useful_life_years?: number | null
+          warranty_end?: string | null
+          warranty_provider?: string | null
+          warranty_start?: string | null
+          weee_reference?: string | null
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          decommission_date?: string | null
+          depreciation_method?: string | null
+          disposal_date?: string | null
+          expected_replacement_date?: string | null
+          id?: string
+          install_date?: string | null
+          manufacturer?: string | null
+          model?: string | null
+          needs_review?: boolean
+          po_or_invoice_number?: string | null
+          purchase_cost?: number | null
+          purchase_date?: string | null
+          residual_value?: number | null
+          serial_number?: string | null
+          site_id?: string | null
+          source?: Database["public"]["Enums"]["asset_source"]
+          status?: Database["public"]["Enums"]["asset_status"]
+          stock_item_id?: string | null
+          supplier?: string | null
+          support_contract_ref?: string | null
+          support_sla?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          useful_life_years?: number | null
+          warranty_end?: string | null
+          warranty_provider?: string | null
+          warranty_start?: string | null
+          weee_reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_register_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_register_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_register_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_register_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_register_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assets: {
         Row: {
           asset_type: string | null
@@ -1764,6 +1920,8 @@ export type Database = {
       set_own_theme: { Args: { new_theme: string }; Returns: undefined }
     }
     Enums: {
+      asset_source: "goods_in" | "import" | "manual"
+      asset_status: "spare" | "in_use" | "faulty" | "in_repair" | "retired"
       equipment_damage_status: "na" | "yes" | "accidental" | "customer"
       job_sheet_status:
         | "building"
@@ -1923,6 +2081,8 @@ export const Constants = {
   },
   public: {
     Enums: {
+      asset_source: ["goods_in", "import", "manual"],
+      asset_status: ["spare", "in_use", "faulty", "in_repair", "retired"],
       equipment_damage_status: ["na", "yes", "accidental", "customer"],
       job_sheet_status: [
         "building",
