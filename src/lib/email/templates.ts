@@ -225,6 +225,36 @@ export function buildAssetNeedsReviewEmail(input: AssetNeedsReviewEmailInput): E
   return { subject: `Asset Register — new asset needs review — ${input.assetLabel}`, html, text };
 }
 
+export type DamagedStockAlertEmailInput = {
+  itemLabel: string;
+  clientName: string | null;
+  siteName: string | null;
+  damageNotes: string | null;
+  /** Human-readable label (e.g. "Pending", "Replace") — the caller resolves the damage_resolution enum value before building the email, same division of labour as every other builder here. */
+  nextStep: string;
+  deepLink: string;
+};
+
+/**
+ * "Damaged Stock Alert" — sent to every active superadmin/manager/warehouse/
+ * finance user when a Damaged Equipment record is created, whether that's
+ * automatic (a goods-in stock item flagged damaged) or manual (logged
+ * directly, e.g. something damaged on the warehouse shelf). Same shape as
+ * buildAssetNeedsReviewEmail; both are "management, please look at this"
+ * alerts off the same underlying data.
+ */
+export function buildDamagedStockAlertEmail(input: DamagedStockAlertEmailInput): EmailContent {
+  const clientOrSite = input.clientName ?? input.siteName;
+  const { html, text } = wrap([
+    `A damaged item has been logged:`,
+    clientOrSite ? `${input.itemLabel} — ${clientOrSite}` : input.itemLabel,
+    input.damageNotes ? `Damage notes: ${input.damageNotes}` : null,
+    `Next step: ${input.nextStep}`,
+    `Review it: ${input.deepLink}`,
+  ].filter((line): line is string => !!line));
+  return { subject: `Damaged Stock Alert – ${input.itemLabel} – ${clientOrSite ?? "Unknown client"}`, html, text };
+}
+
 export type WeeklySummaryEmailInput = {
   projectName: string;
   weekLabel: string;

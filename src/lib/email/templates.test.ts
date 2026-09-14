@@ -3,6 +3,7 @@ import {
   buildApprovedEmail,
   buildAssignedEmail,
   buildCancelledEmail,
+  buildDamagedStockAlertEmail,
   buildDayBeforeEmail,
   buildScheduledEmail,
   buildSubmittedEmail,
@@ -233,5 +234,35 @@ describe("buildWeeklySummaryEmail", () => {
     expect(email.text).toContain("12 scheduled");
     expect(email.text).toContain("2 open issue(s)");
     expect(email.subject).toContain("Acme Rollout");
+  });
+});
+
+describe("buildDamagedStockAlertEmail", () => {
+  it("includes the item and client in both the subject and body", () => {
+    const email = buildDamagedStockAlertEmail({
+      itemLabel: "Samsung QM75 (SN-DMG-0042)",
+      clientName: "Acme Retail",
+      siteName: "Riverside Retail Park",
+      damageNotes: "Screen cracked in transit",
+      nextStep: "Pending",
+      deepLink: "https://uxgengineering.example.com/office/damaged-equipment",
+    });
+    expect(email.subject).toBe("Damaged Stock Alert – Samsung QM75 (SN-DMG-0042) – Acme Retail");
+    expect(email.text).toContain("Samsung QM75 (SN-DMG-0042) — Acme Retail");
+    expect(email.text).toContain("Screen cracked in transit");
+    expect(email.text).toContain("Next step: Pending");
+  });
+
+  it("falls back to the site name when there's no client, and omits blank damage notes", () => {
+    const email = buildDamagedStockAlertEmail({
+      itemLabel: "Epson EB-L200",
+      clientName: null,
+      siteName: "Warehouse",
+      damageNotes: null,
+      nextStep: "Replace",
+      deepLink: "https://uxgengineering.example.com/office/damaged-equipment",
+    });
+    expect(email.subject).toBe("Damaged Stock Alert – Epson EB-L200 – Warehouse");
+    expect(email.text).not.toContain("Damage notes");
   });
 });
