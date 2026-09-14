@@ -17,6 +17,7 @@ export async function createJobSheet(
   reference: string,
   proposedInstallDate: string,
   jobDescription: string,
+  poNumber: string,
 ): Promise<CreateJobSheetResult> {
   if (!projectId) return { ok: false, message: "Select a project." };
   if (!siteId) return { ok: false, message: "Select a site." };
@@ -44,6 +45,7 @@ export async function createJobSheet(
       site_id: siteId,
       proposed_install_date: proposedInstallDate || null,
       job_description: jobDescription.trim() || null,
+      po_number: poNumber.trim() || null,
     })
     .select("id")
     .single();

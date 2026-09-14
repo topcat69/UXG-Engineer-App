@@ -7,6 +7,7 @@ import { humanize } from "@/lib/format/text";
 import { AssignToJobForm } from "./assign-to-job-form";
 import { ReassignStockItemControl } from "./reassign-stock-item-control";
 import { DeleteJobSheetButton } from "./delete-job-sheet-button";
+import { PoNumberControl } from "./po-number-control";
 
 // Matches the TTL other pages use for their own signed URLs (see e.g.
 // office/knowledge-base/[id]/page.tsx) — this page is loaded fresh on every
@@ -27,7 +28,7 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
     supabase
       .from("job_sheets")
       .select(
-        `id, reference, status, proposed_install_date, job_description,
+        `id, reference, status, proposed_install_date, job_description, po_number,
          site:sites(id, name, client:clients(name)), project:projects(name),
          cms_name, software_notes,
          defects, missing_items, packed_correctly, other_parts_used, other_issues, work_area_tidy,
@@ -99,6 +100,8 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
 
       {jobSheet.job_description && <p className="text-sm">{jobSheet.job_description}</p>}
 
+      <PoNumberControl jobSheetId={jobSheet.id} value={jobSheet.po_number} />
+
       <section className="flex flex-col gap-2">
         <h2 className="font-medium">Stock ({(stockItems ?? []).length})</h2>
         <Table>
@@ -168,7 +171,7 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
                   {label || "—"} — {t.tested ? "Tested" : "Not tested"}
                   {t.wifi_dongle ? ` · Wi-Fi Dongle: ${humanize(t.wifi_dongle)}` : ""}
                   {done.length > 0 ? ` · ${done.join(", ")}` : ""}
-                  {t.outcome ? ` (${t.outcome})` : ""}
+                  {t.outcome ? ` · Pass: ${humanize(t.outcome)}` : ""}
                 </li>
               );
             })}

@@ -786,6 +786,7 @@ export type Database = {
           packed_correctly_detail: string | null
           packed_correctly_photo: boolean | null
           packed_correctly_photo_path: string | null
+          po_number: string | null
           project_id: string | null
           proposed_install_date: string | null
           reference: string
@@ -824,6 +825,7 @@ export type Database = {
           packed_correctly_detail?: string | null
           packed_correctly_photo?: boolean | null
           packed_correctly_photo_path?: string | null
+          po_number?: string | null
           project_id?: string | null
           proposed_install_date?: string | null
           reference: string
@@ -862,6 +864,7 @@ export type Database = {
           packed_correctly_detail?: string | null
           packed_correctly_photo?: boolean | null
           packed_correctly_photo_path?: string | null
+          po_number?: string | null
           project_id?: string | null
           proposed_install_date?: string | null
           reference?: string

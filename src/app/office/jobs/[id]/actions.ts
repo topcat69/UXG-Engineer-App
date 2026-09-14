@@ -18,13 +18,16 @@ import type { ActionResult } from "../actions";
 
 /**
  * Edits the core static fields a job was created with — project, site,
- * job type, priority, description, QuickBooks No. (the purchase order
- * reference). Same validation as createJob (project/site/job type all
- * required); priority/description/quickbooks_no are free-form and
- * optional. No status gating — deliberately not blocked once a job is
- * past draft, since restricting that is a design call beyond what was
- * asked for and would just get in an office user's way if they need to
- * correct a genuine mistake after the fact.
+ * job type, priority, description, quickbooks_no (labeled "PO Number" in
+ * the UI — a job sheet's own PO Number, once it's linked to this job,
+ * stays in sync with this same column; see updateJobSheetPoNumber and
+ * assignJobSheetToJob in office/job-sheets/[id]/actions.ts). Same
+ * validation as createJob (project/site/job type all required);
+ * priority/description/quickbooks_no are free-form and optional. No
+ * status gating — deliberately not blocked once a job is past draft,
+ * since restricting that is a design call beyond what was asked for and
+ * would just get in an office user's way if they need to correct a
+ * genuine mistake after the fact.
  */
 export async function updateJob(
   jobId: string,

@@ -19,6 +19,7 @@ export function CreateJobSheetForm({
   const [reference, setReference] = useState("");
   const [proposedInstallDate, setProposedInstallDate] = useState("");
   const [jobDescription, setJobDescription] = useState("");
+  const [poNumber, setPoNumber] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -30,7 +31,7 @@ export function CreateJobSheetForm({
 
   function handleCreate() {
     startTransition(async () => {
-      const result = await createJobSheet(projectId, siteId, reference, proposedInstallDate, jobDescription);
+      const result = await createJobSheet(projectId, siteId, reference, proposedInstallDate, jobDescription, poNumber);
       if (result.ok) {
         // router.push to this same URL wouldn't reset any of this form's own
         // state (same route, no remount) — clearing it explicitly is what
@@ -43,6 +44,7 @@ export function CreateJobSheetForm({
         setReference("");
         setProposedInstallDate("");
         setJobDescription("");
+        setPoNumber("");
         setMessage(null);
         router.refresh();
       } else {
@@ -112,6 +114,15 @@ export function CreateJobSheetForm({
             type="date"
             value={proposedInstallDate}
             onChange={(e) => setProposedInstallDate(e.target.value)}
+            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-muted-foreground text-xs">PO number</label>
+          <input
+            type="text"
+            value={poNumber}
+            onChange={(e) => setPoNumber(e.target.value)}
             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
           />
         </div>

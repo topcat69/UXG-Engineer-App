@@ -6,6 +6,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { updateTestResultDetails } from "./actions";
 import { TestResultFlagControl } from "./test-result-flag-control";
+import { TestResultOutcomeControl } from "./test-result-outcome-control";
 import { TestResultWifiDongleControl } from "./test-result-wifi-dongle-control";
 
 export type TestResultRowData = {
@@ -33,14 +34,13 @@ function itemLabel(t: TestResultRowData): string {
 
 export function TestResultRow({ jobSheetId, testResult }: { jobSheetId: string; testResult: TestResultRowData }) {
   const router = useRouter();
-  const [outcome, setOutcome] = useState(testResult.outcome ?? "");
   const [notes, setNotes] = useState(testResult.notes ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSaveDetails() {
     startTransition(async () => {
-      const result = await updateTestResultDetails(testResult.id, jobSheetId, { outcome, notes });
+      const result = await updateTestResultDetails(testResult.id, jobSheetId, { notes });
       setMessage(result.ok ? null : result.message);
       if (result.ok) router.refresh();
     });
@@ -92,12 +92,7 @@ export function TestResultRow({ jobSheetId, testResult }: { jobSheetId: string; 
         />
       </TableCell>
       <TableCell>
-        <input
-          type="text"
-          value={outcome}
-          onChange={(e) => setOutcome(e.target.value)}
-          className="border-input h-9 w-32 rounded-md border bg-transparent px-2 text-sm"
-        />
+        <TestResultOutcomeControl testId={testResult.id} jobSheetId={jobSheetId} value={testResult.outcome} />
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">

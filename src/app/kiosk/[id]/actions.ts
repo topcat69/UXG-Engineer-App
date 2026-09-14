@@ -312,20 +312,33 @@ export async function updateTestResultWifiDongle(testId: string, jobSheetId: str
   return { ok: true };
 }
 
-export type TestResultDetailsInput = { outcome: string; notes: string };
+export type TestResultDetailsInput = { notes: string };
 
-/** Outcome/Notes — free text, so these get an explicit Save rather than the checkboxes'/dropdown's save-on-change. */
+/** Notes — free text, so it gets an explicit Save rather than the checkboxes'/dropdowns' save-on-change. */
 export async function updateTestResultDetails(
   testId: string,
   jobSheetId: string,
   input: TestResultDetailsInput,
 ): Promise<ActionResult> {
   const supabase = await createClient();
+  const { error } = await supabase.from("job_sheet_tests").update({ notes: input.notes.trim() || null }).eq("id", testId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/kiosk/${jobSheetId}`);
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  return { ok: true };
+}
+
+/** "" clears it back to unanswered — Yes/No/N/A are the only real answers, same shape as updateTestResultWifiDongle. The column stays named `outcome`; only the UI label changed to "Pass" (same convention as wifi_dongle keeping its name after its own hardware/label rename). */
+export async function updateTestResultOutcome(testId: string, jobSheetId: string, value: string): Promise<ActionResult> {
+  const supabase = await createClient();
   const { error } = await supabase
     .from("job_sheet_tests")
-    .update({ outcome: input.outcome.trim() || null, notes: input.notes.trim() || null })
+    .update({ outcome: value || null })
     .eq("id", testId);
   if (error) return { ok: false, message: error.message };
+
+  await bumpToConfiguring(supabase, jobSheetId);
 
   revalidatePath(`/kiosk/${jobSheetId}`);
   revalidatePath(`/office/job-sheets/${jobSheetId}`);

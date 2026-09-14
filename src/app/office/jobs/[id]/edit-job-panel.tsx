@@ -107,7 +107,7 @@ export function EditJobPanel({
             </Link>
           </>
         )}
-        {quickbooksNo && <> · QuickBooks No. {quickbooksNo}</>}{" "}
+        {quickbooksNo && <> · PO Number {quickbooksNo}</>}{" "}
         <button type="button" onClick={() => setEditing(true)} className="text-xs underline">
           Edit
         </button>
@@ -185,12 +185,11 @@ export function EditJobPanel({
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-muted-foreground text-xs">QuickBooks No.</label>
+          <label className="text-muted-foreground text-xs">PO number</label>
           <Input
             value={editQuickbooksNo}
             onChange={(e) => setEditQuickbooksNo(e.target.value)}
             className="h-9 w-40"
-            placeholder="PO number"
           />
         </div>
       </div>

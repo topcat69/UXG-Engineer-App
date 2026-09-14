@@ -160,7 +160,7 @@ export default async function KioskJobSheetPage({ params }: { params: Promise<{ 
               <TableHead>Licence</TableHead>
               <TableHead>TeamViewer / Philips Wave</TableHead>
               <TableHead>UXG account</TableHead>
-              <TableHead>Outcome</TableHead>
+              <TableHead>Pass</TableHead>
               <TableHead>Notes</TableHead>
             </TableRow>
           </TableHeader>

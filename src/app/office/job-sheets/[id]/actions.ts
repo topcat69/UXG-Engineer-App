@@ -34,16 +34,72 @@ export async function deleteJobSheetAction(jobSheetId: string): Promise<ActionRe
  * nothing here should refuse an early or late assignment on a
  * technicality; RLS and this page (Office/Manager only) are the real
  * boundary, not a status check.
+ *
+ * Also reconciles PO Number between the two records — whichever one was
+ * filled in first "wins" and fills the other, since assignment is the
+ * first moment they're actually connected. If both already have a value
+ * (and they differ), neither is touched: a same-order overwrite here
+ * would silently discard whichever one wasn't picked, with no way to
+ * tell the two apart afterward.
  */
 export async function assignJobSheetToJob(jobSheetId: string, jobId: string): Promise<ActionResult> {
   if (!jobId) return { ok: false, message: "Select a job." };
 
   const supabase = await createClient();
+
+  const [{ data: jobSheet }, { data: job }] = await Promise.all([
+    supabase.from("job_sheets").select("po_number").eq("id", jobSheetId).single(),
+    supabase.from("jobs").select("quickbooks_no").eq("id", jobId).single(),
+  ]);
+  const sheetPo = jobSheet?.po_number?.trim() || null;
+  const jobPo = job?.quickbooks_no?.trim() || null;
+
   const { error } = await supabase
     .from("job_sheets")
-    .update({ linked_job_id: jobId, status: "assigned" })
+    .update({ linked_job_id: jobId, status: "assigned", ...(!sheetPo && jobPo ? { po_number: jobPo } : {}) })
     .eq("id", jobSheetId);
   if (error) return { ok: false, message: error.message };
+
+  if (!jobPo && sheetPo) {
+    const { error: jobUpdateError } = await supabase.from("jobs").update({ quickbooks_no: sheetPo }).eq("id", jobId);
+    if (jobUpdateError) return { ok: false, message: jobUpdateError.message };
+  }
+
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  revalidatePath("/office/job-sheets");
+  revalidatePath(`/office/jobs/${jobId}`);
+  return { ok: true };
+}
+
+/**
+ * Edits the Job Sheet's own PO Number. If the sheet is already linked to
+ * a job, the job's copy (`jobs.quickbooks_no` — the same "purchase order
+ * reference" concept, see 20260914050000_job_sheet_po_number.sql)
+ * updates too, since Office explicitly editing it here is exactly the
+ * "filled out and saved" moment that should propagate — unlike the
+ * fill-only reconciliation in assignJobSheetToJob, this one intentionally
+ * overwrites the job's value.
+ */
+export async function updateJobSheetPoNumber(jobSheetId: string, poNumber: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const trimmed = poNumber.trim() || null;
+
+  const { data: jobSheet, error } = await supabase
+    .from("job_sheets")
+    .update({ po_number: trimmed })
+    .eq("id", jobSheetId)
+    .select("linked_job_id")
+    .single();
+  if (error) return { ok: false, message: error.message };
+
+  if (jobSheet.linked_job_id) {
+    const { error: jobUpdateError } = await supabase
+      .from("jobs")
+      .update({ quickbooks_no: trimmed })
+      .eq("id", jobSheet.linked_job_id);
+    if (jobUpdateError) return { ok: false, message: jobUpdateError.message };
+    revalidatePath(`/office/jobs/${jobSheet.linked_job_id}`);
+  }
 
   revalidatePath(`/office/job-sheets/${jobSheetId}`);
   revalidatePath("/office/job-sheets");
