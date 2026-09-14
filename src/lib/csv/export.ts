@@ -36,3 +36,30 @@ const COLUMNS = [
 export function jobsToCsv(rows: JobExportRow[]): string {
   return Papa.unparse({ fields: COLUMNS, data: rows });
 }
+
+export type TimesheetExportRow = {
+  job_number: string;
+  engineer: string;
+  customer: string;
+  site: string;
+  date: string | null;
+  travel_minutes: number | null;
+  work_minutes: number | null;
+  total_minutes: number | null;
+};
+
+const TIMESHEET_COLUMNS = [
+  "job_number",
+  "engineer",
+  "customer",
+  "site",
+  "date",
+  "travel_minutes",
+  "work_minutes",
+  "total_minutes",
+];
+
+/** Same Papa.unparse({fields, data}) shape as jobsToCsv, for the same reason (a zero-row filtered export still gets a header row). */
+export function timesheetsToCsv(rows: TimesheetExportRow[]): string {
+  return Papa.unparse({ fields: TIMESHEET_COLUMNS, data: rows });
+}

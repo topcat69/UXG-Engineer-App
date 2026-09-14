@@ -1,4 +1,23 @@
+import type { Database } from "@/lib/supabase/database.types";
+
 export type StatusEventForDuration = { to_status: string; occurred_at: string };
+
+/**
+ * Which job statuses a Timesheets entry makes sense for — shared between
+ * /office/timesheets and its CSV export so the two queries can't drift
+ * apart. Travel/work time on a job still in_progress is a moving target,
+ * not something to bill against yet (see computeWorkedMinutes' own null
+ * return for an open interval) — so this is every status a job reaches
+ * only after the engineer has actually finished the fieldwork, regardless
+ * of where it ends up in the QA pipeline afterward.
+ */
+export const TIMESHEET_STATUSES: Database["public"]["Enums"]["job_status"][] = [
+  "submitted",
+  "under_review",
+  "approved",
+  "closed",
+  "revisit",
+];
 
 /**
  * Total minutes actually spent "in progress" on a job — summed across every
@@ -21,6 +40,28 @@ export type StatusEventForDuration = { to_status: string; occurred_at: string };
  * formatDurationBetween/formatDurationMinutes.
  */
 export function computeWorkedMinutes(events: StatusEventForDuration[]): number | null {
+  return computeIntervalMinutes(events, "in_progress");
+}
+
+/**
+ * Same interval-summing shape as computeWorkedMinutes, opened by
+ * `travelling` instead — every `travelling -> (anything else)` span
+ * (normally closed by check-in's travelling -> in_progress, but this
+ * doesn't assume that specifically, same generality as the work-time
+ * calculation). Shared by both via computeIntervalMinutes below rather
+ * than duplicating the sort/accumulate loop for a second opening status.
+ *
+ * Return-leg travel (travelling home/back to the office after the job)
+ * isn't tracked anywhere yet — Timesheets Phase 1 only asked for the
+ * outbound leg captured here. It's a deliberate extension point, not an
+ * oversight: see the Timesheets scope notes on why it's trip-level, not
+ * job-level, and deferred to Phase 2.
+ */
+export function computeTravelMinutes(events: StatusEventForDuration[]): number | null {
+  return computeIntervalMinutes(events, "travelling");
+}
+
+function computeIntervalMinutes(events: StatusEventForDuration[], openingStatus: string): number | null {
   const sorted = [...events]
     .map((e) => ({ toStatus: e.to_status, ms: new Date(e.occurred_at).getTime() }))
     .filter((e) => Number.isFinite(e.ms))
@@ -31,7 +72,7 @@ export function computeWorkedMinutes(events: StatusEventForDuration[]): number |
   let hasInterval = false;
 
   for (const event of sorted) {
-    if (event.toStatus === "in_progress") {
+    if (event.toStatus === openingStatus) {
       openStartMs = event.ms;
     } else if (openStartMs !== null) {
       totalMinutes += (event.ms - openStartMs) / 60_000;
@@ -41,4 +82,29 @@ export function computeWorkedMinutes(events: StatusEventForDuration[]): number |
   }
 
   return hasInterval ? totalMinutes : null;
+}
+
+/** Nearest 15 minutes, standard round-half-up — the unit every figure below is rounded to independently. */
+export function roundToNearest15Minutes(minutes: number): number {
+  return Math.round(minutes / 15) * 15;
+}
+
+export type TimesheetMinutes = { travelMinutes: number | null; workMinutes: number | null; totalMinutes: number | null };
+
+/**
+ * The three Timesheets figures for one job: travel, on-site work, and
+ * total — each rounded to the nearest 15 minutes *independently*, not by
+ * summing the two already-rounded figures (confirmed decision: rounding
+ * travel and work separately first can shift the total by up to 15
+ * minutes either way versus rounding the true total directly).
+ */
+export function computeTimesheetMinutes(events: StatusEventForDuration[]): TimesheetMinutes {
+  const rawTravel = computeTravelMinutes(events);
+  const rawWork = computeWorkedMinutes(events);
+  const rawTotal = rawTravel === null && rawWork === null ? null : (rawTravel ?? 0) + (rawWork ?? 0);
+  return {
+    travelMinutes: rawTravel === null ? null : roundToNearest15Minutes(rawTravel),
+    workMinutes: rawWork === null ? null : roundToNearest15Minutes(rawWork),
+    totalMinutes: rawTotal === null ? null : roundToNearest15Minutes(rawTotal),
+  };
 }
