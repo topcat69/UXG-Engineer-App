@@ -116,10 +116,8 @@ export function AssetRegisterManager({
   // reflects the page's initial load, so it goes stale the moment an edit
   // changes category_id/site_id without a full page reload.
   const categoryNameById = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
-  const siteLabelById = useMemo(
-    () => new Map(sites.map((s) => [s.id, s.client ? `${s.name} — ${s.client.name}` : s.name])),
-    [sites],
-  );
+  const siteNameById = useMemo(() => new Map(sites.map((s) => [s.id, s.name])), [sites]);
+  const clientNameById = useMemo(() => new Map(sites.map((s) => [s.id, s.client?.name ?? null])), [sites]);
 
   function handleStartEdit(asset: AssetRegisterRow) {
     setEditingId(asset.id);
@@ -344,6 +342,7 @@ export function AssetRegisterManager({
           <tr className="border-b text-left">
             <th className="py-2 font-medium">Category</th>
             <th className="py-2 font-medium">Item</th>
+            <th className="py-2 font-medium">Client</th>
             <th className="py-2 font-medium">Site</th>
             <th className="py-2 font-medium">Status</th>
             <th className="py-2 font-medium">Install date</th>
@@ -354,7 +353,7 @@ export function AssetRegisterManager({
         <tbody>
           {visibleAssets.length === 0 && (
             <tr>
-              <td colSpan={7} className="text-muted-foreground py-6 text-center">
+              <td colSpan={8} className="text-muted-foreground py-6 text-center">
                 {needsReviewOnly ? "Nothing needs review." : "Nothing in the register yet."}
               </td>
             </tr>
@@ -365,9 +364,8 @@ export function AssetRegisterManager({
                 {(asset.category_id && categoryNameById.get(asset.category_id)) ?? <span className="text-muted-foreground">—</span>}
               </td>
               <td className="py-2">{assetLabel(asset)}</td>
-              <td className="py-2 text-muted-foreground">
-                {(asset.site_id && siteLabelById.get(asset.site_id)) ?? "Unassigned"}
-              </td>
+              <td className="py-2 text-muted-foreground">{(asset.site_id && clientNameById.get(asset.site_id)) || "—"}</td>
+              <td className="py-2 text-muted-foreground">{(asset.site_id && siteNameById.get(asset.site_id)) ?? "Unassigned"}</td>
               <td className="py-2">
                 <Badge variant="secondary">{humanize(asset.status)}</Badge>
               </td>
