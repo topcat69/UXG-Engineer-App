@@ -334,6 +334,96 @@ export type Database = {
         }
         Relationships: []
       }
+      damaged_equipment: {
+        Row: {
+          asset_register_id: string | null
+          created_at: string
+          created_by: string | null
+          damage_notes: string | null
+          description: string | null
+          id: string
+          manufacturer: string | null
+          model: string | null
+          next_step: Database["public"]["Enums"]["damage_resolution"]
+          photo_path: string | null
+          serial_number: string | null
+          site_id: string | null
+          stock_item_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          asset_register_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          damage_notes?: string | null
+          description?: string | null
+          id?: string
+          manufacturer?: string | null
+          model?: string | null
+          next_step?: Database["public"]["Enums"]["damage_resolution"]
+          photo_path?: string | null
+          serial_number?: string | null
+          site_id?: string | null
+          stock_item_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          asset_register_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          damage_notes?: string | null
+          description?: string | null
+          id?: string
+          manufacturer?: string | null
+          model?: string | null
+          next_step?: Database["public"]["Enums"]["damage_resolution"]
+          photo_path?: string | null
+          serial_number?: string | null
+          site_id?: string | null
+          stock_item_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "damaged_equipment_asset_register_id_fkey"
+            columns: ["asset_register_id"]
+            isOneToOne: false
+            referencedRelation: "asset_register"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "damaged_equipment_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "damaged_equipment_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "damaged_equipment_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "damaged_equipment_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       help_article_images: {
         Row: {
           article_id: string
@@ -2056,6 +2146,13 @@ export type Database = {
     Enums: {
       asset_source: "goods_in" | "import" | "manual"
       asset_status: "spare" | "in_use" | "faulty" | "in_repair" | "retired"
+      damage_resolution:
+        | "pending"
+        | "replace"
+        | "warranty_claim"
+        | "repair"
+        | "write_off"
+        | "other"
       equipment_damage_status: "na" | "yes" | "accidental" | "customer"
       job_sheet_status:
         | "building"
@@ -2217,6 +2314,14 @@ export const Constants = {
     Enums: {
       asset_source: ["goods_in", "import", "manual"],
       asset_status: ["spare", "in_use", "faulty", "in_repair", "retired"],
+      damage_resolution: [
+        "pending",
+        "replace",
+        "warranty_claim",
+        "repair",
+        "write_off",
+        "other",
+      ],
       equipment_damage_status: ["na", "yes", "accidental", "customer"],
       job_sheet_status: [
         "building",

@@ -115,6 +115,21 @@ export async function requireFinanceUser(): Promise<CurrentUser> {
 }
 
 /**
+ * Redirects to /login if not signed in, or to / if signed in but not
+ * superadmin/manager/warehouse/finance — the Damaged Equipment scope's
+ * confirmed access decision: those three roles (plus superadmin, as
+ * usual) can view/create and set the next step. Deliberately its own
+ * top-level route rather than living under /office, since Warehouse and
+ * Finance can't reach /office at all — same reasoning as /help.
+ */
+export async function requireDamagedEquipmentUser(): Promise<CurrentUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!["superadmin", "manager", "warehouse", "finance"].includes(user.role)) redirect("/");
+  return user;
+}
+
+/**
  * Redirects to /login if not signed in — no role restriction, since Help
  * Guides is reachable from every role's own surface. What each viewer
  * actually sees within it is filtered by help_categories/help_articles'

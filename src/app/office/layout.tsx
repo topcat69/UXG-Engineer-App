@@ -15,6 +15,7 @@ const NAV = [
   { href: "/office/qa", label: "Job Review" },
   { href: "/office/issues", label: "Issues" },
   { href: "/office/reports", label: "Completed Jobs" },
+  { href: "/damaged-equipment", label: "Damaged Equipment" },
 ];
 
 /** Low-frequency admin pages, tucked behind the "Admin Tools" dropdown (see AdminToolsNav) rather than cluttering the main nav bar. */

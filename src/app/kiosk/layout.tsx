@@ -22,6 +22,9 @@ export default async function KioskLayout({ children }: { children: React.ReactN
           <span className="text-muted-foreground">
             {user.name} · {roleLabel(user.role)}
           </span>
+          <Link href="/damaged-equipment" className="text-muted-foreground hover:text-foreground underline">
+            Damaged Equipment
+          </Link>
           <Link href="/help" className="text-muted-foreground hover:text-foreground underline">
             Help
           </Link>

@@ -1,30 +1,32 @@
 import Link from "next/link";
-import { requireFinanceUser } from "@/lib/auth/current-user";
+import { homeRouteForRole, requireDamagedEquipmentUser } from "@/lib/auth/current-user";
 import { signOut } from "@/lib/auth/actions";
 import { roleLabel } from "@/lib/format/text";
 import { UxgLogo } from "@/components/branding/uxg-logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 
 /**
- * A focused surface for the Finance role — Asset Register only, same
- * "own route instead of the shared /office layout" pattern as
- * /kiosk for Warehouse (see the Goods-In & Job Sheets proposal's "Who
- * does what" callout, and requireFinanceUser's doc comment).
+ * Its own top-level route, not under /office, since two of its four
+ * allowed roles — Warehouse and Finance — have no access to /office at
+ * all (see requireDamagedEquipmentUser). Same "own layout, reachable from
+ * every allowed role's own surface" shape as /help.
  */
-export default async function FinanceLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireFinanceUser();
+export default async function DamagedEquipmentLayout({ children }: { children: React.ReactNode }) {
+  const user = await requireDamagedEquipmentUser();
 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between border-b px-6 py-3">
-        <UxgLogo className="h-6 w-auto" />
+        <Link href={homeRouteForRole(user.role)}>
+          <UxgLogo className="h-6 w-auto" />
+        </Link>
         <div className="flex items-center gap-3 text-sm">
+          <Link href={homeRouteForRole(user.role)} className="text-muted-foreground hover:text-foreground underline">
+            ← Back to the app
+          </Link>
           <span className="text-muted-foreground">
             {user.name} · {roleLabel(user.role)}
           </span>
-          <Link href="/damaged-equipment" className="text-muted-foreground hover:text-foreground underline">
-            Damaged Equipment
-          </Link>
           <Link href="/help" className="text-muted-foreground hover:text-foreground underline">
             Help
           </Link>

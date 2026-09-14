@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import type { Database } from "@/lib/supabase/database.types";
 import { sendAssetNeedsReviewEmail } from "@/lib/email/send-asset-register-emails";
+import { recordDamagedStockItem } from "@/lib/damaged-equipment/record-damage";
 import type { ChecklistKey } from "./checklist-item";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -204,6 +205,19 @@ export async function addStockItem(
   });
 
   await registerGoodsInAsset(supabase, stockItem.id, jobSheetId, trimmedManufacturer, trimmedModel, serialNo);
+
+  if (damaged) {
+    await recordDamagedStockItem({
+      stockItemId: stockItem.id,
+      jobSheetId,
+      manufacturer: trimmedManufacturer || null,
+      model: trimmedModel || null,
+      description: trimmedDescription || null,
+      serialNo: serialNo.trim() || null,
+      damageNotes,
+      createdBy: user.id,
+    });
+  }
 
   const { data: jobSheet } = await supabase.from("job_sheets").select("status").eq("id", jobSheetId).single();
   if (jobSheet?.status === "building") {
@@ -461,10 +475,21 @@ export async function updateStockItem(
   damaged: boolean,
   damageNotes: string,
 ): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, message: "Not signed in." };
+
   const supabase = await createClient();
   const trimmedManufacturer = manufacturer.trim();
   const trimmedModel = model.trim();
   const trimmedDescription = description.trim();
+
+  // Read the previous value first — a retroactive damage flag (Decision 4
+  // of the Damaged Equipment scope: an item edited to damaged after the
+  // fact) triggers the same copy + email as a goods-in scan that arrives
+  // already damaged, but only on the false -> true transition, never on
+  // every save of an already-damaged row.
+  const { data: existing } = await supabase.from("stock_items").select("damaged").eq("id", stockItemId).single();
+  const becameDamaged = damaged && !existing?.damaged;
 
   const { error } = await supabase
     .from("stock_items")
@@ -482,6 +507,19 @@ export async function updateStockItem(
   if (error) return { ok: false, message: error.message };
 
   await ensureCatalogEntry(supabase, trimmedManufacturer, trimmedModel, trimmedDescription);
+
+  if (becameDamaged) {
+    await recordDamagedStockItem({
+      stockItemId,
+      jobSheetId,
+      manufacturer: trimmedManufacturer || null,
+      model: trimmedModel || null,
+      description: trimmedDescription || null,
+      serialNo: serialNo.trim() || null,
+      damageNotes,
+      createdBy: user.id,
+    });
+  }
 
   revalidatePath(`/kiosk/${jobSheetId}`);
   revalidatePath(`/office/job-sheets/${jobSheetId}`);
