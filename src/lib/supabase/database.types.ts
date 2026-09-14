@@ -334,6 +334,137 @@ export type Database = {
         }
         Relationships: []
       }
+      help_article_images: {
+        Row: {
+          article_id: string
+          caption: string | null
+          created_at: string | null
+          id: string
+          position: number
+          storage_path: string
+        }
+        Insert: {
+          article_id: string
+          caption?: string | null
+          created_at?: string | null
+          id?: string
+          position?: number
+          storage_path: string
+        }
+        Update: {
+          article_id?: string
+          caption?: string | null
+          created_at?: string | null
+          id?: string
+          position?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "help_article_images_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "help_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      help_articles: {
+        Row: {
+          body: string
+          category_id: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          position: number
+          title: string
+          updated_at: string | null
+          updated_by: string | null
+          video_path: string | null
+        }
+        Insert: {
+          body: string
+          category_id: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          position?: number
+          title: string
+          updated_at?: string | null
+          updated_by?: string | null
+          video_path?: string | null
+        }
+        Update: {
+          body?: string
+          category_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          position?: number
+          title?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          video_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "help_articles_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "help_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "help_articles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "help_articles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      help_categories: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          position: number
+          role: Database["public"]["Enums"]["user_role"] | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          position?: number
+          role?: Database["public"]["Enums"]["user_role"] | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          position?: number
+          role?: Database["public"]["Enums"]["user_role"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "help_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "help_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       install_forms: {
         Row: {
           client_name: string | null

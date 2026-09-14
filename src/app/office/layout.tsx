@@ -29,6 +29,7 @@ const ADMIN_TOOLS_NAV = [
   { href: "/office/stock-catalog", label: "Stock Catalog" },
   { href: "/office/asset-register", label: "Asset Register" },
   { href: "/office/timesheets", label: "Timesheets" },
+  { href: "/office/help-content", label: "Help Content" },
   { href: "/office/users", label: "Users" },
 ];
 
@@ -63,6 +64,9 @@ export default async function OfficeLayout({ children }: { children: React.React
           </span>
           <Link href="/my-jobs" className="text-muted-foreground hover:text-foreground underline">
             My Jobs (field app)
+          </Link>
+          <Link href="/help" className="text-muted-foreground hover:text-foreground underline">
+            Help
           </Link>
           {user.role === "superadmin" && (
             // Warehouse's own kiosk surface isn't part of the Office nav by design

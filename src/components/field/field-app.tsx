@@ -50,6 +50,9 @@ export function FieldApp({ user }: { user: CurrentUser }) {
           <button type="button" onClick={() => setView({ screen: "kb" })} className="text-muted-foreground underline">
             Knowledge Base
           </button>
+          <Link href="/help" className="text-muted-foreground underline">
+            Help
+          </Link>
           <span className="text-muted-foreground">{user.name}</span>
           <ThemeSwitcher currentTheme={user.theme} />
           {/* Managers/superadmins can be assigned jobs too, so they can reach this

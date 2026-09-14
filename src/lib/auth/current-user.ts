@@ -113,3 +113,31 @@ export async function requireFinanceUser(): Promise<CurrentUser> {
   if (user.role !== "superadmin" && user.role !== "finance") redirect("/");
   return user;
 }
+
+/**
+ * Redirects to /login if not signed in — no role restriction, since Help
+ * Guides is reachable from every role's own surface. What each viewer
+ * actually sees within it is filtered by help_categories/help_articles'
+ * own RLS (role is null, matches the viewer's role, or the viewer is
+ * superadmin — see 20260915000000_help_guides.sql), not by this gate.
+ */
+export async function requireAnyUser(): Promise<CurrentUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  return user;
+}
+
+/** Where "back to the app" should point for a given role — used by the Help layout, which has no home of its own. */
+export function homeRouteForRole(role: CurrentUser["role"]): string {
+  switch (role) {
+    case "superadmin":
+    case "manager":
+      return "/office/dashboard";
+    case "warehouse":
+      return "/kiosk";
+    case "finance":
+      return "/finance";
+    default:
+      return "/my-jobs";
+  }
+}

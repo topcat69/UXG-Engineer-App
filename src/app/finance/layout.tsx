@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireFinanceUser } from "@/lib/auth/current-user";
 import { signOut } from "@/lib/auth/actions";
 import { roleLabel } from "@/lib/format/text";
@@ -21,6 +22,9 @@ export default async function FinanceLayout({ children }: { children: React.Reac
           <span className="text-muted-foreground">
             {user.name} · {roleLabel(user.role)}
           </span>
+          <Link href="/help" className="text-muted-foreground hover:text-foreground underline">
+            Help
+          </Link>
           <ThemeSwitcher currentTheme={user.theme} />
           <form action={signOut}>
             <button type="submit" className="text-muted-foreground hover:text-foreground underline">
