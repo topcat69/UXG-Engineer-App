@@ -1,8 +1,10 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { parseClientsCsv } from "@/lib/csv/clients";
+import { ensureClientDriveFolder } from "@/lib/google/drive-sync";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
@@ -32,6 +34,11 @@ export async function createClientRecord(input: {
     .select("*")
     .single();
   if (error) return { ok: false, message: error.message };
+
+  // Best-effort, non-blocking — same reason syncCalendarForJob runs via
+  // after() rather than being awaited: creating a client must succeed
+  // whether or not Drive is configured or reachable.
+  after(() => ensureClientDriveFolder(supabase, data.id));
 
   revalidatePath("/office/clients");
   return { ok: true, client: data };

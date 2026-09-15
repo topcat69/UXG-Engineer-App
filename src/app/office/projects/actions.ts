@@ -1,7 +1,9 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { ensureProjectDriveFolder } from "@/lib/google/drive-sync";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
@@ -31,6 +33,11 @@ export async function createProject(input: {
     .select("*")
     .single();
   if (error) return { ok: false, message: error.message };
+
+  // Best-effort, non-blocking — same reason ensureClientDriveFolder runs
+  // via after() on client creation: creating a project must succeed
+  // whether or not Drive is configured or reachable.
+  after(() => ensureProjectDriveFolder(supabase, data.id));
 
   revalidatePath("/office/projects");
   revalidatePath(`/office/clients/${input.client_id}`);

@@ -310,6 +310,7 @@ export type Database = {
           contact_name: string | null
           contact_phone: string | null
           created_at: string | null
+          drive_folder_id: string | null
           id: string
           name: string
           notes: string | null
@@ -319,6 +320,7 @@ export type Database = {
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          drive_folder_id?: string | null
           id?: string
           name: string
           notes?: string | null
@@ -328,6 +330,7 @@ export type Database = {
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          drive_folder_id?: string | null
           id?: string
           name?: string
           notes?: string | null
@@ -1646,6 +1649,7 @@ export type Database = {
         Row: {
           client_id: string | null
           created_at: string | null
+          drive_folder_id: string | null
           end_date: string | null
           id: string
           name: string
@@ -1655,6 +1659,7 @@ export type Database = {
         Insert: {
           client_id?: string | null
           created_at?: string | null
+          drive_folder_id?: string | null
           end_date?: string | null
           id?: string
           name: string
@@ -1664,6 +1669,7 @@ export type Database = {
         Update: {
           client_id?: string | null
           created_at?: string | null
+          drive_folder_id?: string | null
           end_date?: string | null
           id?: string
           name?: string
