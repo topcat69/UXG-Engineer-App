@@ -1,8 +1,13 @@
 import "server-only";
 import { google, type drive_v3 } from "googleapis";
-import { findOrCreateFolder as findOrCreateFolderImpl, type DriveFolderClientLike } from "./drive-folder-logic";
+import {
+  findOrCreateFolder as findOrCreateFolderImpl,
+  uploadFile as uploadFileImpl,
+  type DriveFolderClientLike,
+  type DriveUploadClientLike,
+} from "./drive-folder-logic";
 
-export { type DriveFolderClientLike };
+export { type DriveFolderClientLike, type DriveUploadClientLike };
 
 /**
  * One-way, this app → Drive only — same posture as calendar.ts, just a
@@ -66,4 +71,13 @@ export async function createOrFetchFolder(name: string, parentId: string): Promi
 export function customerJobsRootFolderId(): string | null {
   if (!getDriveFolderClient()) return null;
   return driveRootFolderId();
+}
+
+/**
+ * Uploads `content` as a new file named `name` inside `parentId`.
+ * Returns null when Drive isn't configured — best-effort, same contract
+ * as createOrFetchFolder.
+ */
+export async function uploadFile(name: string, parentId: string, content: Buffer, mimeType: string): Promise<string | null> {
+  return uploadFileImpl(getDriveFolderClient() as unknown as DriveUploadClientLike | null, name, parentId, content, mimeType);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { findOrCreateFolder, type DriveFolderClientLike } from "./drive-folder-logic";
+import { findOrCreateFolder, uploadFile, type DriveFolderClientLike, type DriveUploadClientLike } from "./drive-folder-logic";
 
 function fakeDrive(existingId: string | null): DriveFolderClientLike {
   return {
@@ -56,5 +56,42 @@ describe("findOrCreateFolder", () => {
     (drive.files.create as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
 
     await expect(findOrCreateFolder(drive, "Acme Retail", "root-id")).rejects.toThrow(/no id/);
+  });
+});
+
+function fakeUploadDrive(): DriveUploadClientLike {
+  return {
+    files: {
+      create: vi.fn().mockResolvedValue({ data: { id: "new-file-id" } }),
+    },
+  };
+}
+
+describe("uploadFile", () => {
+  it("skips without calling the API when Drive isn't configured (null client)", async () => {
+    const result = await uploadFile(null, "photo.jpg", "job-folder-id", Buffer.from("data"), "image/jpeg");
+    expect(result).toBeNull();
+  });
+
+  it("uploads the content as a new file under the parent and returns its id", async () => {
+    const drive = fakeUploadDrive();
+    const content = Buffer.from("photo bytes");
+    const result = await uploadFile(drive, "photo.jpg", "job-folder-id", content, "image/jpeg");
+
+    expect(drive.files.create).toHaveBeenCalledOnce();
+    expect(drive.files.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestBody: { name: "photo.jpg", parents: ["job-folder-id"] },
+        media: expect.objectContaining({ mimeType: "image/jpeg" }),
+      }),
+    );
+    expect(result).toBe("new-file-id");
+  });
+
+  it("throws when Drive uploads a file but returns no id", async () => {
+    const drive = fakeUploadDrive();
+    (drive.files.create as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
+
+    await expect(uploadFile(drive, "photo.jpg", "job-folder-id", Buffer.from("data"), "image/jpeg")).rejects.toThrow(/no id/);
   });
 });

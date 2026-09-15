@@ -1,3 +1,5 @@
+import { Readable } from "node:stream";
+
 /**
  * Just the shape of googleapis's Drive client this app actually calls,
  * kept separate from the real `googleapis` import so the find-vs-create
@@ -66,4 +68,44 @@ export async function findOrCreateFolder(
   });
   if (!created.id) throw new Error(`Drive returned no id creating folder "${name}" under ${parentId}`);
   return created.id;
+}
+
+/** Just the file-upload call this app actually makes — same split as DriveFolderClientLike above. */
+export type DriveUploadClientLike = {
+  files: {
+    create(params: {
+      requestBody: { name: string; parents: string[] };
+      media: { mimeType: string; body: Readable };
+      fields: string;
+      supportsAllDrives: boolean;
+    }): Promise<{ data: { id?: string | null } }>;
+  };
+};
+
+/**
+ * Uploads `content` as a new file named `name` inside `parentId`. Always
+ * creates — never checked for an existing file with the same name first,
+ * unlike findOrCreateFolder — because every caller already guards on its
+ * own drive_file_id column being null before calling this, so "does this
+ * already exist" was answered by the database, not by asking Drive.
+ * Returns null (not a thrown error) when `drive` itself is null, same
+ * "not configured" contract as findOrCreateFolder.
+ */
+export async function uploadFile(
+  drive: DriveUploadClientLike | null,
+  name: string,
+  parentId: string,
+  content: Buffer,
+  mimeType: string,
+): Promise<string | null> {
+  if (!drive) return null;
+
+  const { data } = await drive.files.create({
+    requestBody: { name, parents: [parentId] },
+    media: { mimeType, body: Readable.from(content) },
+    fields: "id",
+    supportsAllDrives: true,
+  });
+  if (!data.id) throw new Error(`Drive returned no id uploading file "${name}" to ${parentId}`);
+  return data.id;
 }

@@ -714,6 +714,7 @@ export type Database = {
           arrival_notes: string | null
           content_displaying: Database["public"]["Enums"]["pass_fail"] | null
           created_at: string | null
+          design_pack_drive_file_id: string | null
           design_pack_storage_path: string | null
           engineer_notes: string | null
           equipment_damage:
@@ -730,10 +731,12 @@ export type Database = {
           network_type: string | null
           parking_notes: string | null
           parking_notified: boolean | null
+          parking_permit_drive_file_id: string | null
           parking_permit_storage_path: string | null
           player_boot_test: Database["public"]["Enums"]["pass_fail"] | null
           player_serial: string | null
           power_source: string | null
+          rams_drive_file_id: string | null
           rams_storage_path: string | null
           reason_id: string | null
           reported_to_site_manager: boolean | null
@@ -741,6 +744,7 @@ export type Database = {
           screen_serial: string | null
           site_manager_name: string | null
           site_manager_phone: string | null
+          site_plan_drive_file_id: string | null
           site_plan_storage_path: string | null
           sla_requirement_detail: string | null
           submitted_at: string | null
@@ -750,6 +754,7 @@ export type Database = {
           arrival_notes?: string | null
           content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
           created_at?: string | null
+          design_pack_drive_file_id?: string | null
           design_pack_storage_path?: string | null
           engineer_notes?: string | null
           equipment_damage?:
@@ -766,10 +771,12 @@ export type Database = {
           network_type?: string | null
           parking_notes?: string | null
           parking_notified?: boolean | null
+          parking_permit_drive_file_id?: string | null
           parking_permit_storage_path?: string | null
           player_boot_test?: Database["public"]["Enums"]["pass_fail"] | null
           player_serial?: string | null
           power_source?: string | null
+          rams_drive_file_id?: string | null
           rams_storage_path?: string | null
           reason_id?: string | null
           reported_to_site_manager?: boolean | null
@@ -777,6 +784,7 @@ export type Database = {
           screen_serial?: string | null
           site_manager_name?: string | null
           site_manager_phone?: string | null
+          site_plan_drive_file_id?: string | null
           site_plan_storage_path?: string | null
           sla_requirement_detail?: string | null
           submitted_at?: string | null
@@ -786,6 +794,7 @@ export type Database = {
           arrival_notes?: string | null
           content_displaying?: Database["public"]["Enums"]["pass_fail"] | null
           created_at?: string | null
+          design_pack_drive_file_id?: string | null
           design_pack_storage_path?: string | null
           engineer_notes?: string | null
           equipment_damage?:
@@ -802,10 +811,12 @@ export type Database = {
           network_type?: string | null
           parking_notes?: string | null
           parking_notified?: boolean | null
+          parking_permit_drive_file_id?: string | null
           parking_permit_storage_path?: string | null
           player_boot_test?: Database["public"]["Enums"]["pass_fail"] | null
           player_serial?: string | null
           power_source?: string | null
+          rams_drive_file_id?: string | null
           rams_storage_path?: string | null
           reason_id?: string | null
           reported_to_site_manager?: boolean | null
@@ -813,6 +824,7 @@ export type Database = {
           screen_serial?: string | null
           site_manager_name?: string | null
           site_manager_phone?: string | null
+          site_plan_drive_file_id?: string | null
           site_plan_storage_path?: string | null
           sla_requirement_detail?: string | null
           submitted_at?: string | null
@@ -1583,6 +1595,7 @@ export type Database = {
           caption: string | null
           captured_at: string
           captured_by: string | null
+          drive_file_id: string | null
           id: string
           job_id: string | null
           latitude: number | null
@@ -1601,6 +1614,7 @@ export type Database = {
           caption?: string | null
           captured_at: string
           captured_by?: string | null
+          drive_file_id?: string | null
           id?: string
           job_id?: string | null
           latitude?: number | null
@@ -1619,6 +1633,7 @@ export type Database = {
           caption?: string | null
           captured_at?: string
           captured_by?: string | null
+          drive_file_id?: string | null
           id?: string
           job_id?: string | null
           latitude?: number | null
@@ -1743,6 +1758,7 @@ export type Database = {
       }
       signatures: {
         Row: {
+          drive_file_id: string | null
           id: string
           job_id: string | null
           latitude: number | null
@@ -1753,6 +1769,7 @@ export type Database = {
           storage_path: string
         }
         Insert: {
+          drive_file_id?: string | null
           id?: string
           job_id?: string | null
           latitude?: number | null
@@ -1763,6 +1780,7 @@ export type Database = {
           storage_path: string
         }
         Update: {
+          drive_file_id?: string | null
           id?: string
           job_id?: string | null
           latitude?: number | null

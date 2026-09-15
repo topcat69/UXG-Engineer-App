@@ -12,6 +12,7 @@ import { duplicateJob } from "@/lib/jobs/duplicate-job";
 import { cloneTasksForJob } from "@/lib/jobs/clone-tasks";
 import { detectConflicts } from "@/lib/scheduler/conflicts";
 import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
+import { syncJobDocumentToDrive } from "@/lib/google/drive-media-sync";
 import { sendJobAssignedEmail, sendJobCancelledEmail, sendJobScheduledEmail } from "@/lib/email/send-job-emails";
 import type { RequirableFieldKey } from "@/lib/forms/job-form";
 import type { ActionResult } from "../actions";
@@ -320,6 +321,14 @@ export async function uploadJobDocument(
   const patch = { [DOCUMENT_PATCH_KEYS[kind]]: storagePath };
   const { error } = await supabase.from("job_details").upsert({ job_id: jobId, ...patch }, { onConflict: "job_id" });
   if (error) return { ok: false, message: error.message };
+
+  // Best-effort, non-blocking — same reason syncCalendarForJob runs via
+  // after(): uploading a document must succeed whether or not Drive is
+  // configured or reachable. The drive-media-sync cron covers this too
+  // (for documents uploaded before Drive was configured, or if this fails),
+  // but doing it here as well means a newly uploaded document usually
+  // shows up in Drive immediately rather than waiting for the next tick.
+  after(() => syncJobDocumentToDrive(supabase, jobId, kind));
 
   revalidatePath(`/office/jobs/${jobId}`);
   return { ok: true, message: `${DOCUMENT_LABELS[kind]} uploaded.` };
