@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyWebhookSecret } from "@/lib/webhooks/verify-secret";
 import { customerJobsRootFolderId } from "@/lib/google/drive-folders";
-import { syncMediaAssetToDrive, syncSignatureToDrive, syncJobDocumentToDrive, type JobDocumentKind } from "@/lib/google/drive-media-sync";
+import {
+  syncMediaAssetToDrive,
+  syncSignatureToDrive,
+  syncJobDocumentToDrive,
+  syncCompletionReportToDrive,
+  type JobDocumentKind,
+} from "@/lib/google/drive-media-sync";
 
 /**
  * Meant to be hit periodically by an external scheduler, same shape as
@@ -78,9 +84,20 @@ export async function POST(request: Request) {
     }
   }
 
+  const { data: completionReports } = await supabase
+    .from("jobs")
+    .select("id")
+    .not("completion_pdf_url", "is", null)
+    .is("completion_report_drive_file_id", null)
+    .limit(BATCH_SIZE);
+  for (const job of completionReports ?? []) {
+    await syncCompletionReportToDrive(supabase, job.id);
+  }
+
   return NextResponse.json({
     mediaAssetsProcessed: mediaAssets?.length ?? 0,
     signaturesProcessed: signatures?.length ?? 0,
     jobsWithDocumentsProcessed: jobDetails?.length ?? 0,
+    completionReportsProcessed: completionReports?.length ?? 0,
   });
 }

@@ -1272,6 +1272,7 @@ export type Database = {
           check_in_lat: number | null
           check_in_lng: number | null
           completion_pdf_url: string | null
+          completion_report_drive_file_id: string | null
           created_at: string | null
           description: string | null
           drive_folder_id: string | null
@@ -1305,6 +1306,7 @@ export type Database = {
           check_in_lat?: number | null
           check_in_lng?: number | null
           completion_pdf_url?: string | null
+          completion_report_drive_file_id?: string | null
           created_at?: string | null
           description?: string | null
           drive_folder_id?: string | null
@@ -1338,6 +1340,7 @@ export type Database = {
           check_in_lat?: number | null
           check_in_lng?: number | null
           completion_pdf_url?: string | null
+          completion_report_drive_file_id?: string | null
           created_at?: string | null
           description?: string | null
           drive_folder_id?: string | null

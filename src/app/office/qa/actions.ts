@@ -1,11 +1,13 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { createRevisitJob } from "@/lib/jobs/create-revisit";
 import { sendApprovedEmail } from "@/lib/email/send-job-emails";
 import { generateAndStoreCompletionReport } from "@/lib/pdf/completion-report";
+import { syncCompletionReportToDrive } from "@/lib/google/drive-media-sync";
 import type { ActionResult } from "../jobs/actions";
 
 export async function approveJob(jobId: string): Promise<ActionResult> {
@@ -42,6 +44,10 @@ export async function approveJob(jobId: string): Promise<ActionResult> {
   let reportNote = "";
   if ("path" in report) {
     await supabase.from("jobs").update({ completion_pdf_url: report.path }).eq("id", jobId);
+    // Best-effort, non-blocking — same reason every other Drive sync runs
+    // via after(): approving a job must succeed whether or not Drive is
+    // configured or reachable. The drive-media-sync cron covers this too.
+    after(() => syncCompletionReportToDrive(supabase, jobId));
   } else {
     reportNote = ` Report generation failed: ${report.error}`;
   }

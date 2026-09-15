@@ -124,3 +124,35 @@ export async function syncJobDocumentToDrive(supabase: AnySupabaseClient, jobId:
     console.error(`Drive document sync failed for job ${jobId} (${kind})`, error);
   }
 }
+
+/**
+ * Mirrors the completion report PDF (generated on QA approval, see
+ * generateAndStoreCompletionReport) into its job's Drive folder — the
+ * last of the four phases, done last on purpose since a job only has a
+ * completion report once it's already closed, by which point its folder
+ * has certainly been created by every earlier job-related upload.
+ */
+export async function syncCompletionReportToDrive(supabase: AnySupabaseClient, jobId: string): Promise<void> {
+  try {
+    const { data: job } = await supabase
+      .from("jobs")
+      .select("completion_pdf_url, completion_report_drive_file_id")
+      .eq("id", jobId)
+      .single();
+    if (!job || !job.completion_pdf_url || job.completion_report_drive_file_id) return;
+
+    await ensureJobDriveFolder(supabase, jobId);
+    const { data: folder } = await supabase.from("jobs").select("drive_folder_id").eq("id", jobId).single();
+    if (!folder?.drive_folder_id) return;
+
+    const downloaded = await downloadStorageFile(supabase, job.completion_pdf_url);
+    if (!downloaded) return;
+
+    const name = driveFileNameFor(job.completion_pdf_url, `completion-report-${jobId}.pdf`);
+    const fileId = await uploadFile(name, folder.drive_folder_id, downloaded.content, downloaded.mime);
+    if (!fileId) return;
+    await supabase.from("jobs").update({ completion_report_drive_file_id: fileId }).eq("id", jobId);
+  } catch (error) {
+    console.error(`Drive completion report sync failed for job ${jobId}`, error);
+  }
+}
