@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { CREATABLE_JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
+import { importAssetRegisterCsv } from "@/app/office/asset-register/actions";
 import { generateJobs, importSitesCsv } from "./actions";
 
 export function ImportWizard({
@@ -26,6 +27,11 @@ export function ImportWizard({
   const [jobType, setJobType] = useState("");
   const [generateMessage, setGenerateMessage] = useState<string | null>(null);
   const [isGenerating, startGenerate] = useTransition();
+
+  const [assetImportMessage, setAssetImportMessage] = useState<string | null>(null);
+  const [isImportingAssets, startAssetImport] = useTransition();
+  const assetImportFileInputRef = useRef<HTMLInputElement>(null);
+
   const router = useRouter();
 
   function handleImport(formData: FormData) {
@@ -48,6 +54,14 @@ export function ImportWizard({
       const result = await generateJobs(targetIds, projectId, jobType);
       setGenerateMessage(result.message);
       router.refresh();
+    });
+  }
+
+  function handleImportAssets(formData: FormData) {
+    startAssetImport(async () => {
+      const result = await importAssetRegisterCsv(formData);
+      setAssetImportMessage(result.message);
+      if (result.ok && assetImportFileInputRef.current) assetImportFileInputRef.current.value = "";
     });
   }
 
@@ -155,6 +169,28 @@ export function ImportWizard({
           </Button>
         </div>
         {generateMessage && <p className="text-sm">{generateMessage}</p>}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-medium">3. Import assets from CSV</h2>
+        <p className="text-muted-foreground text-sm">
+          For legacy assets that never went through goods-in. Columns: <code>category</code>, <code>manufacturer</code>,{" "}
+          <code>model</code>, <code>serial_number</code>, <code>site</code>, <code>client</code> (only needed if two sites
+          share a name), <code>purchase_date</code>, <code>supplier</code>, <code>po_or_invoice_number</code>,{" "}
+          <code>purchase_cost</code>, <code>depreciation_method</code>, <code>useful_life_years</code>,{" "}
+          <code>residual_value</code>, <code>warranty_start</code>, <code>warranty_end</code>, <code>warranty_provider</code>,{" "}
+          <code>support_contract_ref</code>, <code>support_sla</code>, <code>status</code> (defaults to Spare),{" "}
+          <code>expected_replacement_date</code>, <code>decommission_date</code>, <code>disposal_date</code>,{" "}
+          <code>weee_reference</code>. All optional except site, which is required unless status is Spare. A category
+          that doesn&apos;t exist yet is created automatically; an unrecognised site is a row error, not a new site.
+        </p>
+        <form action={handleImportAssets} className="flex flex-wrap items-center gap-2">
+          <input ref={assetImportFileInputRef} type="file" name="file" accept=".csv,text/csv" required className="text-sm" />
+          <Button type="submit" size="sm" disabled={isImportingAssets}>
+            {isImportingAssets ? "Importing…" : "Import"}
+          </Button>
+        </form>
+        {assetImportMessage && <p className="text-sm">{assetImportMessage}</p>}
       </section>
     </div>
   );

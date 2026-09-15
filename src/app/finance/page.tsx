@@ -44,7 +44,6 @@ export default async function FinancePage() {
         sites={sites ?? []}
         canManageCategories={false}
         canDelete={false}
-        canImport={false}
       />
     </div>
   );

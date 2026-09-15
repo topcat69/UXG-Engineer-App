@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FlatListSection, type NamedListRow } from "@/components/office/flat-list-section";
@@ -11,7 +11,6 @@ import {
   createAssetManually,
   deleteAssetCategory,
   deleteAssetRegisterRow,
-  importAssetRegisterCsv,
   updateAssetCategory,
   updateAssetRegister,
   type AssetFieldsInput,
@@ -82,10 +81,8 @@ function assetToFields(asset: AssetRegisterRow): AssetFieldsInput {
   };
 }
 
-function assetLabel(asset: AssetWithJoins): string {
-  const parts = [asset.manufacturer, asset.model].filter(Boolean).join(" ");
-  const withSerial = asset.serial_number ? `${parts || "—"} — ${asset.serial_number}` : parts || "—";
-  return withSerial;
+function assetItemLabel(asset: AssetWithJoins): string {
+  return [asset.manufacturer, asset.model].filter(Boolean).join(" ") || "—";
 }
 
 /**
@@ -94,9 +91,9 @@ function assetLabel(asset: AssetWithJoins): string {
  * requireFinanceUser). canManageCategories/canDelete default true for the
  * office page; /finance passes both false, matching the RLS grants in
  * 20260914040000_finance_asset_register_access.sql (Finance can view,
- * add, and edit — not delete rows, curate the category picklist, or run
- * a bulk import — canImport also defaults true for the office page and
- * false for /finance, same reasoning as the other two flags).
+ * add, and edit — not delete rows or curate the category picklist).
+ * Bulk CSV import lives at /office/import instead of here — see that
+ * page's own comment on why.
  */
 export function AssetRegisterManager({
   initialAssets,
@@ -104,24 +101,19 @@ export function AssetRegisterManager({
   sites,
   canManageCategories = true,
   canDelete = true,
-  canImport = true,
 }: {
   initialAssets: AssetWithJoins[];
   categories: NamedListRow[];
   sites: SiteOption[];
   canManageCategories?: boolean;
   canDelete?: boolean;
-  canImport?: boolean;
 }) {
   const [assets, setAssets] = useState(initialAssets);
   const [categories, setCategories] = useState(initialCategories);
   const [needsReviewOnly, setNeedsReviewOnly] = useState(false);
+  const [search, setSearch] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  const [importMessage, setImportMessage] = useState<string | null>(null);
-  const [isImporting, startImportTransition] = useTransition();
-  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFields, setEditFields] = useState<AssetFieldsInput>(EMPTY_FIELDS);
@@ -130,7 +122,6 @@ export function AssetRegisterManager({
   const [addFields, setAddFields] = useState<AssetFieldsInput>(EMPTY_FIELDS);
 
   const needsReviewCount = useMemo(() => assets.filter((a) => a.needs_review).length, [assets]);
-  const visibleAssets = needsReviewOnly ? assets.filter((a) => a.needs_review) : assets;
 
   // Looked up from the current categories/sites props rather than trusting
   // each row's server-joined category/site sub-object — that join only
@@ -139,6 +130,27 @@ export function AssetRegisterManager({
   const categoryNameById = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
   const siteNameById = useMemo(() => new Map(sites.map((s) => [s.id, s.name])), [sites]);
   const clientNameById = useMemo(() => new Map(sites.map((s) => [s.id, s.client?.name ?? null])), [sites]);
+
+  // A search box instead of scrolling through however many hundred assets
+  // are on file — matches across everything already visible in the table
+  // (item, serial, category, client, site), not just the item name.
+  const visibleAssets = useMemo(() => {
+    let list = needsReviewOnly ? assets.filter((a) => a.needs_review) : assets;
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter((a) => {
+        const categoryName = (a.category_id && categoryNameById.get(a.category_id)) || "";
+        const clientName = (a.site_id && clientNameById.get(a.site_id)) || "";
+        const siteName = (a.site_id && siteNameById.get(a.site_id)) || "";
+        const haystack = [a.manufacturer, a.model, a.serial_number, categoryName, clientName, siteName]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      });
+    }
+    return list;
+  }, [assets, needsReviewOnly, search, categoryNameById, clientNameById, siteNameById]);
 
   function handleStartEdit(asset: AssetRegisterRow) {
     setEditingId(asset.id);
@@ -182,20 +194,6 @@ export function AssetRegisterManager({
         setMessage(null);
       } else {
         setMessage(result.message);
-      }
-    });
-  }
-
-  function handleImport(formData: FormData) {
-    startImportTransition(async () => {
-      const result = await importAssetRegisterCsv(formData);
-      setImportMessage(result.message);
-      if (result.ok) {
-        setAssets((prev) => [...result.insertedAssets, ...prev]);
-        if (result.newCategories.length > 0) {
-          setCategories((prev) => [...prev, ...result.newCategories].sort((a, b) => a.name.localeCompare(b.name)));
-        }
-        if (importFileInputRef.current) importFileInputRef.current.value = "";
       }
     });
   }
@@ -327,36 +325,21 @@ export function AssetRegisterManager({
         />
       )}
 
-      {canImport && (
-        <section className="flex flex-col gap-3 rounded-md border p-3">
-          <h2 className="font-medium">Import assets from CSV</h2>
-          <p className="text-muted-foreground text-xs">
-            For legacy assets that never went through goods-in. Columns: <code>category</code>, <code>manufacturer</code>,{" "}
-            <code>model</code>, <code>serial_number</code>, <code>site</code>, <code>client</code> (only needed if two sites
-            share a name), <code>purchase_date</code>, <code>supplier</code>, <code>po_or_invoice_number</code>,{" "}
-            <code>purchase_cost</code>, <code>depreciation_method</code>, <code>useful_life_years</code>,{" "}
-            <code>residual_value</code>, <code>warranty_start</code>, <code>warranty_end</code>, <code>warranty_provider</code>,{" "}
-            <code>support_contract_ref</code>, <code>support_sla</code>, <code>status</code> (defaults to Spare),{" "}
-            <code>expected_replacement_date</code>, <code>decommission_date</code>, <code>disposal_date</code>,{" "}
-            <code>weee_reference</code>. All optional except site, which is required unless status is Spare. A category
-            that doesn&apos;t exist yet is created automatically; an unrecognised site is a row error, not a new site.
-          </p>
-          <form action={handleImport} className="flex flex-wrap items-center gap-2">
-            <input ref={importFileInputRef} type="file" name="file" accept=".csv,text/csv" required className="text-sm" />
-            <Button type="submit" size="sm" disabled={isImporting}>
-              {isImporting ? "Importing…" : "Import"}
-            </Button>
-          </form>
-          {importMessage && <p className="text-sm">{importMessage}</p>}
-        </section>
-      )}
-
-      <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={needsReviewOnly} onChange={(e) => setNeedsReviewOnly(e.target.checked)} />
-          Needs review only
-          <Badge variant={needsReviewCount > 0 ? "destructive" : "secondary"}>{needsReviewCount}</Badge>
-        </label>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search item, serial, client, site…"
+            className="border-input h-9 w-64 rounded-md border bg-transparent px-3 text-sm"
+          />
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={needsReviewOnly} onChange={(e) => setNeedsReviewOnly(e.target.checked)} />
+            Needs review only
+            <Badge variant={needsReviewCount > 0 ? "destructive" : "secondary"}>{needsReviewCount}</Badge>
+          </label>
+        </div>
         <Button type="button" size="sm" onClick={() => setShowAddForm((prev) => !prev)}>
           {showAddForm ? "Cancel" : "Add asset manually"}
         </Button>
@@ -403,6 +386,7 @@ export function AssetRegisterManager({
           <tr className="border-b text-left">
             <th className="py-2 font-medium">Category</th>
             <th className="py-2 font-medium">Item</th>
+            <th className="py-2 font-medium">Serial no.</th>
             <th className="py-2 font-medium">Client</th>
             <th className="py-2 font-medium">Site</th>
             <th className="py-2 font-medium">Status</th>
@@ -414,8 +398,12 @@ export function AssetRegisterManager({
         <tbody>
           {visibleAssets.length === 0 && (
             <tr>
-              <td colSpan={8} className="text-muted-foreground py-6 text-center">
-                {needsReviewOnly ? "Nothing needs review." : "Nothing in the register yet."}
+              <td colSpan={9} className="text-muted-foreground py-6 text-center">
+                {search.trim()
+                  ? "No assets match this search."
+                  : needsReviewOnly
+                    ? "Nothing needs review."
+                    : "Nothing in the register yet."}
               </td>
             </tr>
           )}
@@ -424,7 +412,8 @@ export function AssetRegisterManager({
               <td className="py-2">
                 {(asset.category_id && categoryNameById.get(asset.category_id)) ?? <span className="text-muted-foreground">—</span>}
               </td>
-              <td className="py-2">{assetLabel(asset)}</td>
+              <td className="py-2">{assetItemLabel(asset)}</td>
+              <td className="py-2 text-muted-foreground">{asset.serial_number ?? "—"}</td>
               <td className="py-2 text-muted-foreground">{(asset.site_id && clientNameById.get(asset.site_id)) || "—"}</td>
               <td className="py-2 text-muted-foreground">{(asset.site_id && siteNameById.get(asset.site_id)) ?? "Unassigned"}</td>
               <td className="py-2">
