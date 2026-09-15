@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { sendDamagedStockAlertEmail } from "@/lib/email/send-damaged-equipment-emails";
+import { ensureCatalogEntry } from "@/lib/stock/ensure-catalog-entry";
 import type { Database } from "@/lib/supabase/database.types";
 
 type DamageResolution = Database["public"]["Enums"]["damage_resolution"];
@@ -31,13 +32,17 @@ export async function createDamagedEquipment(input: ManualDamagedEquipmentInput)
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Not signed in." };
 
+  const trimmedManufacturer = input.manufacturer.trim();
+  const trimmedModel = input.model.trim();
+  const trimmedDescription = input.description.trim();
+
   const supabase = await createClient();
   const { data: row, error } = await supabase
     .from("damaged_equipment")
     .insert({
-      manufacturer: input.manufacturer.trim() || null,
-      model: input.model.trim() || null,
-      description: input.description.trim() || null,
+      manufacturer: trimmedManufacturer || null,
+      model: trimmedModel || null,
+      description: trimmedDescription || null,
       serial_number: input.serialNumber.trim() || null,
       site_id: input.siteId || null,
       damage_notes: input.damageNotes.trim() || null,
@@ -48,10 +53,16 @@ export async function createDamagedEquipment(input: ManualDamagedEquipmentInput)
     .single();
   if (error) return { ok: false, message: error.message };
 
-  // Admin client: users_select doesn't let warehouse/finance read other
-  // users' rows, but the alert must fan out regardless of which of the
-  // four allowed roles logged this — same reasoning as record-damage.ts.
+  // Admin client throughout below: stock_manufacturers/stock_models write
+  // is superadmin/manager/warehouse only (see
+  // 20260910040000_stock_catalog_warehouse_write.sql) and users_select
+  // doesn't let warehouse/finance read other users' rows — but both the
+  // catalog registration and the alert fan-out must work regardless of
+  // which of the four allowed roles logged this, same reasoning as
+  // record-damage.ts.
   const admin = createAdminClient();
+  await ensureCatalogEntry(admin, trimmedManufacturer, trimmedModel, trimmedDescription);
+
   const { data: recipients } = await admin
     .from("users")
     .select("email")

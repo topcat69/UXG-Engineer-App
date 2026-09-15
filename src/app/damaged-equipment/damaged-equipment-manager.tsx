@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { humanize } from "@/lib/format/text";
@@ -8,10 +8,15 @@ import type { Database } from "@/lib/supabase/database.types";
 import { createDamagedEquipment, deleteDamagedEquipment, updateDamagedEquipmentNextStep } from "./actions";
 import { DamagedEquipmentPhotoControl } from "./damaged-equipment-photo-control";
 
+const OTHER = "__other__";
+
 type DamageResolution = Database["public"]["Enums"]["damage_resolution"];
 const NEXT_STEPS: DamageResolution[] = ["pending", "replace", "warranty_claim", "repair", "write_off", "other"];
 
-type SiteOption = { id: string; name: string; client: { name: string } | null };
+type ClientOption = { id: string; name: string };
+type SiteOption = { id: string; name: string; client_id: string };
+type Manufacturer = { id: string; name: string };
+type Model = { id: string; name: string; manufacturer_id: string; description: string | null };
 
 type DamagedItem = {
   id: string;
@@ -33,15 +38,21 @@ function itemLabel(item: DamagedItem): string {
   return item.serial_number ? `${parts || "—"} — ${item.serial_number}` : parts || "—";
 }
 
-const EMPTY_FORM = { manufacturer: "", model: "", description: "", serialNumber: "", siteId: "", damageNotes: "" };
+const EMPTY_FORM = { serialNumber: "", siteId: "", damageNotes: "" };
 
 export function DamagedEquipmentManager({
   initialItems,
+  clients,
   sites,
+  manufacturers,
+  models,
   canDelete,
 }: {
   initialItems: DamagedItem[];
+  clients: ClientOption[];
   sites: SiteOption[];
+  manufacturers: Manufacturer[];
+  models: Model[];
   canDelete: boolean;
 }) {
   const router = useRouter();
@@ -51,7 +62,33 @@ export function DamagedEquipmentManager({
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [clientId, setClientId] = useState("");
+  const [manufacturerChoice, setManufacturerChoice] = useState("");
+  const [manufacturerOther, setManufacturerOther] = useState("");
+  const [modelChoice, setModelChoice] = useState("");
+  const [modelOther, setModelOther] = useState("");
+  const [description, setDescription] = useState("");
   const [isAdding, startAddTransition] = useTransition();
+
+  // Same Client -> Site cascade as the SLA creation form — a flat, unscoped
+  // site list was the actual bug report: two clients can each have a
+  // "Site 1", and there was no way to tell them apart or narrow the list.
+  const clientSites = useMemo(() => sites.filter((s) => s.client_id === clientId), [sites, clientId]);
+  const selectedManufacturer = manufacturers.find((m) => m.id === manufacturerChoice);
+  const modelsForManufacturer = useMemo(
+    () => (selectedManufacturer ? models.filter((m) => m.manufacturer_id === selectedManufacturer.id) : []),
+    [models, selectedManufacturer],
+  );
+
+  function resetForm() {
+    setForm(EMPTY_FORM);
+    setClientId("");
+    setManufacturerChoice("");
+    setManufacturerOther("");
+    setModelChoice("");
+    setModelOther("");
+    setDescription("");
+  }
 
   function handleNextStepChange(id: string, value: DamageResolution) {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, next_step: value } : i)));
@@ -74,10 +111,16 @@ export function DamagedEquipmentManager({
   }
 
   function handleAdd() {
+    const manufacturer = manufacturerChoice === OTHER ? manufacturerOther : (selectedManufacturer?.name ?? "");
+    const model =
+      manufacturerChoice === OTHER || modelChoice === OTHER
+        ? modelOther
+        : (modelsForManufacturer.find((m) => m.id === modelChoice)?.name ?? "");
+
     startAddTransition(async () => {
-      const result = await createDamagedEquipment(form);
+      const result = await createDamagedEquipment({ ...form, manufacturer, model, description });
       if (result.ok) {
-        setForm(EMPTY_FORM);
+        resetForm();
         setShowAddForm(false);
         router.refresh();
       } else {
@@ -96,21 +139,108 @@ export function DamagedEquipmentManager({
               For something damaged outside of goods-in — e.g. it fell off a shelf in the warehouse.
             </p>
             <div className="flex flex-wrap items-end gap-2">
-              <LabeledInput label="Manufacturer" value={form.manufacturer} onChange={(v) => setForm({ ...form, manufacturer: v })} />
-              <LabeledInput label="Model" value={form.model} onChange={(v) => setForm({ ...form, model: v })} />
-              <LabeledInput label="Description" value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
+              <div className="flex flex-col gap-1">
+                <label className="text-muted-foreground text-xs">Manufacturer</label>
+                <select
+                  value={manufacturerChoice}
+                  onChange={(e) => {
+                    setManufacturerChoice(e.target.value);
+                    setModelChoice("");
+                    setModelOther("");
+                  }}
+                  className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+                >
+                  <option value="">Select…</option>
+                  {manufacturers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                  <option value={OTHER}>Other…</option>
+                </select>
+                {manufacturerChoice === OTHER && (
+                  <input
+                    type="text"
+                    value={manufacturerOther}
+                    onChange={(e) => setManufacturerOther(e.target.value)}
+                    placeholder="Manufacturer name"
+                    className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+                  />
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-muted-foreground text-xs">Model</label>
+                {manufacturerChoice === OTHER ? (
+                  <input
+                    type="text"
+                    value={modelOther}
+                    onChange={(e) => setModelOther(e.target.value)}
+                    placeholder="Model name"
+                    className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+                  />
+                ) : (
+                  <>
+                    <select
+                      value={modelChoice}
+                      onChange={(e) => {
+                        setModelChoice(e.target.value);
+                        setDescription(modelsForManufacturer.find((m) => m.id === e.target.value)?.description ?? "");
+                      }}
+                      disabled={!selectedManufacturer}
+                      className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+                    >
+                      <option value="">{selectedManufacturer ? "Select…" : "Pick a manufacturer first"}</option>
+                      {modelsForManufacturer.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                      {selectedManufacturer && <option value={OTHER}>Other…</option>}
+                    </select>
+                    {modelChoice === OTHER && (
+                      <input
+                        type="text"
+                        value={modelOther}
+                        onChange={(e) => setModelOther(e.target.value)}
+                        placeholder="Model name"
+                        className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+              <LabeledInput label="Description" value={description} onChange={setDescription} />
               <LabeledInput label="Serial number" value={form.serialNumber} onChange={(v) => setForm({ ...form, serialNumber: v })} />
+              <div className="flex flex-col gap-1">
+                <label className="text-muted-foreground text-xs">Client</label>
+                <select
+                  value={clientId}
+                  onChange={(e) => {
+                    setClientId(e.target.value);
+                    setForm({ ...form, siteId: "" });
+                  }}
+                  className="border-input h-9 w-44 rounded-md border bg-transparent px-2 text-sm"
+                >
+                  <option value="">Select…</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex flex-col gap-1">
                 <label className="text-muted-foreground text-xs">Site</label>
                 <select
                   value={form.siteId}
                   onChange={(e) => setForm({ ...form, siteId: e.target.value })}
+                  disabled={!clientId}
                   className="border-input h-9 w-56 rounded-md border bg-transparent px-2 text-sm"
                 >
-                  <option value="">Unassigned</option>
-                  {sites.map((s) => (
+                  <option value="">{clientId ? "Select…" : "Pick a client first"}</option>
+                  {clientSites.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.client ? `${s.name} — ${s.client.name}` : s.name}
+                      {s.name}
                     </option>
                   ))}
                 </select>

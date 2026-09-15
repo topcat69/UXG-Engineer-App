@@ -8,7 +8,7 @@ export default async function DamagedEquipmentPage() {
   const user = await getCurrentUser();
   const supabase = await createClient();
 
-  const [{ data: items, error }, { data: sites }] = await Promise.all([
+  const [{ data: items, error }, { data: clients }, { data: sites }, { data: manufacturers }, { data: models }] = await Promise.all([
     supabase
       .from("damaged_equipment")
       .select(
@@ -16,7 +16,10 @@ export default async function DamagedEquipmentPage() {
          created_at, site:sites(name, client:clients(name))`,
       )
       .order("created_at", { ascending: false }),
-    supabase.from("sites").select("id, name, client:clients(name)").order("name"),
+    supabase.from("clients").select("id, name").order("name"),
+    supabase.from("sites").select("id, name, client_id").order("name"),
+    supabase.from("stock_manufacturers").select("id, name").order("name"),
+    supabase.from("stock_models").select("id, name, manufacturer_id, description").order("name"),
   ]);
 
   if (error) {
@@ -43,7 +46,10 @@ export default async function DamagedEquipmentPage() {
       </div>
       <DamagedEquipmentManager
         initialItems={itemsWithUrls}
+        clients={clients ?? []}
         sites={sites ?? []}
+        manufacturers={manufacturers ?? []}
+        models={models ?? []}
         canDelete={user?.role === "superadmin" || user?.role === "manager"}
       />
     </div>
