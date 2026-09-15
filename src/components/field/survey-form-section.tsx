@@ -111,7 +111,7 @@ export function SurveyFormSection({
       </div>
 
       <div>
-        <p className="mb-2 text-sm font-medium">1. Access &amp; logistics</p>
+        <p className="mb-2 text-sm font-medium">Access &amp; logistics</p>
         <div className="flex flex-col gap-3">
           <Field label="Access notes (parking, drop-off, booking-in)">
             <Textarea value={values.access_notes} onChange={(e) => setValues((p) => ({ ...p, access_notes: e.target.value }))} rows={2} />
@@ -128,8 +128,7 @@ export function SurveyFormSection({
       </div>
 
       <div>
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-medium">Screens ({screens.length})</p>
+        <div className="mb-2 flex items-center gap-3">
           <Button
             type="button"
             size="sm"
@@ -138,6 +137,7 @@ export function SurveyFormSection({
           >
             Add screen
           </Button>
+          <p className="text-sm font-medium">Screens ({screens.length})</p>
         </div>
         <div className="flex flex-col gap-3">
           {screens.map((screen, i) => (
@@ -148,7 +148,7 @@ export function SurveyFormSection({
       </div>
 
       <div>
-        <p className="mb-2 text-sm font-medium">7/8. Network &amp; cabling</p>
+        <p className="mb-2 text-sm font-medium">Network &amp; cabling</p>
         <div className="flex flex-col gap-3">
           <Field label="IT / network contact">
             <TextInput value={values.it_contact_name} onChange={(v) => setValues((p) => ({ ...p, it_contact_name: v }))} />
@@ -173,7 +173,7 @@ export function SurveyFormSection({
       </div>
 
       <div>
-        <p className="mb-2 text-sm font-medium">9. Environmental</p>
+        <p className="mb-2 text-sm font-medium">Environmental</p>
         <div className="flex flex-col gap-2">
           <Check label="Ventilation / heat dissipation adequate" checked={values.ventilation_adequate} onChange={(v) => setValues((p) => ({ ...p, ventilation_adequate: v }))} />
           <Check label="Enclosure required (dust / tamper / weather)" checked={values.enclosure_required} onChange={(v) => setValues((p) => ({ ...p, enclosure_required: v }))} />
@@ -183,7 +183,7 @@ export function SurveyFormSection({
       </div>
 
       <div>
-        <p className="mb-2 text-sm font-medium">12/13. Health, safety &amp; survey record</p>
+        <p className="mb-2 text-sm font-medium">Health, safety &amp; survey record</p>
         <div className="flex flex-col gap-3">
           <Field label="Working at height — access equipment required">
             <TextInput value={values.working_at_height} onChange={(v) => setValues((p) => ({ ...p, working_at_height: v }))} />
@@ -212,8 +212,7 @@ export function SurveyFormSection({
       </div>
 
       <div>
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-medium">14. Actions &amp; follow-up ({actions.length})</p>
+        <div className="mb-2 flex items-center gap-3">
           <Button
             type="button"
             size="sm"
@@ -222,6 +221,7 @@ export function SurveyFormSection({
           >
             Add action
           </Button>
+          <p className="text-sm font-medium">Actions &amp; follow-up ({actions.length})</p>
         </div>
         <div className="flex flex-col gap-2">
           {actions.map((action) => (
