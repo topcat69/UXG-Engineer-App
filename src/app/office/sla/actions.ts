@@ -1,9 +1,11 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { nextJobNumber } from "@/lib/jobs/job-number";
 import { maxJobSequenceForYear } from "@/lib/jobs/next-job-number";
+import { ensureJobDriveFolder } from "@/lib/google/drive-sync";
 import { assignJobSheetToJob } from "../job-sheets/[id]/actions";
 
 export type CreateSlaJobResult = { ok: true; jobId: string } | { ok: false; message: string };
@@ -75,6 +77,11 @@ export async function createSlaJob(
     const linkResult = await assignJobSheetToJob(jobSheetId, job.id);
     if (!linkResult.ok) return { ok: false, message: `SLA created, but failed to link the job sheet: ${linkResult.message}` };
   }
+
+  // Best-effort, non-blocking, same as createJob's own Drive sync. An SLA
+  // job always has project_id null, so ensureJobDriveFolder nests its
+  // folder straight under the Client, skipping the Project level.
+  after(() => ensureJobDriveFolder(supabase, job.id));
 
   revalidatePath("/office/sla");
   return { ok: true, jobId: job.id };

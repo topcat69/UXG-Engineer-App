@@ -1,0 +1,17 @@
+-- Phase 2 of the Drive folder sync: per-job folders, nested under a Site
+-- folder, nested under a Project folder (or, for job_type "sla" — which
+-- is always created with project_id null, see office/sla/actions.ts's own
+-- comment — directly under the Client folder, skipping the Project
+-- level entirely).
+--
+-- Only jobs get a drive_folder_id column here, not sites. A site's Drive
+-- folder is NOT 1:1 with the sites row: sites.client_id is direct and
+-- nothing ties a site to a project (see office/jobs/actions.ts's createJob
+-- comment), so the same site can end up nested under more than one
+-- Project folder, or directly under Client for an SLA job, depending on
+-- which job put it there. Caching that on the sites row would cache the
+-- wrong parent for the next job that uses a different path. Instead the
+-- site-level folder is found-or-created fresh (idempotent, cheap, low
+-- volume — one job at a time) every time a job needs it; only the job's
+-- own leaf folder, which genuinely is 1:1 with its row, gets cached.
+alter table jobs add column drive_folder_id text;

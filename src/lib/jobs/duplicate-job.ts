@@ -1,9 +1,11 @@
 import "server-only";
+import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { nextJobNumber } from "./job-number";
 import { maxJobSequenceForYear } from "./next-job-number";
 import { cloneTasksForJob } from "./clone-tasks";
+import { ensureJobDriveFolder } from "@/lib/google/drive-sync";
 
 type AnySupabaseClient = SupabaseClient<Database>;
 
@@ -61,6 +63,9 @@ export async function duplicateJob(supabase: AnySupabaseClient, source: SourceJo
     user_id: userId,
     reason: `Duplicated from ${source.job_number}`,
   });
+
+  // Best-effort, non-blocking, same as createJob's own Drive sync.
+  after(() => ensureJobDriveFolder(supabase, duplicate.id));
 
   return { newJobId: duplicate.id };
 }

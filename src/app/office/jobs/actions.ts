@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
+import { ensureJobDriveFolder } from "@/lib/google/drive-sync";
 import { sendJobAssignedEmail, sendJobScheduledEmail } from "@/lib/email/send-job-emails";
 import { nextJobNumber } from "@/lib/jobs/job-number";
 import { maxJobSequenceForYear } from "@/lib/jobs/next-job-number";
@@ -87,6 +88,11 @@ export async function createJob(projectId: string, siteId: string, jobType: stri
     const linkResult = await assignJobSheetToJob(jobSheetId, data.id);
     if (!linkResult.ok) return { ok: false, message: `Job created, but failed to link the job sheet: ${linkResult.message}` };
   }
+
+  // Best-effort, non-blocking — same reason syncCalendarForJob runs via
+  // after(): creating a job must succeed whether or not Drive is
+  // configured or reachable.
+  after(() => ensureJobDriveFolder(supabase, data.id));
 
   revalidatePath("/office/jobs");
   return { ok: true, jobId: data.id };

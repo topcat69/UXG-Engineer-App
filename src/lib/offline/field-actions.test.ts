@@ -30,6 +30,7 @@ function jobRow(overrides: Partial<JobRow> = {}): JobRow {
     calendar_event_id: null,
     email_thread_id: null,
     completion_pdf_url: null,
+    drive_folder_id: null,
     qa_status: null,
     qa_notes: null,
     created_at: "2026-08-24T08:00:00Z",

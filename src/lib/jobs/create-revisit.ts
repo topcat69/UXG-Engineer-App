@@ -1,9 +1,11 @@
 import "server-only";
+import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { nextJobNumber } from "./job-number";
 import { maxJobSequenceForYear } from "./next-job-number";
 import { cloneEquipmentForJob, cloneJobDetailsForRevisit } from "./clone-job-details";
+import { ensureJobDriveFolder } from "@/lib/google/drive-sync";
 
 type AnySupabaseClient = SupabaseClient<Database>;
 
@@ -78,6 +80,9 @@ export async function createRevisitJob(
     user_id: userId,
     reason: `Revisit created from ${parent.job_number}: ${reason}`,
   });
+
+  // Best-effort, non-blocking, same as createJob's own Drive sync.
+  after(() => ensureJobDriveFolder(supabase, revisit.id));
 
   return { revisitId: revisit.id };
 }

@@ -1262,6 +1262,7 @@ export type Database = {
           completion_pdf_url: string | null
           created_at: string | null
           description: string | null
+          drive_folder_id: string | null
           email_thread_id: string | null
           geofence_variance_m: number | null
           id: string
@@ -1294,6 +1295,7 @@ export type Database = {
           completion_pdf_url?: string | null
           created_at?: string | null
           description?: string | null
+          drive_folder_id?: string | null
           email_thread_id?: string | null
           geofence_variance_m?: number | null
           id?: string
@@ -1326,6 +1328,7 @@ export type Database = {
           completion_pdf_url?: string | null
           created_at?: string | null
           description?: string | null
+          drive_folder_id?: string | null
           email_thread_id?: string | null
           geofence_variance_m?: number | null
           id?: string
