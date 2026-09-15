@@ -34,11 +34,16 @@ test("manager imports sites, generates jobs, and bulk assigns/schedules them", a
 
   await loginAs(page, "manager@opoc.test");
 
-  // Step 1: import 50 sites.
+  // Step 1: import 50 sites. Scoped to this specific form (identified by
+  // its clientId select) rather than page-wide selectors — /office/import
+  // also has its own "Import assets from CSV" section with its own file
+  // input and Import button, and getByRole's name match is substring by
+  // default, so an unscoped locator here would be ambiguous between the two.
   await page.goto("/office/import");
-  await page.locator('select[name="clientId"]').selectOption({ label: "Acme Retail" });
-  await page.setInputFiles('input[type="file"]', csvPath);
-  await page.getByRole("button", { name: "Import" }).click();
+  const sitesImportForm = page.locator("form").filter({ has: page.locator('select[name="clientId"]') });
+  await sitesImportForm.locator('select[name="clientId"]').selectOption({ label: "Acme Retail" });
+  await sitesImportForm.locator('input[type="file"]').setInputFiles(csvPath);
+  await sitesImportForm.getByRole("button", { name: "Import" }).click();
   await expect(page.getByText("Imported 50 site(s).")).toBeVisible({ timeout: 15_000 });
 
   // Case-insensitive: parseSitesCsv now title-cases the imported name (see

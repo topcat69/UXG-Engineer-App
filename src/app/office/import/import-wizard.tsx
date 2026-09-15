@@ -187,7 +187,7 @@ export function ImportWizard({
         <form action={handleImportAssets} className="flex flex-wrap items-center gap-2">
           <input ref={assetImportFileInputRef} type="file" name="file" accept=".csv,text/csv" required className="text-sm" />
           <Button type="submit" size="sm" disabled={isImportingAssets}>
-            {isImportingAssets ? "Importing…" : "Import"}
+            {isImportingAssets ? "Importing…" : "Import assets"}
           </Button>
         </form>
         {assetImportMessage && <p className="text-sm">{assetImportMessage}</p>}
