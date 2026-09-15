@@ -1,9 +1,9 @@
 import { AssetDepreciationReport, type DepreciationSearchParams } from "@/components/asset-register/depreciation-report";
 
-export default async function DepreciationReportPage({
+export default async function FinanceDepreciationReportPage({
   searchParams,
 }: {
   searchParams: Promise<DepreciationSearchParams>;
 }) {
-  return <AssetDepreciationReport searchParams={searchParams} basePath="/office/asset-register" />;
+  return <AssetDepreciationReport searchParams={searchParams} basePath="/finance" />;
 }

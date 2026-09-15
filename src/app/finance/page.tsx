@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { AssetRegisterManager } from "@/components/office/asset-register-manager";
 
@@ -31,12 +32,25 @@ export default async function FinancePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold">Asset Register</h1>
-        <p className="text-muted-foreground text-sm">
-          Fill in financial and warranty details for each asset. Categories and asset deletion are managed by the
-          office team.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Asset Register</h1>
+          <p className="text-muted-foreground text-sm">
+            Fill in financial and warranty details for each asset. Categories and asset deletion are managed by the
+            office team.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3 text-sm whitespace-nowrap">
+          <Link href="/finance/financial" className="underline-offset-2 hover:underline">
+            Financial report
+          </Link>
+          <Link href="/finance/warranty" className="underline-offset-2 hover:underline">
+            Warranty report
+          </Link>
+          <Link href="/finance/depreciation" className="underline-offset-2 hover:underline">
+            Depreciation report
+          </Link>
+        </div>
       </div>
       <AssetRegisterManager
         initialAssets={assets ?? []}
