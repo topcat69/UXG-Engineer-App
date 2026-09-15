@@ -1,6 +1,6 @@
 "use client";
 
-import { db, type InstallFormRow, type JobDetailsRow, type JobStatus } from "./db";
+import { db, type InstallFormRow, type JobDetailsRow, type JobStatus, type SurveyActionRow, type SurveyFormRow, type SurveyScreenRow } from "./db";
 import { detectAutoIssues, installFormRowToValues } from "@/lib/forms/install-form";
 import { detectAutoIssues as detectJobDetailsAutoIssues, jobDetailsRowToValues, type JobDetailsType } from "@/lib/forms/job-form";
 import { generateId } from "./id";
@@ -236,6 +236,166 @@ export async function saveJobDetailsDraft(row: JobDetailsRow): Promise<void> {
       type: "job_details_upsert",
       row,
       createdAt: existing?.createdAt ?? new Date().toISOString(),
+      attempts: 0,
+    });
+  });
+}
+
+/**
+ * survey_forms equivalent of saveInstallFormDraft/saveJobDetailsDraft, for
+ * the header + once-per-survey sections. Must be called (even with an
+ * otherwise-empty row) before the first survey_screens/survey_actions row
+ * is ever added — those tables' RLS requires a real survey_forms row to
+ * already exist server-side, and the outbox replays strictly in createdAt
+ * order, so JobWorkflow calls this once eagerly on mount for a survey job
+ * rather than waiting for the first 15s autosave tick (see job-workflow.tsx).
+ */
+export async function saveSurveyFormDraft(row: SurveyFormRow): Promise<void> {
+  await db.transaction("rw", [db.surveyForms, db.outbox], async () => {
+    await db.surveyForms.put(row);
+    const opId = `draft-survey-${row.job_id}`;
+    const existing = await db.outbox.get(opId);
+    await db.outbox.put({
+      id: opId,
+      type: "survey_form_upsert",
+      row,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+      attempts: 0,
+    });
+  });
+}
+
+/**
+ * Adds or edits one screen. Unlike the whole-row draft functions above
+ * (batched on a 15s timer because a single job_details/install_forms/
+ * survey_forms row has dozens of fields that all change together), a
+ * screen is small enough — and edited one at a time — that saving on every
+ * change is simple and correct: the fixed `draft-screen-${id}` outbox id
+ * still collapses rapid edits into one pending op, same collapsing trick,
+ * just invoked immediately instead of every 15 seconds.
+ */
+export async function upsertSurveyScreen(jobId: string, row: SurveyScreenRow): Promise<void> {
+  await db.transaction("rw", [db.surveyScreens, db.outbox], async () => {
+    await db.surveyScreens.put(row);
+    const opId = `draft-screen-${row.id}`;
+    const existing = await db.outbox.get(opId);
+    await db.outbox.put({
+      id: opId,
+      type: "survey_screen_upsert",
+      jobId,
+      row,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+      attempts: 0,
+    });
+  });
+}
+
+/** Removes a screen the engineer added by mistake. Drops any still-pending draft-upsert for it first — no point replaying a write for a row about to be deleted. */
+export async function deleteSurveyScreen(jobId: string, screenId: string): Promise<void> {
+  await db.transaction("rw", [db.surveyScreens, db.outbox], async () => {
+    await db.surveyScreens.delete(screenId);
+    await db.outbox.delete(`draft-screen-${screenId}`);
+    await db.outbox.add({
+      id: uuid(),
+      type: "survey_screen_delete",
+      jobId,
+      screenId,
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    });
+  });
+}
+
+/** Actions & Follow-up equivalent of upsertSurveyScreen — same reasoning. */
+export async function upsertSurveyAction(jobId: string, row: SurveyActionRow): Promise<void> {
+  await db.transaction("rw", [db.surveyActions, db.outbox], async () => {
+    await db.surveyActions.put(row);
+    const opId = `draft-action-${row.id}`;
+    const existing = await db.outbox.get(opId);
+    await db.outbox.put({
+      id: opId,
+      type: "survey_action_upsert",
+      jobId,
+      row,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+      attempts: 0,
+    });
+  });
+}
+
+/** Actions & Follow-up equivalent of deleteSurveyScreen — same reasoning. */
+export async function deleteSurveyAction(jobId: string, actionId: string): Promise<void> {
+  await db.transaction("rw", [db.surveyActions, db.outbox], async () => {
+    await db.surveyActions.delete(actionId);
+    await db.outbox.delete(`draft-action-${actionId}`);
+    await db.outbox.add({
+      id: uuid(),
+      type: "survey_action_delete",
+      jobId,
+      actionId,
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    });
+  });
+}
+
+/**
+ * survey_forms equivalent of submitJob/submitJobDetails — Check Out &
+ * Submit for a survey job. No auto-issue detection: unlike install/sla/
+ * maintenance's pass/fail checks, nothing on a survey implies a defect to
+ * raise automatically. No signature either — a survey is an internal
+ * record, not customer sign-off, so JobWorkflow doesn't require one for
+ * job_type "survey" (see validateSurveyForm in lib/forms/survey-form.ts).
+ */
+export async function submitSurveyForm(
+  jobId: string,
+  surveyRow: SurveyFormRow,
+  point: GeoPoint | null,
+  raisedBy: string,
+): Promise<void> {
+  const job = await db.jobs.get(jobId);
+  if (!job) throw new Error("Job not found locally");
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const submittedSurvey = { ...surveyRow, submitted_at: nowIso };
+  const [surveyCreatedAt, patchCreatedAt, eventCreatedAt] = batchTimestamps(now, 3);
+
+  await db.transaction("rw", [db.jobs, db.surveyForms, db.outbox], async () => {
+    await db.surveyForms.put(submittedSurvey);
+    await db.jobs.update(jobId, {
+      status: "submitted" as JobStatus,
+      actual_end: nowIso,
+    });
+
+    // See the matching comment in submitJob above — collapses any still-
+    // pending pre-submission draft op into this final write.
+    await db.outbox.put({
+      id: `draft-survey-${jobId}`,
+      type: "survey_form_upsert",
+      row: submittedSurvey,
+      createdAt: surveyCreatedAt,
+      attempts: 0,
+    });
+    await db.outbox.add({
+      id: uuid(),
+      type: "job_patch",
+      jobId,
+      patch: { actual_end: nowIso },
+      createdAt: patchCreatedAt,
+      attempts: 0,
+    });
+    await db.outbox.add({
+      id: uuid(),
+      type: "status_event",
+      jobId,
+      fromStatus: job.status,
+      toStatus: "submitted",
+      userId: raisedBy,
+      reason: "Submitted from field",
+      occurredAt: nowIso,
+      latitude: point?.latitude,
+      longitude: point?.longitude,
+      createdAt: eventCreatedAt,
       attempts: 0,
     });
   });

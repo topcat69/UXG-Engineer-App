@@ -7,38 +7,36 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { createClient } from "@/lib/supabase/client";
 import type { CurrentUser } from "@/lib/auth/current-user";
-import { db, type ClientSlaReasonRow, type InstallFormRow, type JobDetailsRow, type MediaQueueItem, type StockItemRow } from "@/lib/offline/db";
+import { db, type ClientSlaReasonRow, type JobDetailsRow, type MediaQueueItem, type StockItemRow, type SurveyFormRow } from "@/lib/offline/db";
 import { generateId } from "@/lib/offline/id";
 import {
   checkIn,
   pauseJob,
   resumeJob,
-  saveInstallFormDraft,
   saveJobDetailsDraft,
+  saveSurveyFormDraft,
   startTravelling,
-  submitJob,
   submitJobDetails,
+  submitSurveyForm,
   toggleTask,
 } from "@/lib/offline/field-actions";
 import { getCurrentPosition, resolveJobLocation, siteLocationFallback } from "@/lib/offline/media-capture";
 import { distanceMeters } from "@/lib/geo/distance";
 import { humanize } from "@/lib/format/text";
 import {
-  EMPTY_INSTALL_FORM,
   EQUIPMENT_DAMAGE_STATUSES,
   MOUNT_TYPES,
   NETWORK_TYPES,
   PASS_FAIL,
-  PHOTO_SLOTS,
   POWER_SOURCES,
   WIFI_SIGNALS,
-  installFormRowToValues,
-  showIssueDetail as showIssueDetailInstall,
-  showNetworkPort as showNetworkPortInstall,
-  showWifiSignal as showWifiSignalInstall,
-  validateInstallForm,
-  type InstallFormValues,
 } from "@/lib/forms/install-form";
+import {
+  EMPTY_SURVEY_FORM,
+  surveyFormRowToValues,
+  validateSurveyForm,
+  type SurveyFormValues,
+} from "@/lib/forms/survey-form";
 import {
   EMPTY_JOB_DETAILS,
   JOB_TYPE_LABELS,
@@ -65,6 +63,7 @@ import SiteMap from "@/components/site-map-loader";
 import { BarcodeScanButton } from "./barcode-scan-button";
 import { PhotoSlot } from "./photo-slot";
 import { SignatureCapture } from "./signature-capture";
+import { SurveyFormSection } from "./survey-form-section";
 
 const AUTOSAVE_INTERVAL_MS = 15_000;
 // Two distinct spec-required timestamps, two distinct pre-site statuses:
@@ -92,7 +91,17 @@ export function JobWorkflow({
   const job = useLiveQuery(() => db.jobs.get(jobId), [jobId]);
   const site = useLiveQuery(() => (job ? db.sites.get(job.site_id) : undefined), [job?.site_id]);
   const client = useLiveQuery(() => (site ? db.clients.get(site.client_id) : undefined), [site?.client_id]);
-  const formRow = useLiveQuery(() => db.installForms.where("job_id").equals(jobId).first(), [jobId]);
+  const surveyForm = useLiveQuery(() => db.surveyForms.where("job_id").equals(jobId).first(), [jobId]);
+  const surveyScreens = useLiveQuery(
+    () => (surveyForm ? db.surveyScreens.where("survey_form_id").equals(surveyForm.id).sortBy("position") : []),
+    [surveyForm?.id],
+    [],
+  );
+  const surveyActions = useLiveQuery(
+    () => (surveyForm ? db.surveyActions.where("survey_form_id").equals(surveyForm.id).sortBy("position") : []),
+    [surveyForm?.id],
+    [],
+  );
   const detailsRow = useLiveQuery(() => db.jobDetails.where("job_id").equals(jobId).first(), [jobId]);
   const fixtureType = useLiveQuery(
     () => (detailsRow?.fixture_type_id ? db.clientSlaFixtureTypes.get(detailsRow.fixture_type_id) : undefined),
@@ -123,7 +132,7 @@ export function JobWorkflow({
   // Two parallel form-state slots — only one is ever rendered/used, per
   // detailsMode, but hooks can't be called conditionally, so both exist
   // unconditionally and the unused one just sits idle at its empty default.
-  const [installValues, setInstallValues] = useState<InstallFormValues>(EMPTY_INSTALL_FORM);
+  const [surveyValues, setSurveyValues] = useState<SurveyFormValues>(EMPTY_SURVEY_FORM);
   const [detailsValues, setDetailsValues] = useState<JobDetailsValues>(EMPTY_JOB_DETAILS);
   const [isStartingTravel, setIsStartingTravel] = useState(false);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
@@ -137,6 +146,23 @@ export function JobWorkflow({
   const [pauseError, setPauseError] = useState<string | null>(null);
   const [isResuming, setIsResuming] = useState(false);
   const hydrated = useRef(false);
+  // Stable fallback id across renders even before the row has ever been
+  // persisted — otherwise two calls to currentSurveyRow() before the first
+  // successful save (e.g. saveSurveyFormDraft immediately followed by
+  // adding a screen) would each generateId() a *different* row. Real state
+  // rather than a ref since it's read during render (surveyFormId below),
+  // and refs can't be read there; reset on jobId change via React's own
+  // "adjusting state when a prop changes" pattern (a guarded setState
+  // during render) rather than in an effect, since resetting derived state
+  // from inside an effect just to immediately re-render is the exact
+  // cascading-render anti-pattern the hooks lint now flags.
+  const [surveyFormIdFallback, setSurveyFormIdFallback] = useState(() => generateId());
+  const [surveyFormIdFallbackJobId, setSurveyFormIdFallbackJobId] = useState(jobId);
+  if (jobId !== surveyFormIdFallbackJobId) {
+    setSurveyFormIdFallbackJobId(jobId);
+    setSurveyFormIdFallback(generateId());
+  }
+  const surveyFormId = surveyForm?.id ?? surveyFormIdFallback;
 
   // Hydrate local edit state from Dexie once per job, not on every autosave echo.
   useEffect(() => {
@@ -148,10 +174,10 @@ export function JobWorkflow({
     hydrated.current = true;
   }, [detailsMode, detailsRow]);
   useEffect(() => {
-    if (hydrated.current || detailsMode || formRow === undefined) return;
-    setInstallValues(installFormRowToValues(formRow));
+    if (hydrated.current || detailsMode || surveyForm === undefined) return;
+    setSurveyValues(surveyFormRowToValues(surveyForm));
     hydrated.current = true;
-  }, [detailsMode, formRow]);
+  }, [detailsMode, surveyForm]);
 
   // Grouped by slot (not a single latest-wins entry) so every captured item
   // shows up — a slot can hold more than one photo. Video is included here
@@ -166,28 +192,58 @@ export function JobWorkflow({
   }
   const signature = (media ?? []).find((m) => m.kind === "signature");
 
-  function currentInstallRow(): InstallFormRow {
+  function currentSurveyRow(): SurveyFormRow {
     return {
-      id: formRow?.id ?? generateId(),
+      id: surveyFormId,
       job_id: jobId,
-      player_serial: installValues.player_serial || null,
-      screen_serial: installValues.screen_serial || null,
-      mount_type: installValues.mount_type || null,
-      power_source: installValues.power_source || null,
-      network_type: installValues.network_type || null,
-      wifi_signal: installValues.wifi_signal || null,
-      network_port: installValues.network_port || null,
-      player_boot_test: (installValues.player_boot_test || null) as InstallFormRow["player_boot_test"],
-      content_displaying: (installValues.content_displaying || null) as InstallFormRow["content_displaying"],
-      issues_found: installValues.issues_found,
-      issue_detail: installValues.issue_detail || null,
-      equipment_damage: (installValues.equipment_damage || null) as InstallFormRow["equipment_damage"],
-      engineer_notes: installValues.engineer_notes || null,
-      client_name: installValues.client_name || null,
-      submitted_at: formRow?.submitted_at ?? null,
-      created_at: formRow?.created_at ?? new Date().toISOString(),
+      project: surveyValues.project || null,
+      surveyor: surveyValues.surveyor || null,
+      survey_date: surveyValues.survey_date || null,
+      site_contact_name: surveyValues.site_contact_name || null,
+      site_contact_role: surveyValues.site_contact_role || null,
+      site_contact_phone: surveyValues.site_contact_phone || null,
+      screen_count: surveyScreens?.length ?? 0,
+      access_notes: surveyValues.access_notes || null,
+      delivery_notes: surveyValues.delivery_notes || null,
+      working_hours: surveyValues.working_hours || null,
+      site_induction_required: surveyValues.site_induction_required,
+      ppe_required: surveyValues.ppe_required || null,
+      escort_required: surveyValues.escort_required,
+      it_contact_name: surveyValues.it_contact_name || null,
+      network_summary_notes: surveyValues.network_summary_notes || null,
+      cable_route_notes: surveyValues.cable_route_notes || null,
+      containment_present: surveyValues.containment_present || null,
+      floor_boxes_required: surveyValues.floor_boxes_required,
+      cable_concealment: surveyValues.cable_concealment || null,
+      firestopping_notes: surveyValues.firestopping_notes || null,
+      ventilation_adequate: surveyValues.ventilation_adequate,
+      enclosure_required: surveyValues.enclosure_required,
+      direct_sunlight: surveyValues.direct_sunlight,
+      temp_humidity_ok: surveyValues.temp_humidity_ok,
+      working_at_height: surveyValues.working_at_height || null,
+      asbestos_checked: surveyValues.asbestos_checked,
+      rams_required: surveyValues.rams_required,
+      dda_compliant: surveyValues.dda_compliant,
+      other_trades_notes: surveyValues.other_trades_notes || null,
+      floor_plan_captured: surveyValues.floor_plan_captured,
+      measurements_checked: surveyValues.measurements_checked,
+      outstanding_items: surveyValues.outstanding_items || null,
+      engineer_notes: surveyValues.engineer_notes || null,
+      submitted_at: surveyForm?.submitted_at ?? null,
+      created_at: surveyForm?.created_at ?? new Date().toISOString(),
     };
   }
+
+  // Ensures a survey_forms row exists as soon as the survey section is
+  // opened, rather than waiting for the first 15s autosave tick — see
+  // saveSurveyFormDraft's own doc comment for why survey_screens/
+  // survey_actions need this to already exist before the engineer can add
+  // the first screen.
+  useEffect(() => {
+    if (jobType !== "survey" || job === undefined || surveyForm !== undefined) return;
+    saveSurveyFormDraft(currentSurveyRow());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobType, job, surveyForm]);
 
   function currentDetailsRow(): JobDetailsRow {
     return {
@@ -233,11 +289,11 @@ export function JobWorkflow({
     if (!job || NOT_YET_ON_SITE.includes(job.status)) return;
     const interval = setInterval(() => {
       if (detailsMode) saveJobDetailsDraft(currentDetailsRow());
-      else saveInstallFormDraft(currentInstallRow());
+      else saveSurveyFormDraft(currentSurveyRow());
     }, AUTOSAVE_INTERVAL_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job?.status, installValues, detailsValues, detailsMode]);
+  }, [job?.status, surveyValues, detailsValues, detailsMode]);
 
   if (job === undefined || site === undefined) {
     return <p className="text-muted-foreground p-4 text-sm">Loading…</p>;
@@ -345,7 +401,7 @@ export function JobWorkflow({
       const optionalKeys = new Set((optionalFieldRows ?? []).map((row) => row.field_key));
       validationErrors = validateJobDetails(jobType as JobDetailsType, detailsValues, capturedSlots, !!signature, optionalKeys);
     } else {
-      validationErrors = validateInstallForm(installValues, capturedSlots, !!signature);
+      validationErrors = validateSurveyForm(surveyValues, surveyScreens ?? []);
     }
     const incompleteTasks = (tasks ?? []).filter((t) => !t.is_done);
     if (incompleteTasks.length > 0) {
@@ -376,8 +432,8 @@ export function JobWorkflow({
         await saveJobDetailsDraft(currentDetailsRow());
         await submitJobDetails(jobId, jobType as JobDetailsType, currentDetailsRow(), point, currentUser.id);
       } else {
-        await saveInstallFormDraft(currentInstallRow());
-        await submitJob(jobId, currentInstallRow(), point, currentUser.id);
+        await saveSurveyFormDraft(currentSurveyRow());
+        await submitSurveyForm(jobId, currentSurveyRow(), point, currentUser.id);
       }
       onMutated?.();
     } catch (err) {
@@ -472,16 +528,17 @@ export function JobWorkflow({
         ))}
 
       {onSite && !detailsMode && (
-        <InstallFormSection
+        <SurveyFormSection
           jobId={jobId}
           currentUser={currentUser}
-          values={installValues}
-          setValues={setInstallValues}
+          values={surveyValues}
+          setValues={setSurveyValues}
+          surveyFormId={surveyFormId}
+          screens={surveyScreens ?? []}
+          actions={surveyActions ?? []}
           tasks={tasks ?? []}
           onToggleTask={handleToggleTask}
           mediaBySlot={mediaBySlot}
-          signature={signature}
-          onMutated={onMutated}
           errors={errors}
           isSubmitting={isSubmitting}
           onSubmit={handleSubmit}
@@ -518,159 +575,6 @@ export function JobWorkflow({
           This job is {job.status.replace("_", " ")}. No further action needed here.
         </p>
       )}
-    </div>
-  );
-}
-
-/** The pre-existing install form flow, unchanged — this only renders for job_type "survey" now, since "install" moved to JobDetailsSection below. Kept exactly as-is rather than reworked, since survey's own field-app rendering was never built to begin with (a pre-existing gap this change doesn't touch). */
-function InstallFormSection({
-  jobId,
-  currentUser,
-  values,
-  setValues,
-  tasks,
-  onToggleTask,
-  mediaBySlot,
-  signature,
-  onMutated,
-  errors,
-  isSubmitting,
-  onSubmit,
-}: {
-  jobId: string;
-  currentUser: CurrentUser;
-  values: InstallFormValues;
-  setValues: React.Dispatch<React.SetStateAction<InstallFormValues>>;
-  tasks: { id: string; label: string; is_done: boolean }[];
-  onToggleTask: (taskId: string, isDone: boolean) => void;
-  mediaBySlot: Map<string, MediaQueueItem[]>;
-  signature: MediaQueueItem | undefined;
-  onMutated?: () => void;
-  errors: string[];
-  isSubmitting: boolean;
-  onSubmit: () => void;
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      {tasks.length > 0 && (
-        <div>
-          <p className="mb-2 text-sm font-medium">Tasks</p>
-          <ul className="flex flex-col gap-2">
-            {tasks.map((task) => (
-              <li key={task.id} className="flex items-center gap-2 rounded-md border p-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={task.is_done}
-                  onChange={(e) => onToggleTask(task.id, e.target.checked)}
-                  className="h-4 w-4"
-                />
-                <span className={task.is_done ? "text-muted-foreground line-through" : ""}>{task.label}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <Field label="Player serial">
-        <div className="flex gap-2">
-          <input
-            value={values.player_serial}
-            onChange={(e) => setValues((v) => ({ ...v, player_serial: e.target.value }))}
-            className="border-input h-9 flex-1 rounded-md border bg-transparent px-2 text-sm"
-          />
-          <BarcodeScanButton onScan={(v) => setValues((prev) => ({ ...prev, player_serial: v }))} />
-        </div>
-      </Field>
-
-      <Field label="Screen serial">
-        <div className="flex gap-2">
-          <input
-            value={values.screen_serial}
-            onChange={(e) => setValues((v) => ({ ...v, screen_serial: e.target.value }))}
-            className="border-input h-9 flex-1 rounded-md border bg-transparent px-2 text-sm"
-          />
-          <BarcodeScanButton onScan={(v) => setValues((prev) => ({ ...prev, screen_serial: v }))} />
-        </div>
-      </Field>
-
-      <Field label="Mount type">
-        <Select value={values.mount_type} options={MOUNT_TYPES} onChange={(v) => setValues((prev) => ({ ...prev, mount_type: v }))} />
-      </Field>
-
-      <Field label="Power source">
-        <Select value={values.power_source} options={POWER_SOURCES} onChange={(v) => setValues((prev) => ({ ...prev, power_source: v }))} />
-      </Field>
-
-      <Field label="Network">
-        <Select value={values.network_type} options={NETWORK_TYPES} onChange={(v) => setValues((prev) => ({ ...prev, network_type: v }))} />
-      </Field>
-
-      {showWifiSignalInstall(values) && (
-        <Field label="WiFi signal">
-          <Select value={values.wifi_signal} options={WIFI_SIGNALS} onChange={(v) => setValues((prev) => ({ ...prev, wifi_signal: v }))} />
-        </Field>
-      )}
-
-      {showNetworkPortInstall(values) && (
-        <Field label="Network port">
-          <input
-            value={values.network_port}
-            onChange={(e) => setValues((v) => ({ ...v, network_port: e.target.value }))}
-            className="border-input h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-          />
-        </Field>
-      )}
-
-      <Field label="Player boot test">
-        <Select value={values.player_boot_test} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, player_boot_test: v }))} labelFor={humanize} />
-      </Field>
-
-      <Field label="Content displaying">
-        <Select value={values.content_displaying} options={PASS_FAIL} onChange={(v) => setValues((prev) => ({ ...prev, content_displaying: v }))} labelFor={humanize} />
-      </Field>
-
-      <PhotoGrid jobId={jobId} slots={PHOTO_SLOTS} currentUser={currentUser} mediaBySlot={mediaBySlot} onMutated={onMutated} />
-
-      <Field label="Issues found?">
-        <YesNoButtons
-          value={values.issues_found}
-          onChange={(v) => setValues((prev) => ({ ...prev, issues_found: v, issue_detail: v ? prev.issue_detail : "" }))}
-        />
-      </Field>
-
-      <Field label="Equipment damage">
-        <Select
-          value={values.equipment_damage}
-          options={EQUIPMENT_DAMAGE_STATUSES}
-          onChange={(v) => setValues((prev) => ({ ...prev, equipment_damage: v }))}
-          labelFor={humanize}
-        />
-      </Field>
-
-      {showIssueDetailInstall(values) && (
-        <Field label="Issue detail">
-          <Textarea value={values.issue_detail} onChange={(e) => setValues((v) => ({ ...v, issue_detail: e.target.value }))} />
-        </Field>
-      )}
-
-      <Field label="Engineer notes">
-        <Textarea value={values.engineer_notes} onChange={(e) => setValues((v) => ({ ...v, engineer_notes: e.target.value }))} />
-      </Field>
-
-      <Field label="Customer name">
-        <input
-          value={values.client_name}
-          onChange={(e) => setValues((v) => ({ ...v, client_name: e.target.value }))}
-          className="border-input h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-        />
-      </Field>
-
-      <div>
-        <p className="mb-2 text-sm font-medium">Customer signature</p>
-        <SignatureCapture jobId={jobId} capturedBy={currentUser.id} captured={!!signature} clientName={values.client_name} onCaptured={onMutated} />
-      </div>
-
-      <SubmitSection errors={errors} isSubmitting={isSubmitting} onSubmit={onSubmit} />
     </div>
   );
 }

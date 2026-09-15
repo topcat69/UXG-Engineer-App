@@ -44,6 +44,10 @@ export function jobIdForOp(op: OutboxOperation): string | null {
     case "task_toggle":
     case "media_pending_delta":
     case "media_delete":
+    case "survey_screen_upsert":
+    case "survey_screen_delete":
+    case "survey_action_upsert":
+    case "survey_action_delete":
       return op.jobId;
     case "install_form_upsert":
     case "survey_form_upsert":
@@ -151,6 +155,46 @@ async function applyOperation(supabase: ReturnType<typeof createClient>, op: Out
     }
     case "survey_form_upsert": {
       const { error } = await supabase.from("survey_forms").upsert(op.row);
+      if (error) {
+        // Same stale-draft guard as install_form_upsert/job_details_upsert
+        // above — see isFormWriteLocked's doc comment.
+        if (op.row.job_id && isFormWriteLocked((await db.jobs.get(op.row.job_id))?.status)) {
+          console.info(`Dropping stale survey_form_upsert for job ${op.row.job_id} — already past submission`);
+          return;
+        }
+        throw error;
+      }
+      return;
+    }
+    case "survey_screen_upsert": {
+      const { error } = await supabase.from("survey_screens").upsert(op.row);
+      if (error) {
+        if (isFormWriteLocked((await db.jobs.get(op.jobId))?.status)) {
+          console.info(`Dropping stale survey_screen_upsert for job ${op.jobId} — already past submission`);
+          return;
+        }
+        throw error;
+      }
+      return;
+    }
+    case "survey_screen_delete": {
+      const { error } = await supabase.from("survey_screens").delete().eq("id", op.screenId);
+      if (error) throw error;
+      return;
+    }
+    case "survey_action_upsert": {
+      const { error } = await supabase.from("survey_actions").upsert(op.row);
+      if (error) {
+        if (isFormWriteLocked((await db.jobs.get(op.jobId))?.status)) {
+          console.info(`Dropping stale survey_action_upsert for job ${op.jobId} — already past submission`);
+          return;
+        }
+        throw error;
+      }
+      return;
+    }
+    case "survey_action_delete": {
+      const { error } = await supabase.from("survey_actions").delete().eq("id", op.actionId);
       if (error) throw error;
       return;
     }

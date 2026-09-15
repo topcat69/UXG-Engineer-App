@@ -20,8 +20,9 @@ export type SyncDownResult = { jobCount: number; siteCount: number };
  * ±30-day window — see 20260129000000_widen_engineer_job_window.sql),
  * their sites, and their forms into Dexie. Jobs and
  * sites are server-authoritative and always overwritten; install/survey
- * forms are only overwritten for jobs with no pending outbox operation, so
- * a sync-down never clobbers an in-progress offline form edit.
+ * forms (and the survey form's own screens/actions) are only overwritten
+ * for jobs with no pending outbox operation, so a sync-down never clobbers
+ * an in-progress offline form edit.
  */
 export async function syncDown(userId: string): Promise<SyncDownResult> {
   const supabase = createClient();
@@ -72,6 +73,9 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
       .filter((id): id is string => !!id),
   );
   const overwritableJobIds = new Set(jobIdsSafeToOverwrite(jobIds, pendingJobIds));
+  // survey_screens/survey_actions only carry survey_form_id, not job_id — this
+  // maps back to a job once surveyForms below is fetched, so the same
+  // overwritableJobIds guard can apply to them (see the transaction below).
 
   const [
     { data: installForms, error: installError },
@@ -117,6 +121,20 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
   if (jobOptionalFieldsError) throw jobOptionalFieldsError;
   if (jobSheetsError) throw jobSheetsError;
 
+  // survey_screens/survey_actions, keyed off the survey_forms just fetched —
+  // a second round trip since the FK is survey_form_id, not job_id.
+  const surveyFormIds = (surveyForms ?? []).map((f) => f.id);
+  const jobIdBySurveyFormId = new Map((surveyForms ?? []).map((f) => [f.id, f.job_id]));
+  const [{ data: surveyScreens, error: surveyScreensError }, { data: surveyActions, error: surveyActionsError }] =
+    surveyFormIds.length > 0
+      ? await Promise.all([
+          supabase.from("survey_screens").select("*").in("survey_form_id", surveyFormIds),
+          supabase.from("survey_actions").select("*").in("survey_form_id", surveyFormIds),
+        ])
+      : [{ data: [], error: null } as const, { data: [], error: null } as const];
+  if (surveyScreensError) throw surveyScreensError;
+  if (surveyActionsError) throw surveyActionsError;
+
   const jobSheetIds = (jobSheets ?? []).map((js) => js.id);
   const { data: stockItems, error: stockItemsError } =
     jobSheetIds.length > 0
@@ -147,6 +165,8 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
       db.clientSlaReasons,
       db.jobSheets,
       db.stockItems,
+      db.surveyScreens,
+      db.surveyActions,
       db.syncMeta,
     ],
     async () => {
@@ -161,6 +181,25 @@ export async function syncDown(userId: string): Promise<SyncDownResult> {
       }
       for (const row of surveyForms ?? []) {
         if (row.job_id && overwritableJobIds.has(row.job_id)) await db.surveyForms.put(row);
+      }
+      // Full replace per overwritable survey form, not just bulkPut — a
+      // screen or action can be *removed*, and only re-fetching can't ever
+      // notice that (same reasoning as job_optional_fields' full replace
+      // below). Rows for a survey_form still pending offline edits are left
+      // untouched entirely.
+      const overwritableSurveyFormIds = surveyFormIds.filter((id) => {
+        const jobId = jobIdBySurveyFormId.get(id);
+        return jobId && overwritableJobIds.has(jobId);
+      });
+      if (overwritableSurveyFormIds.length > 0) {
+        await db.surveyScreens.where("survey_form_id").anyOf(overwritableSurveyFormIds).delete();
+        await db.surveyActions.where("survey_form_id").anyOf(overwritableSurveyFormIds).delete();
+      }
+      for (const row of surveyScreens ?? []) {
+        if (overwritableSurveyFormIds.includes(row.survey_form_id)) await db.surveyScreens.put(row);
+      }
+      for (const row of surveyActions ?? []) {
+        if (overwritableSurveyFormIds.includes(row.survey_form_id)) await db.surveyActions.put(row);
       }
       for (const row of jobTasks ?? []) {
         if (!pendingTaskIds.has(row.id)) await db.jobTasks.put(row);

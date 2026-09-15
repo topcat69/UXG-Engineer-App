@@ -7,7 +7,6 @@ import { parseIssuesCsv, resolveIssueRows } from "@/lib/migration/parse-issues";
 import { parseJobsCsv, resolveJobRows } from "@/lib/migration/parse-jobs";
 import { parseProjectsCsv } from "@/lib/migration/parse-projects";
 import { parseSitesCsv } from "@/lib/csv/sites";
-import { parseSurveyFormsCsv, resolveSurveyFormRows } from "@/lib/migration/parse-survey-forms";
 import { parseUsersCsv } from "@/lib/migration/parse-users";
 import type { ScriptAdminClient } from "./supabase-admin";
 
@@ -40,8 +39,8 @@ async function resolveClientId(supabase: ScriptAdminClient, name: string): Promi
 /**
  * Runs the full AppSheet-export import against `dir` (expected to contain
  * some subset of users.csv, projects.csv, sites.csv, assets.csv, jobs.csv,
- * install_forms.csv, survey_forms.csv, issues.csv — every file is
- * optional, since not every AppSheet app exports every table). Tables are
+ * install_forms.csv, issues.csv — every file is optional, since not every
+ * AppSheet app exports every table). Tables are
  * imported in dependency order; each stage's natural-key lookup (email,
  * site/project name, job_number) feeds the next.
  *
@@ -212,7 +211,10 @@ export async function runMigration(dir: string, supabase: ScriptAdminClient): Pr
   }
   const jobLookup = buildLookup(jobLookupEntries);
 
-  // --- install_forms / survey_forms (job_id, one row per job)
+  // --- install_forms (job_id, one row per job). survey_forms is no longer
+  // importable via CSV here — its shape moved to the real Site Survey Form
+  // (survey_forms/survey_screens/survey_actions), which has no CSV import
+  // path since nothing was ever actually migrated into the old shape.
   const installFormsCsv = readIfExists(dir, "install_forms.csv");
   if (installFormsCsv) {
     const { rows: parsed, errors: parseErrors } = parseInstallFormsCsv(installFormsCsv);
@@ -223,19 +225,6 @@ export async function runMigration(dir: string, supabase: ScriptAdminClient): Pr
       const { data, error } = await supabase.from("install_forms").insert(rows).select("id");
       if (error) errors.push(`install_forms.csv: insert failed: ${error.message}`);
       else counts.install_forms = data.length;
-    }
-  }
-
-  const surveyFormsCsv = readIfExists(dir, "survey_forms.csv");
-  if (surveyFormsCsv) {
-    const { rows: parsed, errors: parseErrors } = parseSurveyFormsCsv(surveyFormsCsv);
-    errors.push(...parseErrors.map((e) => `survey_forms.csv: ${e}`));
-    const { rows, errors: resolveErrors } = resolveSurveyFormRows(parsed, jobLookup);
-    errors.push(...resolveErrors.map((e) => `survey_forms.csv: ${e}`));
-    if (rows.length > 0) {
-      const { data, error } = await supabase.from("survey_forms").insert(rows).select("id");
-      if (error) errors.push(`survey_forms.csv: insert failed: ${error.message}`);
-      else counts.survey_forms = data.length;
     }
   }
 

@@ -12,6 +12,7 @@ import { DuplicateJobButton } from "./duplicate-job-button";
 import { TaskPanel } from "./task-panel";
 import { ShareLinkPanel } from "./share-link-panel";
 import { JobDetailsPanel } from "./job-details-panel";
+import { SurveyFormPanel } from "./survey-form-panel";
 import { RequiredFieldsPanel } from "./required-fields-panel";
 import { AssignSchedulePanel } from "./assign-schedule-panel";
 import { EditJobPanel } from "./edit-job-panel";
@@ -82,18 +83,25 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   // which isn't known until the main query above resolves. The SLA fixture
   // type/reason lists are fetched the same way, for the same reason —
   // they're scoped to the job's site's client, only known once job resolves.
-  const [{ data: parentJob }, { data: revisitChildren }, { data: fixtureTypes }, { data: reasons }] = await Promise.all([
-    job.parent_job_id
-      ? supabase.from("jobs").select("id, job_number").eq("id", job.parent_job_id).single()
-      : Promise.resolve({ data: null }),
-    supabase.from("jobs").select("id, job_number").eq("parent_job_id", id),
-    job.site?.client?.id
-      ? supabase.from("client_sla_fixture_types").select("id, name").eq("client_id", job.site.client.id).order("name")
-      : Promise.resolve({ data: [] }),
-    job.site?.client?.id
-      ? supabase.from("client_sla_reasons").select("id, name").eq("client_id", job.site.client.id).order("name")
-      : Promise.resolve({ data: [] }),
-  ]);
+  const [{ data: parentJob }, { data: revisitChildren }, { data: fixtureTypes }, { data: reasons }, { data: surveyScreens }, { data: surveyActions }] =
+    await Promise.all([
+      job.parent_job_id
+        ? supabase.from("jobs").select("id, job_number").eq("id", job.parent_job_id).single()
+        : Promise.resolve({ data: null }),
+      supabase.from("jobs").select("id, job_number").eq("parent_job_id", id),
+      job.site?.client?.id
+        ? supabase.from("client_sla_fixture_types").select("id, name").eq("client_id", job.site.client.id).order("name")
+        : Promise.resolve({ data: [] }),
+      job.site?.client?.id
+        ? supabase.from("client_sla_reasons").select("id, name").eq("client_id", job.site.client.id).order("name")
+        : Promise.resolve({ data: [] }),
+      surveyForm
+        ? supabase.from("survey_screens").select("*").eq("survey_form_id", surveyForm.id).order("position")
+        : Promise.resolve({ data: [] }),
+      surveyForm
+        ? supabase.from("survey_actions").select("*").eq("survey_form_id", surveyForm.id).order("position")
+        : Promise.resolve({ data: [] }),
+    ]);
 
   // Signed URLs so the office can actually see the photos/videos, not just
   // their slot placeholders — the Media section used to render an emoji box
@@ -262,15 +270,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <FormField label="Customer name" value={installForm.client_name} />
             </dl>
           )}
-          {surveyForm && (
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
-              <FormField label="Mounting surface" value={surveyForm.mounting_surface} />
-              <FormField label="Power available" value={surveyForm.power_available ? "Yes" : "No"} />
-              <FormField label="Network available" value={surveyForm.network_available ? "Yes" : "No"} />
-              <FormField label="Access restrictions" value={surveyForm.access_restrictions} />
-              <FormField label="Measurements" value={surveyForm.measurements} />
-            </dl>
-          )}
+          {surveyForm && <SurveyFormPanel survey={surveyForm} screens={surveyScreens ?? []} actions={surveyActions ?? []} />}
           {jobDetails && (
             <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
               {usesJobDetails(job.job_type) && showsAvFields(job.job_type) && (

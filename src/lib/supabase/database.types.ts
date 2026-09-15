@@ -2039,42 +2039,164 @@ export type Database = {
         }
         Relationships: []
       }
-      survey_forms: {
+      survey_actions: {
         Row: {
-          access_restrictions: string | null
+          action: string
           created_at: string | null
-          engineer_notes: string | null
+          done: boolean | null
+          due_date: string | null
           id: string
-          job_id: string | null
-          measurements: string | null
-          mounting_surface: string | null
-          network_available: boolean | null
-          power_available: boolean | null
-          submitted_at: string | null
+          owner: string | null
+          position: number
+          survey_form_id: string
         }
         Insert: {
-          access_restrictions?: string | null
+          action: string
           created_at?: string | null
-          engineer_notes?: string | null
+          done?: boolean | null
+          due_date?: string | null
           id?: string
-          job_id?: string | null
-          measurements?: string | null
-          mounting_surface?: string | null
-          network_available?: boolean | null
-          power_available?: boolean | null
-          submitted_at?: string | null
+          owner?: string | null
+          position?: number
+          survey_form_id: string
         }
         Update: {
-          access_restrictions?: string | null
+          action?: string
           created_at?: string | null
-          engineer_notes?: string | null
+          done?: boolean | null
+          due_date?: string | null
           id?: string
+          owner?: string | null
+          position?: number
+          survey_form_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_actions_survey_form_id_fkey"
+            columns: ["survey_form_id"]
+            isOneToOne: false
+            referencedRelation: "survey_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      survey_forms: {
+        Row: {
+          access_notes: string | null
+          asbestos_checked: boolean | null
+          cable_concealment: string | null
+          cable_route_notes: string | null
+          containment_present: string | null
+          created_at: string | null
+          dda_compliant: boolean | null
+          delivery_notes: string | null
+          direct_sunlight: boolean | null
+          enclosure_required: boolean | null
+          engineer_notes: string | null
+          escort_required: boolean | null
+          firestopping_notes: string | null
+          floor_boxes_required: boolean | null
+          floor_plan_captured: boolean | null
+          id: string
+          it_contact_name: string | null
+          job_id: string | null
+          measurements_checked: boolean | null
+          network_summary_notes: string | null
+          other_trades_notes: string | null
+          outstanding_items: string | null
+          ppe_required: string | null
+          project: string | null
+          rams_required: boolean | null
+          screen_count: number | null
+          site_contact_name: string | null
+          site_contact_phone: string | null
+          site_contact_role: string | null
+          site_induction_required: boolean | null
+          submitted_at: string | null
+          survey_date: string | null
+          surveyor: string | null
+          temp_humidity_ok: boolean | null
+          ventilation_adequate: boolean | null
+          working_at_height: string | null
+          working_hours: string | null
+        }
+        Insert: {
+          access_notes?: string | null
+          asbestos_checked?: boolean | null
+          cable_concealment?: string | null
+          cable_route_notes?: string | null
+          containment_present?: string | null
+          created_at?: string | null
+          dda_compliant?: boolean | null
+          delivery_notes?: string | null
+          direct_sunlight?: boolean | null
+          enclosure_required?: boolean | null
+          engineer_notes?: string | null
+          escort_required?: boolean | null
+          firestopping_notes?: string | null
+          floor_boxes_required?: boolean | null
+          floor_plan_captured?: boolean | null
+          id?: string
+          it_contact_name?: string | null
           job_id?: string | null
-          measurements?: string | null
-          mounting_surface?: string | null
-          network_available?: boolean | null
-          power_available?: boolean | null
+          measurements_checked?: boolean | null
+          network_summary_notes?: string | null
+          other_trades_notes?: string | null
+          outstanding_items?: string | null
+          ppe_required?: string | null
+          project?: string | null
+          rams_required?: boolean | null
+          screen_count?: number | null
+          site_contact_name?: string | null
+          site_contact_phone?: string | null
+          site_contact_role?: string | null
+          site_induction_required?: boolean | null
           submitted_at?: string | null
+          survey_date?: string | null
+          surveyor?: string | null
+          temp_humidity_ok?: boolean | null
+          ventilation_adequate?: boolean | null
+          working_at_height?: string | null
+          working_hours?: string | null
+        }
+        Update: {
+          access_notes?: string | null
+          asbestos_checked?: boolean | null
+          cable_concealment?: string | null
+          cable_route_notes?: string | null
+          containment_present?: string | null
+          created_at?: string | null
+          dda_compliant?: boolean | null
+          delivery_notes?: string | null
+          direct_sunlight?: boolean | null
+          enclosure_required?: boolean | null
+          engineer_notes?: string | null
+          escort_required?: boolean | null
+          firestopping_notes?: string | null
+          floor_boxes_required?: boolean | null
+          floor_plan_captured?: boolean | null
+          id?: string
+          it_contact_name?: string | null
+          job_id?: string | null
+          measurements_checked?: boolean | null
+          network_summary_notes?: string | null
+          other_trades_notes?: string | null
+          outstanding_items?: string | null
+          ppe_required?: string | null
+          project?: string | null
+          rams_required?: boolean | null
+          screen_count?: number | null
+          site_contact_name?: string | null
+          site_contact_phone?: string | null
+          site_contact_role?: string | null
+          site_induction_required?: boolean | null
+          submitted_at?: string | null
+          survey_date?: string | null
+          surveyor?: string | null
+          temp_humidity_ok?: boolean | null
+          ventilation_adequate?: boolean | null
+          working_at_height?: string | null
+          working_hours?: string | null
         }
         Relationships: [
           {
@@ -2082,6 +2204,170 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: true
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      survey_screens: {
+        Row: {
+          brightness_tier: string | null
+          commercial_grade_required: boolean | null
+          connection_method: string | null
+          created_at: string | null
+          display_make_model: string | null
+          distance_to_socket: string | null
+          environment: string | null
+          estimated_weight: number | null
+          existing_bracket_reusable: boolean | null
+          existing_display_detail: string | null
+          existing_player_detail: string | null
+          fixing_type: string | null
+          glare_assessed: boolean | null
+          hdmi_run_length: string | null
+          id: string
+          ip_mode: string | null
+          isolation_notes: string | null
+          live_data_point: boolean | null
+          location: string | null
+          mac_address: string | null
+          maintenance_access_ok: boolean | null
+          mount_surface: string | null
+          mounting_height: string | null
+          new_spur_required: boolean | null
+          orientation: string | null
+          overhead_obstructions: boolean | null
+          photo_taken: boolean | null
+          player_location: string | null
+          player_make_model: string | null
+          player_required: boolean | null
+          position: number
+          position_agreed: boolean | null
+          reuse_existing_display: boolean | null
+          reuse_existing_player: boolean | null
+          screen_label: string | null
+          screen_size: string | null
+          serial_number: string | null
+          shared_power_socket: boolean | null
+          socket_count: number | null
+          socket_sufficient: boolean | null
+          stud_checked: boolean | null
+          survey_form_id: string
+          switched_with_lighting: boolean | null
+          tamper_proof_required: boolean | null
+          ventilation_ok: boolean | null
+          vlan: string | null
+          wifi_security: string | null
+          wifi_signal_checked: boolean | null
+          wifi_ssid: string | null
+        }
+        Insert: {
+          brightness_tier?: string | null
+          commercial_grade_required?: boolean | null
+          connection_method?: string | null
+          created_at?: string | null
+          display_make_model?: string | null
+          distance_to_socket?: string | null
+          environment?: string | null
+          estimated_weight?: number | null
+          existing_bracket_reusable?: boolean | null
+          existing_display_detail?: string | null
+          existing_player_detail?: string | null
+          fixing_type?: string | null
+          glare_assessed?: boolean | null
+          hdmi_run_length?: string | null
+          id?: string
+          ip_mode?: string | null
+          isolation_notes?: string | null
+          live_data_point?: boolean | null
+          location?: string | null
+          mac_address?: string | null
+          maintenance_access_ok?: boolean | null
+          mount_surface?: string | null
+          mounting_height?: string | null
+          new_spur_required?: boolean | null
+          orientation?: string | null
+          overhead_obstructions?: boolean | null
+          photo_taken?: boolean | null
+          player_location?: string | null
+          player_make_model?: string | null
+          player_required?: boolean | null
+          position?: number
+          position_agreed?: boolean | null
+          reuse_existing_display?: boolean | null
+          reuse_existing_player?: boolean | null
+          screen_label?: string | null
+          screen_size?: string | null
+          serial_number?: string | null
+          shared_power_socket?: boolean | null
+          socket_count?: number | null
+          socket_sufficient?: boolean | null
+          stud_checked?: boolean | null
+          survey_form_id: string
+          switched_with_lighting?: boolean | null
+          tamper_proof_required?: boolean | null
+          ventilation_ok?: boolean | null
+          vlan?: string | null
+          wifi_security?: string | null
+          wifi_signal_checked?: boolean | null
+          wifi_ssid?: string | null
+        }
+        Update: {
+          brightness_tier?: string | null
+          commercial_grade_required?: boolean | null
+          connection_method?: string | null
+          created_at?: string | null
+          display_make_model?: string | null
+          distance_to_socket?: string | null
+          environment?: string | null
+          estimated_weight?: number | null
+          existing_bracket_reusable?: boolean | null
+          existing_display_detail?: string | null
+          existing_player_detail?: string | null
+          fixing_type?: string | null
+          glare_assessed?: boolean | null
+          hdmi_run_length?: string | null
+          id?: string
+          ip_mode?: string | null
+          isolation_notes?: string | null
+          live_data_point?: boolean | null
+          location?: string | null
+          mac_address?: string | null
+          maintenance_access_ok?: boolean | null
+          mount_surface?: string | null
+          mounting_height?: string | null
+          new_spur_required?: boolean | null
+          orientation?: string | null
+          overhead_obstructions?: boolean | null
+          photo_taken?: boolean | null
+          player_location?: string | null
+          player_make_model?: string | null
+          player_required?: boolean | null
+          position?: number
+          position_agreed?: boolean | null
+          reuse_existing_display?: boolean | null
+          reuse_existing_player?: boolean | null
+          screen_label?: string | null
+          screen_size?: string | null
+          serial_number?: string | null
+          shared_power_socket?: boolean | null
+          socket_count?: number | null
+          socket_sufficient?: boolean | null
+          stud_checked?: boolean | null
+          survey_form_id?: string
+          switched_with_lighting?: boolean | null
+          tamper_proof_required?: boolean | null
+          ventilation_ok?: boolean | null
+          vlan?: string | null
+          wifi_security?: string | null
+          wifi_signal_checked?: boolean | null
+          wifi_ssid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_screens_survey_form_id_fkey"
+            columns: ["survey_form_id"]
+            isOneToOne: false
+            referencedRelation: "survey_forms"
             referencedColumns: ["id"]
           },
         ]

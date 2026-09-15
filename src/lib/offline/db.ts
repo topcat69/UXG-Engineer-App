@@ -6,6 +6,8 @@ export type SiteRow = Database["public"]["Tables"]["sites"]["Row"];
 export type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
 export type InstallFormRow = Database["public"]["Tables"]["install_forms"]["Row"];
 export type SurveyFormRow = Database["public"]["Tables"]["survey_forms"]["Row"];
+export type SurveyScreenRow = Database["public"]["Tables"]["survey_screens"]["Row"];
+export type SurveyActionRow = Database["public"]["Tables"]["survey_actions"]["Row"];
 export type JobDetailsRow = Database["public"]["Tables"]["job_details"]["Row"];
 export type JobEquipmentRow = Database["public"]["Tables"]["job_equipment"]["Row"];
 export type SignatureRow = Database["public"]["Tables"]["signatures"]["Row"];
@@ -48,6 +50,13 @@ export type OutboxOperation = OutboxBase &
     | { type: "job_patch"; jobId: string; patch: Partial<JobRow> }
     | { type: "install_form_upsert"; row: InstallFormRow }
     | { type: "survey_form_upsert"; row: SurveyFormRow }
+    // Screens/actions carry jobId explicitly (denormalized off row.survey_form_id)
+    // so jobIdForOp/sync-down's pending-job guard can read it directly, the
+    // same way task_toggle carries jobId despite belonging to a job_tasks row.
+    | { type: "survey_screen_upsert"; jobId: string; row: SurveyScreenRow }
+    | { type: "survey_screen_delete"; jobId: string; screenId: string }
+    | { type: "survey_action_upsert"; jobId: string; row: SurveyActionRow }
+    | { type: "survey_action_delete"; jobId: string; actionId: string }
     | { type: "job_details_upsert"; row: JobDetailsRow }
     | { type: "signature_insert"; row: SignatureRow }
     | { type: "issue_insert"; row: IssueRow }
@@ -101,6 +110,8 @@ class OfflineDB extends Dexie {
   clients!: EntityTable<ClientRow, "id">;
   installForms!: EntityTable<InstallFormRow, "id">;
   surveyForms!: EntityTable<SurveyFormRow, "id">;
+  surveyScreens!: EntityTable<SurveyScreenRow, "id">;
+  surveyActions!: EntityTable<SurveyActionRow, "id">;
   outbox!: Table<OutboxOperation, string>;
   mediaQueue!: EntityTable<MediaQueueItem, "id">;
   syncMeta!: EntityTable<SyncMeta, "key">;
@@ -210,6 +221,29 @@ class OfflineDB extends Dexie {
       clients: "id",
       installForms: "id, job_id",
       surveyForms: "id, job_id",
+      outbox: "id, createdAt",
+      mediaQueue: "id, jobId, status",
+      syncMeta: "key",
+      jobTasks: "id, job_id, is_done",
+      jobDetails: "id, job_id",
+      jobEquipment: "id, job_id",
+      jobOptionalFields: "id, job_id",
+      clientSlaFixtureTypes: "id, client_id",
+      clientSlaReasons: "id, client_id",
+      jobSheets: "id, linked_job_id",
+      stockItems: "id, job_sheet_id",
+    });
+    // survey_screens/survey_actions: the Site Survey Form's repeating child
+    // rows (one screen per physical display, one action per follow-up item),
+    // indexed by survey_form_id since that's how the field app looks them up.
+    this.version(8).stores({
+      jobs: "id, status, assigned_to, scheduled_start, site_id",
+      sites: "id",
+      clients: "id",
+      installForms: "id, job_id",
+      surveyForms: "id, job_id",
+      surveyScreens: "id, survey_form_id",
+      surveyActions: "id, survey_form_id",
       outbox: "id, createdAt",
       mediaQueue: "id, jobId, status",
       syncMeta: "key",
