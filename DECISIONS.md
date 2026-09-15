@@ -5582,3 +5582,30 @@ Verified: `pnpm typecheck` and `pnpm lint` clean. 8 of 10 Playwright
 specs should now run (job-templates-tasks and phase5 fixme'd); if
 job-reports' race fix is correct, CI should go fully green for the
 first time in this project's history, and `deploy.yml` should fire.
+
+## Addendum, 2026-09-15 — the cron routes finally have a scheduler
+
+The "Cron" bullet in the deploy addendum above (`/api/cron/{day-before-
+reminders,weekly-summary,media-lifecycle}` are plain authenticated POST
+routes with no self-triggering mechanism, "needs real crontab entries
+hitting them with `curl`") was still true right up to this point — none
+of the three had ever actually been wired to anything in production.
+Closed it with real VM crontab entries, alongside a fourth route added in
+this same session, `/api/cron/drive-media-sync` (the Google Drive folder
+sync's Phase 3/4 retry mechanism — see the Drive Folder Sync scoping memo
+and its four build phases).
+
+Each crontab line calls `curl` directly with `X-Webhook-Secret` read
+fresh from `.env.production` at invocation time (`grep ... | cut -d= -f2-
+| tr -d '"'`) rather than a secret baked into the crontab itself, so
+rotating `WEBHOOK_SHARED_SECRET` never means touching the schedule.
+Frequencies: `day-before-reminders` daily at 06:00 UTC (once a day is
+enough — it only needs to catch tomorrow's jobs before tomorrow starts),
+`weekly-summary` Monday 07:00 UTC, `media-lifecycle` daily at 02:30 UTC
+(off-peak, not time-sensitive), and `drive-media-sync` every 15 minutes —
+that one's the outlier, since it's the retry path for a genuinely bursty
+case (an engineer's phone reconnecting after a day offline can mean
+twenty photos landing at once).
+
+No application code changed here — this closes an infrastructure gap
+that predates the Drive work, not a bug in it.
