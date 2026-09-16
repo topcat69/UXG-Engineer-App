@@ -13,18 +13,31 @@ type AnySupabaseClient = SupabaseClient<Database>;
  * must succeed regardless of whether Drive is reachable. Grow-as-you-go
  * per the confirmed scoping — this only ever runs when a client is
  * created, never as a backfill over existing rows.
+ *
+ * supabase-js never throws on a query error (it returns `{ data: null,
+ * error }`), so every query below checks `error` explicitly and throws it
+ * — otherwise a real failure (e.g. a genuinely missing column, as
+ * happened in production once already) reads identically to "no row
+ * found" and the outer catch's console.error, the only thing that would
+ * otherwise surface it, never fires.
  */
 export async function ensureClientDriveFolder(supabase: AnySupabaseClient, clientId: string): Promise<void> {
   try {
     const root = customerJobsRootFolderId();
     if (!root) return;
 
-    const { data: client } = await supabase.from("clients").select("name, drive_folder_id").eq("id", clientId).single();
+    const { data: client, error: clientError } = await supabase
+      .from("clients")
+      .select("name, drive_folder_id")
+      .eq("id", clientId)
+      .single();
+    if (clientError) throw clientError;
     if (!client || client.drive_folder_id) return;
 
     const folderId = await createOrFetchFolder(client.name, root);
     if (!folderId) return;
-    await supabase.from("clients").update({ drive_folder_id: folderId }).eq("id", clientId);
+    const { error: updateError } = await supabase.from("clients").update({ drive_folder_id: folderId }).eq("id", clientId);
+    if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive client folder sync failed for client ${clientId}`, error);
   }
@@ -40,16 +53,27 @@ export async function ensureProjectDriveFolder(supabase: AnySupabaseClient, proj
   try {
     if (!customerJobsRootFolderId()) return;
 
-    const { data: project } = await supabase.from("projects").select("name, client_id, drive_folder_id").eq("id", projectId).single();
+    const { data: project, error: projectError } = await supabase
+      .from("projects")
+      .select("name, client_id, drive_folder_id")
+      .eq("id", projectId)
+      .single();
+    if (projectError) throw projectError;
     if (!project || project.drive_folder_id || !project.client_id) return;
 
     await ensureClientDriveFolder(supabase, project.client_id);
-    const { data: client } = await supabase.from("clients").select("drive_folder_id").eq("id", project.client_id).single();
+    const { data: client, error: clientError } = await supabase
+      .from("clients")
+      .select("drive_folder_id")
+      .eq("id", project.client_id)
+      .single();
+    if (clientError) throw clientError;
     if (!client?.drive_folder_id) return;
 
     const folderId = await createOrFetchFolder(project.name, client.drive_folder_id);
     if (!folderId) return;
-    await supabase.from("projects").update({ drive_folder_id: folderId }).eq("id", projectId);
+    const { error: updateError } = await supabase.from("projects").update({ drive_folder_id: folderId }).eq("id", projectId);
+    if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive project folder sync failed for project ${projectId}`, error);
   }
@@ -74,20 +98,36 @@ export async function ensureJobDriveFolder(supabase: AnySupabaseClient, jobId: s
   try {
     if (!customerJobsRootFolderId()) return;
 
-    const { data: job } = await supabase.from("jobs").select("job_number, project_id, site_id, drive_folder_id").eq("id", jobId).single();
+    const { data: job, error: jobError } = await supabase
+      .from("jobs")
+      .select("job_number, project_id, site_id, drive_folder_id")
+      .eq("id", jobId)
+      .single();
+    if (jobError) throw jobError;
     if (!job || job.drive_folder_id) return;
 
-    const { data: site } = await supabase.from("sites").select("name, client_id").eq("id", job.site_id).single();
+    const { data: site, error: siteError } = await supabase.from("sites").select("name, client_id").eq("id", job.site_id).single();
+    if (siteError) throw siteError;
     if (!site) return;
 
     let siteParentFolderId: string | null;
     if (job.project_id) {
       await ensureProjectDriveFolder(supabase, job.project_id);
-      const { data: project } = await supabase.from("projects").select("drive_folder_id").eq("id", job.project_id).single();
+      const { data: project, error: projectError } = await supabase
+        .from("projects")
+        .select("drive_folder_id")
+        .eq("id", job.project_id)
+        .single();
+      if (projectError) throw projectError;
       siteParentFolderId = project?.drive_folder_id ?? null;
     } else {
       await ensureClientDriveFolder(supabase, site.client_id);
-      const { data: client } = await supabase.from("clients").select("drive_folder_id").eq("id", site.client_id).single();
+      const { data: client, error: clientError } = await supabase
+        .from("clients")
+        .select("drive_folder_id")
+        .eq("id", site.client_id)
+        .single();
+      if (clientError) throw clientError;
       siteParentFolderId = client?.drive_folder_id ?? null;
     }
     if (!siteParentFolderId) return;
@@ -97,7 +137,8 @@ export async function ensureJobDriveFolder(supabase: AnySupabaseClient, jobId: s
 
     const jobFolderId = await createOrFetchFolder(job.job_number, siteFolderId);
     if (!jobFolderId) return;
-    await supabase.from("jobs").update({ drive_folder_id: jobFolderId }).eq("id", jobId);
+    const { error: updateError } = await supabase.from("jobs").update({ drive_folder_id: jobFolderId }).eq("id", jobId);
+    if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive job folder sync failed for job ${jobId}`, error);
   }

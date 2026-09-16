@@ -44,23 +44,40 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
+  // supabase-js never throws on a query error (it returns `{ data: null,
+  // error }`), so each of the four "what's pending" queries below is
+  // checked explicitly — otherwise a real failure (e.g. a genuinely
+  // missing column, as happened in production once already) reads
+  // identically to "nothing pending" and this route reports a clean
+  // success while quietly doing nothing. Logged for the server, and
+  // surfaced in the response with a 500 so an external scheduler (or
+  // whoever's watching it) can actually see it too.
+  const queryErrors: string[] = [];
 
-  const { data: mediaAssets } = await supabase
+  const { data: mediaAssets, error: mediaAssetsError } = await supabase
     .from("media_assets")
     .select("id")
     .is("drive_file_id", null)
     .not("job_id", "is", null)
     .limit(BATCH_SIZE);
+  if (mediaAssetsError) {
+    console.error("drive-media-sync: media_assets query failed", mediaAssetsError);
+    queryErrors.push(`media_assets: ${mediaAssetsError.message}`);
+  }
   for (const asset of mediaAssets ?? []) {
     await syncMediaAssetToDrive(supabase, asset.id);
   }
 
-  const { data: signatures } = await supabase
+  const { data: signatures, error: signaturesError } = await supabase
     .from("signatures")
     .select("id")
     .is("drive_file_id", null)
     .not("job_id", "is", null)
     .limit(BATCH_SIZE);
+  if (signaturesError) {
+    console.error("drive-media-sync: signatures query failed", signaturesError);
+    queryErrors.push(`signatures: ${signaturesError.message}`);
+  }
   for (const signature of signatures ?? []) {
     await syncSignatureToDrive(supabase, signature.id);
   }
@@ -71,12 +88,16 @@ export async function POST(request: Request) {
   // checks that *some* document exists, not which ones remain unsynced);
   // syncJobDocumentToDrive's own per-kind drive_file_id check is what
   // actually skips already-mirrored documents, cheaply.
-  const { data: jobDetails } = await supabase
+  const { data: jobDetails, error: jobDetailsError } = await supabase
     .from("job_details")
     .select("job_id")
     .not("job_id", "is", null)
     .or("rams_storage_path.not.is.null,site_plan_storage_path.not.is.null,design_pack_storage_path.not.is.null,parking_permit_storage_path.not.is.null")
     .limit(BATCH_SIZE);
+  if (jobDetailsError) {
+    console.error("drive-media-sync: job_details query failed", jobDetailsError);
+    queryErrors.push(`job_details: ${jobDetailsError.message}`);
+  }
   for (const details of jobDetails ?? []) {
     if (!details.job_id) continue;
     for (const kind of JOB_DOCUMENT_KINDS) {
@@ -84,20 +105,28 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data: completionReports } = await supabase
+  const { data: completionReports, error: completionReportsError } = await supabase
     .from("jobs")
     .select("id")
     .not("completion_pdf_url", "is", null)
     .is("completion_report_drive_file_id", null)
     .limit(BATCH_SIZE);
+  if (completionReportsError) {
+    console.error("drive-media-sync: completion reports query failed", completionReportsError);
+    queryErrors.push(`completion_reports: ${completionReportsError.message}`);
+  }
   for (const job of completionReports ?? []) {
     await syncCompletionReportToDrive(supabase, job.id);
   }
 
-  return NextResponse.json({
-    mediaAssetsProcessed: mediaAssets?.length ?? 0,
-    signaturesProcessed: signatures?.length ?? 0,
-    jobsWithDocumentsProcessed: jobDetails?.length ?? 0,
-    completionReportsProcessed: completionReports?.length ?? 0,
-  });
+  return NextResponse.json(
+    {
+      mediaAssetsProcessed: mediaAssets?.length ?? 0,
+      signaturesProcessed: signatures?.length ?? 0,
+      jobsWithDocumentsProcessed: jobDetails?.length ?? 0,
+      completionReportsProcessed: completionReports?.length ?? 0,
+      ...(queryErrors.length > 0 ? { errors: queryErrors } : {}),
+    },
+    { status: queryErrors.length > 0 ? 500 : 200 },
+  );
 }

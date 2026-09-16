@@ -27,17 +27,28 @@ function driveFileNameFor(storagePath: string, fallback: string): string {
   return storagePath.split("/").pop() || fallback;
 }
 
+/**
+ * supabase-js never throws on a query error (it returns `{ data: null,
+ * error }`), so every query in this file checks `error` explicitly and
+ * throws it into the surrounding try/catch below — otherwise a real
+ * failure (e.g. a genuinely missing column, as happened in production
+ * once already) reads identically to "no row found" and the outer
+ * catch's console.error, the only thing that would otherwise surface
+ * it, never fires.
+ */
 export async function syncMediaAssetToDrive(supabase: AnySupabaseClient, mediaAssetId: string): Promise<void> {
   try {
-    const { data: asset } = await supabase
+    const { data: asset, error: assetError } = await supabase
       .from("media_assets")
       .select("job_id, slot, storage_path, drive_file_id")
       .eq("id", mediaAssetId)
       .single();
+    if (assetError) throw assetError;
     if (!asset || asset.drive_file_id || !asset.job_id) return;
 
     await ensureJobDriveFolder(supabase, asset.job_id);
-    const { data: job } = await supabase.from("jobs").select("drive_folder_id").eq("id", asset.job_id).single();
+    const { data: job, error: jobError } = await supabase.from("jobs").select("drive_folder_id").eq("id", asset.job_id).single();
+    if (jobError) throw jobError;
     if (!job?.drive_folder_id) return;
 
     const downloaded = await downloadStorageFile(supabase, asset.storage_path);
@@ -46,7 +57,8 @@ export async function syncMediaAssetToDrive(supabase: AnySupabaseClient, mediaAs
     const name = driveFileNameFor(asset.storage_path, `${asset.slot}-${mediaAssetId}`);
     const fileId = await uploadFile(name, job.drive_folder_id, downloaded.content, downloaded.mime);
     if (!fileId) return;
-    await supabase.from("media_assets").update({ drive_file_id: fileId }).eq("id", mediaAssetId);
+    const { error: updateError } = await supabase.from("media_assets").update({ drive_file_id: fileId }).eq("id", mediaAssetId);
+    if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive media sync failed for media_asset ${mediaAssetId}`, error);
   }
@@ -54,15 +66,17 @@ export async function syncMediaAssetToDrive(supabase: AnySupabaseClient, mediaAs
 
 export async function syncSignatureToDrive(supabase: AnySupabaseClient, signatureId: string): Promise<void> {
   try {
-    const { data: signature } = await supabase
+    const { data: signature, error: signatureError } = await supabase
       .from("signatures")
       .select("job_id, storage_path, drive_file_id")
       .eq("id", signatureId)
       .single();
+    if (signatureError) throw signatureError;
     if (!signature || signature.drive_file_id || !signature.job_id) return;
 
     await ensureJobDriveFolder(supabase, signature.job_id);
-    const { data: job } = await supabase.from("jobs").select("drive_folder_id").eq("id", signature.job_id).single();
+    const { data: job, error: jobError } = await supabase.from("jobs").select("drive_folder_id").eq("id", signature.job_id).single();
+    if (jobError) throw jobError;
     if (!job?.drive_folder_id) return;
 
     const downloaded = await downloadStorageFile(supabase, signature.storage_path);
@@ -71,7 +85,8 @@ export async function syncSignatureToDrive(supabase: AnySupabaseClient, signatur
     const name = driveFileNameFor(signature.storage_path, `signature-${signatureId}`);
     const fileId = await uploadFile(name, job.drive_folder_id, downloaded.content, downloaded.mime);
     if (!fileId) return;
-    await supabase.from("signatures").update({ drive_file_id: fileId }).eq("id", signatureId);
+    const { error: updateError } = await supabase.from("signatures").update({ drive_file_id: fileId }).eq("id", signatureId);
+    if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive signature sync failed for signature ${signatureId}`, error);
   }
@@ -104,13 +119,15 @@ function driveFileIdPatch(kind: JobDocumentKind, fileId: string): Partial<JobDet
 export async function syncJobDocumentToDrive(supabase: AnySupabaseClient, jobId: string, kind: JobDocumentKind): Promise<void> {
   try {
     const columns = JOB_DOCUMENT_COLUMNS[kind];
-    const { data: details } = await supabase.from("job_details").select("*").eq("job_id", jobId).maybeSingle();
+    const { data: details, error: detailsError } = await supabase.from("job_details").select("*").eq("job_id", jobId).maybeSingle();
+    if (detailsError) throw detailsError;
     const storagePath = details?.[columns.storage] as string | null | undefined;
     const existingDriveFileId = details?.[columns.drive] as string | null | undefined;
     if (!storagePath || existingDriveFileId) return;
 
     await ensureJobDriveFolder(supabase, jobId);
-    const { data: job } = await supabase.from("jobs").select("drive_folder_id").eq("id", jobId).single();
+    const { data: job, error: jobError } = await supabase.from("jobs").select("drive_folder_id").eq("id", jobId).single();
+    if (jobError) throw jobError;
     if (!job?.drive_folder_id) return;
 
     const downloaded = await downloadStorageFile(supabase, storagePath);
@@ -119,7 +136,8 @@ export async function syncJobDocumentToDrive(supabase: AnySupabaseClient, jobId:
     const name = driveFileNameFor(storagePath, `${kind}-${jobId}`);
     const fileId = await uploadFile(name, job.drive_folder_id, downloaded.content, downloaded.mime);
     if (!fileId) return;
-    await supabase.from("job_details").update(driveFileIdPatch(kind, fileId)).eq("job_id", jobId);
+    const { error: updateError } = await supabase.from("job_details").update(driveFileIdPatch(kind, fileId)).eq("job_id", jobId);
+    if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive document sync failed for job ${jobId} (${kind})`, error);
   }
@@ -134,15 +152,17 @@ export async function syncJobDocumentToDrive(supabase: AnySupabaseClient, jobId:
  */
 export async function syncCompletionReportToDrive(supabase: AnySupabaseClient, jobId: string): Promise<void> {
   try {
-    const { data: job } = await supabase
+    const { data: job, error: jobError } = await supabase
       .from("jobs")
       .select("completion_pdf_url, completion_report_drive_file_id")
       .eq("id", jobId)
       .single();
+    if (jobError) throw jobError;
     if (!job || !job.completion_pdf_url || job.completion_report_drive_file_id) return;
 
     await ensureJobDriveFolder(supabase, jobId);
-    const { data: folder } = await supabase.from("jobs").select("drive_folder_id").eq("id", jobId).single();
+    const { data: folder, error: folderError } = await supabase.from("jobs").select("drive_folder_id").eq("id", jobId).single();
+    if (folderError) throw folderError;
     if (!folder?.drive_folder_id) return;
 
     const downloaded = await downloadStorageFile(supabase, job.completion_pdf_url);
@@ -151,7 +171,8 @@ export async function syncCompletionReportToDrive(supabase: AnySupabaseClient, j
     const name = driveFileNameFor(job.completion_pdf_url, `completion-report-${jobId}.pdf`);
     const fileId = await uploadFile(name, folder.drive_folder_id, downloaded.content, downloaded.mime);
     if (!fileId) return;
-    await supabase.from("jobs").update({ completion_report_drive_file_id: fileId }).eq("id", jobId);
+    const { error: updateError } = await supabase.from("jobs").update({ completion_report_drive_file_id: fileId }).eq("id", jobId);
+    if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive completion report sync failed for job ${jobId}`, error);
   }
