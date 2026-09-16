@@ -5871,3 +5871,30 @@ needed.
 All three Watchdog phases from the original scoping memo are now
 built. Phase 4 (the optional superadmin status page) remains the one
 open decision the memo deliberately left for later.
+
+A mockup of Phase 4 was published as an artifact, grounded in real
+production `health_checks`/`integration_failures` data (including the
+migration-ordering blip above) rather than invented examples — no code
+built from it yet.
+
+Looking at that mockup prompted a further idea, explicitly deferred:
+**Phase 5, not scoped — Supabase platform metrics** (compute CPU/disk/
+RAM, per-service request and error counts). Motivation was wanting
+"everything in one place" rather than a real gap Watchdog currently
+has. Two things make this a distinct, later decision rather than a
+natural Phase 4 extension:
+
+- That data lives behind Supabase's **Management API**, which needs a
+  new, more powerful credential than anything this app currently
+  holds — org/account-scoped, not the per-project service-role key
+  Watchdog and everything else use today.
+- The data itself is already free and live in the Supabase dashboard.
+  Mirroring the same charts into Watchdog adds little on its own — the
+  actual value would be the same "catch it and email me" pattern as
+  Phases 1–3 (threshold alerts: disk >80%, sustained CPU, an
+  error-rate spike), not a second copy of a dashboard that already
+  exists.
+
+If picked up later, it slots into the same pipeline (a new check
+category feeding the same `health_checks` edge-triggered notify
+logic) rather than needing new infrastructure.
