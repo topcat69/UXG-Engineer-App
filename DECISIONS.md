@@ -5609,3 +5609,66 @@ twenty photos landing at once).
 
 No application code changed here — this closes an infrastructure gap
 that predates the Drive work, not a bug in it.
+
+## Addendum, 2026-09-16 — the two known-skipped E2E specs, actually investigated
+
+The "Fix + known-skipped E2E specs" section above parked
+`job-templates-tasks.spec.ts` and `phase5-issue-revisit-report.spec.ts`
+as `test.fixme()` after 11 CI round-trips, on the theory that
+`job-templates-tasks` had a Submit-click hang and `phase5` had an
+auto-revisit webhook that wasn't linking within 30s — both blamed on
+something in the app or the trigger, with a note that this needed real
+Docker/Supabase access to actually investigate rather than more CI-log
+guessing. That access was available in this sandbox all along; running
+both specs with `test.fixme` removed and reading what actually happened
+found three real, unrelated causes, none of which were what CI logs led
+anyone to suspect:
+
+1. **A genuine data-loss race, upstream of both specs** — `job-workflow.tsx`'s
+   details form only ever created its first `job_details` row on the
+   15s autosave tick (unlike the survey form's equivalent path, which
+   creates it immediately). Until that first row landed, `detailsRow`
+   stayed `undefined`, and the hydrate effect fired for the first time
+   whenever it finally did — overwriting whatever the engineer had
+   typed in the meantime. Reproduced directly: identical fill code for
+   "Player serial" (typed first) and "Screen serial" (typed a moment
+   later) landed one wiped, one intact, purely on timing. Fixed by
+   creating the draft immediately on mount, same as survey — see the
+   commit just before this one for the actual change.
+2. **`job-templates-tasks.spec.ts`'s own retry loop was racing itself.**
+   It checked "still blocked" ~8ms after clicking Submit — nowhere near
+   long enough for the real async submit (location resolve, Dexie
+   writes, outbox drain) to have done anything — so it always attempted
+   a second click. That second click could then land after the first
+   click's own delayed success had already navigated the view away,
+   leaving Playwright waiting forever for a button that would never
+   reappear. This, not anything server-side, was "the Submit click
+   hangs." Rewritten to click once and only retry if the specific
+   stale-closure error actually reappears within a short, real window.
+3. **`phase5`'s webhook chain was never actually being reached.** Once
+   (1) stopped blocking it, the test ran the whole chain for real —
+   issue created, revisit job linked, QA approved, PDF generated — and
+   only failed on its last assertion, checking for the phrase "Hash
+   manifest", which only ever existed in a code comment; the PDF's real
+   section heading is "VERIFICATION". Fixed to match. The webhook link
+   itself turned out fine once reached — its 30s wait had never
+   actually been exercised before, since earlier runs never survived
+   long enough to get there.
+
+Separately, while getting phase5 to actually run: its 30s poll for the
+revisit job *did* time out on the very first clean attempt, for a real
+if mundane reason — `app_settings.webhook_secret` (seeded by
+`seed.sql`) didn't match `.env.local`'s `WEBHOOK_SHARED_SECRET`, so
+`net.http_post` was firing correctly (confirmed independently — a
+manual `net.http_post` from inside the Postgres container to a plain
+listener on the host succeeded first try) but every delivery got a 401
+back from `verifyWebhookSecret`. Fixed by pointing `.env.local` at the
+same value `seed.sql` already used (that file is gitignored, not a
+repo change). This is exactly the kind of thing "nothing suspicious in
+the trigger or the polling logic" masks: both were fine the whole time.
+
+Both specs now pass individually, back-to-back repeated, and as part of
+the full 10-spec suite — confirmed clean on 3 of 4 full-suite runs; the
+one blip was a plain timeout under heavier load, not a hang, consistent
+with this sandbox's already-documented Docker/resource flakiness rather
+than a logic problem in either fix.
