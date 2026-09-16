@@ -33,6 +33,14 @@ jobs:
             echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
             echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
             echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            # Must match seed.sql's app_settings 'webhook_secret' row — the
+            # DB webhook triggers (status-submitted, issue-blocks-completion)
+            # send this value as X-Webhook-Secret, and the receiving routes
+            # 401 without a match. Locally this comes from .env.local, which
+            # is gitignored and never exists in CI, so it has to be set here
+            # too. It's a local/test-only value, already checked into
+            # seed.sql, not a real secret.
+            echo "WEBHOOK_SHARED_SECRET=local-dev-webhook-secret-not-for-production-use"
           } >> "$GITHUB_ENV"
 
       - run: pnpm test

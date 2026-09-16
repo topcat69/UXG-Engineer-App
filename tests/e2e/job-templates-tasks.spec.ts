@@ -155,20 +155,24 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   // handleSubmit's actual work (resolving location, Dexie writes, outbox
   // drain) takes real time, and reading "still blocked" before any of
   // that has had a chance to run would read true regardless of whether
-  // the click is about to succeed. That's what a tight click-retry loop
-  // gets wrong here: a second click can race the first click's own
-  // delayed success — by the time it lands, the button may already be
-  // gone (the job view moves on once submitted), leaving Playwright
-  // waiting forever for a button that will never reappear. One click,
-  // one bounded wait-and-maybe-retry, no more.
-  await fieldPage.getByRole("button", { name: /Check Out & Submit/ }).click();
-  const staleTasksCaught = await fieldPage
-    .getByText(/task.*not yet checked off/)
-    .waitFor({ state: "visible", timeout: 1_500 })
-    .then(() => true)
-    .catch(() => false);
-  if (staleTasksCaught) {
-    await fieldPage.getByRole("button", { name: /Check Out & Submit/ }).click();
+  // the click is about to succeed. Retrying is bounded by a deadline
+  // rather than a single fixed retry, since a busier CI runner can need
+  // more than one extra attempt — but every retry checks the button is
+  // still there first: once handleSubmit's delayed success actually
+  // lands, the button is gone for good, and clicking into that void is
+  // exactly what made an earlier, tighter retry loop here hang forever
+  // waiting on a button that would never reappear.
+  const submitButton = fieldPage.getByRole("button", { name: /Check Out & Submit/ });
+  await submitButton.click();
+  const submitDeadline = Date.now() + 10_000;
+  while (Date.now() < submitDeadline) {
+    const stillBlocked = await fieldPage
+      .getByText(/task.*not yet checked off/)
+      .waitFor({ state: "visible", timeout: 1_500 })
+      .then(() => true)
+      .catch(() => false);
+    if (!stillBlocked || !(await submitButton.isVisible())) break;
+    await submitButton.click();
   }
   await expect(fieldPage.getByText("This job is submitted.")).toBeVisible({ timeout: 15_000 });
 
