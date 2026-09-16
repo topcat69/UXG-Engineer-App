@@ -5944,3 +5944,38 @@ suite (10/10) and unit suite (524/524) green; typecheck/lint clean.
 Nothing to deploy beyond the usual code push — no migration, no RLS
 change, no crontab entry. This closes out all four phases from the
 original Watchdog scoping memo.
+
+## Multi-Tenant Blueprint — scoping only, no build scheduled
+
+Prompted by an earlier hypothetical conversation (sister company with
+zero data crossover; "how easy would it be to sell/install this
+solution"), not by an actual second tenant. Written down now so the
+answer already exists if either becomes real, rather than being
+re-derived from scratch under time pressure later. No code changed.
+
+Two paths, not two steps of one path:
+
+- **Fleet** — one Supabase project + one VM per organisation,
+  provisioned from the current architecture via automation/scripting.
+  Physical isolation, linear cost per tenant, small engineering lift
+  to reach (mostly ops tooling, no schema change). This is the
+  default recommendation until there's a concrete need for two+ orgs
+  sharing one URL.
+- **Shared tenancy** — one Supabase project, one deployment, every
+  org's data in the same ~46 tables separated by a new `org_id` +
+  rewritten RLS. Confirmed today: zero tables have `org_id`/
+  `tenant_id` anywhere, all 175 `CREATE POLICY` statements key off
+  global role only (`current_user_role()`), reference-data policies
+  (`clients`/`sites`/`projects`/`assets`) are `using (true)` — any
+  authenticated user, full stop. Every integration (Google Drive/
+  Calendar, Resend, Monday.com) is one global credential set via env
+  var, not per-org. This path touches every table, every RLS policy,
+  auth/tenant resolution, and turns five env vars into a per-org
+  encrypted settings store — comparable in size to all four Watchdog
+  phases combined, and that's just the engineering; reference-data
+  ownership, domain model, and billing are open product decisions
+  that have to be answered first.
+
+Full scoping memo (path comparison, subsystem-by-subsystem breakdown,
+phased roadmap, current-architecture appendix):
+https://claude.ai/artifact/HLZABtzfsNTEwdrdwtxAzK
