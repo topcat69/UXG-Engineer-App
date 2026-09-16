@@ -427,6 +427,36 @@ export type Database = {
           },
         ]
       }
+      health_checks: {
+        Row: {
+          is_healthy: boolean
+          key: string
+          last_detail: string | null
+          last_fail_at: string | null
+          last_notified_at: string | null
+          last_ok_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          is_healthy?: boolean
+          key: string
+          last_detail?: string | null
+          last_fail_at?: string | null
+          last_notified_at?: string | null
+          last_ok_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          is_healthy?: boolean
+          key?: string
+          last_detail?: string | null
+          last_fail_at?: string | null
+          last_notified_at?: string | null
+          last_ok_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       help_article_images: {
         Row: {
           article_id: string
@@ -2455,6 +2485,10 @@ export type Database = {
       adjust_media_pending: {
         Args: { p_delta: number; p_job_id: string }
         Returns: undefined
+      }
+      check_expected_columns: {
+        Args: never
+        Returns: string[]
       }
       current_user_role: {
         Args: never

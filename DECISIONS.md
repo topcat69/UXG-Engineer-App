@@ -5710,3 +5710,52 @@ level) is now a stray, orphaned artifact under Customer Jobs New — it
 won't be moved or cleaned up automatically. Grow-as-you-go was always
 the deal (no backfill), so this is the same kind of one-off manual
 tidy-up as any naming change would have caused, not a new risk.
+
+## Addendum, 2026-09-16 — Watchdog Phase 1: database + schema-drift self-check
+
+Motivated directly by this week's own incident: the missing Drive
+migrations went unnoticed for a day because nothing throws when a
+query's `data` comes back null instead of `error` — Sentry (already
+wired up) only ever sees what actually throws, so a silent structural
+failure like that is invisible to it by design. Watchdog is the
+complementary check: not "did something throw" but "is everything
+that's supposed to be happening actually still happening."
+
+Built per the "Watchdog" scoping memo's Phase 1: `health_checks` (one
+row per check key, RLS enabled with deliberately no policies — same
+posture as `app_settings`, since nothing needs to reach it through the
+anon/authenticated API), `check_expected_columns()` (a plain SQL
+function over a fixed list of columns the app depends on, checked via
+`information_schema` — every future migration that adds one appends a
+row to that list in the same commit), and `/api/cron/health-check`
+(same `X-Webhook-Secret` pattern as the other four cron routes).
+
+The edge-triggered/cooldown decision logic (healthy -> bad fires once,
+stays silent while still bad except for one reminder every 4h, bad ->
+healthy fires once) is split into a pure function,
+`decideHealthCheckTransition` (`lib/health/health-logic.ts`), specifically
+so it's unit-testable without a live database — same split this app
+already uses for Calendar sync (`sync-logic.ts`/`sync-job-calendar.ts`).
+6 new tests cover every transition.
+
+Verified against a real local Postgres (not just the unit tests): reset
+the DB, confirmed `check_expected_columns()` returns empty against the
+current schema, and confirmed a real upsert into `health_checks` round-
+trips correctly via the service-role client, the same client the cron
+route itself uses. Full Playwright suite (10/10) and unit suite
+(504/504) green; `pnpm typecheck`/`pnpm lint` clean.
+
+Not done here, deliberately: recipients (superadmin, active — same
+query shape as the Damaged Equipment and weekly-summary alerts) only
+matter once something actually fires, which won't happen until this
+migration reaches production and the crontab entry exists. Both still
+need doing, same two-step as every other Drive/cron migration this
+session: run the migration's SQL in the Supabase SQL Editor + `supabase
+migration repair 20260916010000 --status applied`, and add a `curl`
+line to the VM crontab every 15 minutes, same shape as the existing
+`drive-media-sync` entry, pointed at `/api/cron/health-check`.
+
+Phases 2 (cron heartbeats) and 3 (integration failure checks) are
+scoped in the same memo but not started — Phase 1 is a complete,
+independently-useful slice on its own (database reachability + schema
+drift are exactly what caused this week's incident).

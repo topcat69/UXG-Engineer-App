@@ -272,3 +272,39 @@ export function buildWeeklySummaryEmail(input: WeeklySummaryEmailInput): EmailCo
   ]);
   return { subject: `${input.projectName} — weekly summary — ${input.weekLabel}`, html, text };
 }
+
+export type HealthAlertItem = { key: string; kind: "new_failure" | "still_failing" | "recovered"; detail: string };
+export type HealthAlertEmailInput = { items: HealthAlertItem[] };
+
+/**
+ * Watchdog's alert — see the reconcileHealthChecks doc comment for the
+ * edge-triggered/cooldown logic that decides when this gets sent at
+ * all. One email per run covers every check that changed, rather than
+ * one per fault, so a full outage that trips several checks at once
+ * doesn't turn into several emails.
+ */
+export function buildHealthAlertEmail(input: HealthAlertEmailInput): EmailContent {
+  const failing = input.items.filter((item) => item.kind !== "recovered");
+  const recovered = input.items.filter((item) => item.kind === "recovered");
+
+  const lines: (string | null)[] = [];
+  if (failing.length > 0) {
+    lines.push(`${failing.length} health check${failing.length === 1 ? "" : "s"} need attention:`);
+    for (const item of failing) {
+      lines.push(`${item.key}${item.kind === "still_failing" ? " (still failing)" : ""} — ${item.detail}`);
+    }
+  }
+  if (recovered.length > 0) {
+    lines.push(`Recovered:`);
+    for (const item of recovered) {
+      lines.push(`${item.key} — ${item.detail}`);
+    }
+  }
+
+  const subject =
+    failing.length > 0
+      ? `Watchdog: ${failing.length} check${failing.length === 1 ? "" : "s"} failing`
+      : `Watchdog: recovered — ${recovered.map((item) => item.key).join(", ")}`;
+  const { html, text } = wrap(lines.filter((line): line is string => !!line));
+  return { subject, html, text };
+}
