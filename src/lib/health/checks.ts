@@ -3,6 +3,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import type { HealthCheckResult } from "./types";
 import { CRON_EXPECTATIONS, evaluateCronHeartbeat } from "./cron-heartbeat-logic";
+import { FAILURE_LOOKBACK_MS, evaluateIntegrationFailureCount } from "./integration-failure-logic";
+import { customerJobsRootFolderId } from "@/lib/google/drive-folders";
+import { getCalendarClient } from "@/lib/google/calendar";
+import { isResendConfigured } from "@/lib/email/resend";
+import { isMondayConfigured } from "@/lib/monday/client";
 
 type AnySupabaseClient = SupabaseClient<Database>;
 
@@ -57,11 +62,52 @@ async function checkCronHeartbeats(supabase: AnySupabaseClient): Promise<HealthC
   return CRON_EXPECTATIONS.map((expectation) => evaluateCronHeartbeat(expectation, byName.get(expectation.name), nowIso));
 }
 
+/**
+ * Watchdog Phase 3: is a *configured* integration actually failing.
+ * Drive/Calendar/Resend/Monday.com each already degrade to a no-op
+ * when unconfigured (returns null/skipped, never throws) — that's a
+ * deliberate setting, not a fault, so an integration that isn't
+ * configured at all is left out of the results entirely rather than
+ * reported as either healthy or unhealthy. For the ones that are
+ * configured, evaluateIntegrationFailureCount (integration-failure-
+ * logic.ts) decides "failed repeatedly" from the count recorded by
+ * recordIntegrationFailure.
+ */
+async function checkIntegrationFailures(supabase: AnySupabaseClient): Promise<HealthCheckResult[]> {
+  const configured = [
+    { key: "drive", isConfigured: customerJobsRootFolderId() !== null },
+    { key: "calendar", isConfigured: getCalendarClient() !== null },
+    { key: "resend", isConfigured: isResendConfigured() },
+    { key: "monday", isConfigured: isMondayConfigured() },
+  ].filter((integration) => integration.isConfigured);
+  if (configured.length === 0) return [];
+
+  const sinceIso = new Date(Date.now() - FAILURE_LOOKBACK_MS).toISOString();
+  const { data: rows, error } = await supabase
+    .from("integration_failures")
+    .select("integration")
+    .in(
+      "integration",
+      configured.map((c) => c.key),
+    )
+    .gte("occurred_at", sinceIso);
+  if (error) {
+    // The whole category fails together — if this query itself fails,
+    // nothing can be said about any configured integration's own state.
+    return configured.map((c) => ({ key: `integration:${c.key}`, ok: false, detail: error.message }));
+  }
+
+  const counts = new Map<string, number>();
+  for (const row of rows ?? []) counts.set(row.integration, (counts.get(row.integration) ?? 0) + 1);
+  return configured.map((c) => evaluateIntegrationFailureCount(c.key, counts.get(c.key) ?? 0));
+}
+
 export async function runHealthChecks(supabase: AnySupabaseClient): Promise<HealthCheckResult[]> {
-  const [db, schema, cronHeartbeats] = await Promise.all([
+  const [db, schema, cronHeartbeats, integrationFailures] = await Promise.all([
     checkDatabase(supabase),
     checkSchema(supabase),
     checkCronHeartbeats(supabase),
+    checkIntegrationFailures(supabase),
   ]);
-  return [db, schema, ...cronHeartbeats];
+  return [db, schema, ...cronHeartbeats, ...integrationFailures];
 }

@@ -25,6 +25,11 @@ function getResendClient(): Resend | null {
   return new Resend(apiKey);
 }
 
+/** Whether Resend is configured at all — used by Watchdog Phase 3 to know whether to check for failures, without duplicating getResendClient's own env check. */
+export function isResendConfigured(): boolean {
+  return getResendClient() !== null;
+}
+
 export type SendResult = { status: "sent" | "skipped"; messageId: string | null };
 
 /** A file to attach, already downloaded into memory — e.g. a RAMS/site-plan document pulled from Storage. */

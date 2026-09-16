@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { createMondayIssueItem } from "./client";
 import { buildIssueColumnValues, buildIssueItemName } from "./issue-payload";
+import { recordIntegrationFailure } from "@/lib/health/integration-failures";
 
 type AnySupabaseClient = SupabaseClient<Database>;
 
@@ -29,5 +30,6 @@ export async function syncIssueToMonday(supabase: AnySupabaseClient, issueId: st
     await createMondayIssueItem(itemName, columnValues);
   } catch (error) {
     console.error(`Monday.com sync failed for issue ${issueId}`, error);
+    await recordIntegrationFailure("monday", error instanceof Error ? error.message : String(error));
   }
 }

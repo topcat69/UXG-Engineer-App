@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { createOrFetchFolder, customerJobsRootFolderId } from "./drive-folders";
+import { recordIntegrationFailure } from "@/lib/health/integration-failures";
 
 type AnySupabaseClient = SupabaseClient<Database>;
 
@@ -40,6 +41,7 @@ export async function ensureClientDriveFolder(supabase: AnySupabaseClient, clien
     if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive client folder sync failed for client ${clientId}`, error);
+    await recordIntegrationFailure("drive", error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -78,6 +80,7 @@ export async function ensureSiteDriveFolder(supabase: AnySupabaseClient, siteId:
     if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive site folder sync failed for site ${siteId}`, error);
+    await recordIntegrationFailure("drive", error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -122,5 +125,6 @@ export async function ensureJobDriveFolder(supabase: AnySupabaseClient, jobId: s
     if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive job folder sync failed for job ${jobId}`, error);
+    await recordIntegrationFailure("drive", error instanceof Error ? error.message : String(error));
   }
 }

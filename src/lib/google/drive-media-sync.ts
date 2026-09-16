@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { uploadFile } from "./drive-folders";
 import { ensureJobDriveFolder } from "./drive-sync";
+import { recordIntegrationFailure } from "@/lib/health/integration-failures";
 
 type AnySupabaseClient = SupabaseClient<Database>;
 type JobDetailsRow = Database["public"]["Tables"]["job_details"]["Row"];
@@ -61,6 +62,7 @@ export async function syncMediaAssetToDrive(supabase: AnySupabaseClient, mediaAs
     if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive media sync failed for media_asset ${mediaAssetId}`, error);
+    await recordIntegrationFailure("drive", error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -89,6 +91,7 @@ export async function syncSignatureToDrive(supabase: AnySupabaseClient, signatur
     if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive signature sync failed for signature ${signatureId}`, error);
+    await recordIntegrationFailure("drive", error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -140,6 +143,7 @@ export async function syncJobDocumentToDrive(supabase: AnySupabaseClient, jobId:
     if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive document sync failed for job ${jobId} (${kind})`, error);
+    await recordIntegrationFailure("drive", error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -175,5 +179,6 @@ export async function syncCompletionReportToDrive(supabase: AnySupabaseClient, j
     if (updateError) throw updateError;
   } catch (error) {
     console.error(`Drive completion report sync failed for job ${jobId}`, error);
+    await recordIntegrationFailure("drive", error instanceof Error ? error.message : String(error));
   }
 }

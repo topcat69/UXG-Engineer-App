@@ -5816,3 +5816,58 @@ needed, this rides on the existing four crontab entries plus the
 health-check one already added for Phase 1.
 
 Phase 3 (integration failure checks) remains scoped but not started.
+
+## Addendum, 2026-09-16 — Watchdog Phase 3: integration failure checks
+
+Adds `integration_failures` (append-only: one row per failed attempt,
+not a single "last failure" row — the check needs a count within a
+lookback window, not just a timestamp) and wires `recordIntegrationFailure`
+into every existing best-effort `catch` block across the four
+integrations: three in `drive-sync.ts`, four in `drive-media-sync.ts`,
+two in `sync-job-calendar.ts`, one in `monday/sync-issue.ts`, and the
+three Resend call sites that already had their own try/catch around a
+throwing `sendJobEmail` (`jobs/actions.ts`'s `sendEmailSafely`,
+`jobs/[id]/actions.ts`, `scheduler/actions.ts`). Every one alongside
+the `console.error` that was already there, never instead of it.
+
+`/api/cron/health-check` now also reports one `integration:<name>`
+check per **configured** integration — Drive/Calendar checked via
+their own existing `customerJobsRootFolderId()`/`getCalendarClient()`
+null-checks, Resend/Monday.com via two new one-line exports
+(`isResendConfigured`, `isMondayConfigured`) that just mirror each
+integration's own existing env-var gate rather than duplicating it.
+An integration that isn't configured at all is left out of the results
+entirely — not reported healthy, not reported unhealthy, just absent —
+so a deployment that's deliberately never turned Monday.com on doesn't
+carry a permanently-irrelevant check.
+
+The threshold judgment call: `FAILURE_THRESHOLD = 3` failures within a
+1-hour lookback, not 1. A single transient blip (a dropped connection,
+a momentary rate limit) is exactly the kind of noise the curated-
+critical-set decision from the original scoping conversation was meant
+to avoid alerting on — three in an hour is a real pattern, one isn't.
+Pure decision logic (`evaluateIntegrationFailureCount`,
+`integration-failure-logic.ts`), same split as Phases 1/2, unit tested
+(5 new tests).
+
+Verified end-to-end against a real local Postgres and the actual route
+— not just unit tests: built and started the app, faked
+`MONDAY_API_TOKEN`/`MONDAY_ISSUES_BOARD_ID` so Monday.com read as
+configured, confirmed `/api/cron/health-check` picked it up
+(`integration:monday` appeared, healthy, 0 failures), inserted three
+real failure rows via the REST API, and confirmed the very next run
+flagged it unhealthy and fired exactly one notification
+(`"notified":1`) — the edge-triggered logic worked against a genuine
+state change, not a mocked one. Full Playwright suite (10/10, after
+one re-run past an unrelated resource-contention flake in the login
+helper — traced and confirmed environmental, not a regression) and
+unit suite (514/514) green; typecheck/lint clean.
+
+Still needed before this does anything in production: apply the
+migration (SQL Editor + `supabase migration repair 20260916030000
+--status applied`) and rebuild the app container. No crontab changes
+needed.
+
+All three Watchdog phases from the original scoping memo are now
+built. Phase 4 (the optional superadmin status page) remains the one
+open decision the memo deliberately left for later.

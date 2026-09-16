@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { detectConflicts } from "@/lib/scheduler/conflicts";
 import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
 import { sendJobScheduledEmail } from "@/lib/email/send-job-emails";
+import { recordIntegrationFailure } from "@/lib/health/integration-failures";
 
 export type RescheduleResult = { ok: true; message: string; warning?: string } | { ok: false; message: string };
 
@@ -111,6 +112,7 @@ export async function rescheduleJob(
         // an unhandled rejection with no record of which job/reason — log it
         // so "no emails sending" is diagnosable instead of silent.
         console.error(`Scheduled email failed for job ${jobId}`, error);
+        await recordIntegrationFailure("resend", error instanceof Error ? error.message : String(error));
       }
     }
   });

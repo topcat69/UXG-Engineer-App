@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
 import { ensureJobDriveFolder } from "@/lib/google/drive-sync";
 import { sendJobAssignedEmail, sendJobScheduledEmail } from "@/lib/email/send-job-emails";
+import { recordIntegrationFailure } from "@/lib/health/integration-failures";
 import { nextJobNumber } from "@/lib/jobs/job-number";
 import { maxJobSequenceForYear } from "@/lib/jobs/next-job-number";
 import { assignJobSheetToJob } from "../job-sheets/[id]/actions";
@@ -27,6 +28,7 @@ async function sendEmailSafely(promise: Promise<unknown>, jobId: string, label: 
     await promise;
   } catch (error) {
     console.error(`${label} failed for job ${jobId}`, error);
+    await recordIntegrationFailure("resend", error instanceof Error ? error.message : String(error));
   }
 }
 

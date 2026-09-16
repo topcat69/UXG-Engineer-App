@@ -24,6 +24,11 @@ async function mondayRequest<T>(token: string, query: string, variables: Record<
  */
 export type MondayCreateItemResult = { status: "created" | "skipped"; itemId: string | null };
 
+/** Whether Monday.com is configured at all — used by Watchdog Phase 3 to know whether to check for failures, without duplicating createMondayIssueItem's own env check. */
+export function isMondayConfigured(): boolean {
+  return !!process.env.MONDAY_API_TOKEN && !!process.env.MONDAY_ISSUES_BOARD_ID;
+}
+
 // The CRM > Issues board's "Open Issues" group id (this board's own
 // top_group, unlike the Field Service Management board this app targeted
 // before — passed explicitly anyway rather than relying on that holding).

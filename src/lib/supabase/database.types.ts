@@ -686,6 +686,27 @@ export type Database = {
           },
         ]
       }
+      integration_failures: {
+        Row: {
+          detail: string | null
+          id: string
+          integration: string
+          occurred_at: string
+        }
+        Insert: {
+          detail?: string | null
+          id?: string
+          integration: string
+          occurred_at?: string
+        }
+        Update: {
+          detail?: string | null
+          id?: string
+          integration?: string
+          occurred_at?: string
+        }
+        Relationships: []
+      }
       issues: {
         Row: {
           blocks_completion: boolean | null
