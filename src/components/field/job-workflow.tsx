@@ -286,6 +286,23 @@ export function JobWorkflow({
     };
   }
 
+  // Ensures a job_details row exists as soon as the details section is
+  // opened, rather than waiting for the first 15s autosave tick — mirrors
+  // survey's equivalent effect above, for the same reason. Without this,
+  // detailsRow stays undefined (Dexie's live query can't tell "still
+  // loading" from "genuinely no row yet") until that first autosave
+  // lands, and the hydrate effect earlier in this component fires for the
+  // first time whenever that happens — if the engineer is still typing at
+  // that point, mid-form, it overwrites detailsValues with that autosave's
+  // own snapshot, silently discarding anything typed since. Creating the
+  // row immediately means the hydrate effect's first (and only) fire
+  // happens right at mount, before there's anything to lose.
+  useEffect(() => {
+    if (!detailsMode || job === undefined || detailsRow !== undefined) return;
+    saveJobDetailsDraft(currentDetailsRow());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailsMode, job, detailsRow]);
+
   // 15-second autosave, surviving force-quit: Dexie writes are durable
   // IndexedDB writes, so whatever made it into the last tick is safe even
   // if the tab is killed a moment later.
