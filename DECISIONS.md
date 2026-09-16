@@ -5898,3 +5898,49 @@ natural Phase 4 extension:
 If picked up later, it slots into the same pipeline (a new check
 category feeding the same `health_checks` edge-triggered notify
 logic) rather than needing new infrastructure.
+
+## Addendum, 2026-09-16 — Watchdog Phase 4: the status page, built
+
+Built from the mockup above rather than left as scoped-but-deferred —
+`/office/health`, superadmin-only, pure read from `health_checks`.
+Two implementation calls worth recording, both departures from what
+the memo speculated:
+
+- **No new RLS policy.** The memo guessed Phase 4 "would add its own
+  read-only policy when/if it's built." Built it instead the same way
+  `UsersPage` already reads `auth.admin.listUsers` — via the service-
+  role client, with the page itself enforcing "superadmin only"
+  (`requireSuperadminUser`, new alongside `requireOfficeUser` et al. in
+  `current-user.ts`) rather than RLS. `health_checks` keeps its
+  "deliberately no policies" posture from Phase 1 untouched — no
+  migration needed for this phase at all.
+- **A real "Check now" button, not just a read.** The mockup showed
+  one; building the page without it would have been a visible
+  downgrade from what was already demonstrated. It calls the exact
+  same sweep the crontab does — `runHealthCheckSweep`, pulled out of
+  the cron route into `lib/health/run-health-check.ts` so both entry
+  points share one implementation and can't drift — gated by
+  `requireSuperadminUser` instead of the webhook secret, since there's
+  no external caller here.
+
+The two/three-tier severity split shown in the mockup (healthy/
+degraded/critical) didn't carry over — `health_checks.is_healthy` is a
+plain boolean, so the real page only ever shows two states. Grouping/
+labeling (core vs. scheduled jobs vs. integrations, friendly names for
+the four integrations) and relative-time formatting are pure functions
+(`health-checks-view.ts`), unit tested (10 new tests) the same way as
+every other piece of Watchdog's actual logic.
+
+Verified in a real browser, not just unit tests: logged in as a real
+manager account and confirmed the redirect away from `/office/health`;
+logged in as the seeded superadmin, loaded the page against a freshly
+reset (empty) `health_checks` table and confirmed the "no health data
+yet" empty state; clicked "Check now" for real and confirmed it
+populated genuine rows (db reachable, schema fine, all four legacy
+crons showing "no heartbeat recorded yet" on a database that's never
+had one run) and re-rendered without a manual refresh. Full Playwright
+suite (10/10) and unit suite (524/524) green; typecheck/lint clean.
+
+Nothing to deploy beyond the usual code push — no migration, no RLS
+change, no crontab entry. This closes out all four phases from the
+original Watchdog scoping memo.

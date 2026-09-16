@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyWebhookSecret } from "@/lib/webhooks/verify-secret";
-import { runHealthChecks } from "@/lib/health/checks";
-import { reconcileHealthChecks } from "@/lib/health/notify";
-import { sendHealthAlertEmail } from "@/lib/email/send-health-emails";
+import { runHealthCheckSweep } from "@/lib/health/run-health-check";
 
 /**
  * Watchdog Phase 1 (see the "Watchdog" scoping memo). Meant to be hit
@@ -27,25 +25,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createAdminClient();
-  const results = await runHealthChecks(supabase);
-  const notifyItems = await reconcileHealthChecks(supabase, results);
-
-  let notified = 0;
-  if (notifyItems.length > 0) {
-    const { data: recipients, error: recipientsError } = await supabase
-      .from("users")
-      .select("email")
-      .eq("role", "superadmin")
-      .eq("active", true);
-    if (recipientsError) throw recipientsError;
-
-    await Promise.all((recipients ?? []).map((r) => sendHealthAlertEmail(r.email, notifyItems)));
-    notified = recipients?.length ?? 0;
-  }
-
-  return NextResponse.json({
-    checks: results.map((r) => ({ key: r.key, ok: r.ok })),
-    notified,
-  });
+  const summary = await runHealthCheckSweep(createAdminClient());
+  return NextResponse.json(summary);
 }

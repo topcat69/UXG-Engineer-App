@@ -34,6 +34,9 @@ const ADMIN_TOOLS_NAV = [
   { href: "/office/users", label: "Users" },
 ];
 
+/** Superadmin-only, unlike everything else in ADMIN_TOOLS_NAV above (which managers can also reach, just with reduced capability) — Watchdog's status page has no reduced view for a manager, so it's left out of their dropdown entirely rather than showing a link that just bounces them to "/". */
+const SUPERADMIN_ADMIN_TOOLS_NAV = [{ href: "/office/health", label: "Watchdog" }];
+
 export default async function OfficeLayout({ children }: { children: React.ReactNode }) {
   const user = await requireOfficeUser();
 
@@ -48,7 +51,7 @@ export default async function OfficeLayout({ children }: { children: React.React
                 {item.label}
               </Link>
             ))}
-            <AdminToolsNav links={ADMIN_TOOLS_NAV} />
+            <AdminToolsNav links={user.role === "superadmin" ? [...ADMIN_TOOLS_NAV, ...SUPERADMIN_ADMIN_TOOLS_NAV] : ADMIN_TOOLS_NAV} />
           </nav>
         </div>
         <div className="flex items-center gap-3 text-sm">

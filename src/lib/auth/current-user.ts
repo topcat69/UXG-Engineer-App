@@ -129,6 +129,14 @@ export async function requireDamagedEquipmentUser(): Promise<CurrentUser> {
   return user;
 }
 
+/** Redirects to /login if not signed in, or to / if signed in but not superadmin — Watchdog's status page (/office/health) is the one surface this gates, per the Watchdog scoping memo's Phase 4. */
+export async function requireSuperadminUser(): Promise<CurrentUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.role !== "superadmin") redirect("/");
+  return user;
+}
+
 /**
  * Redirects to /login if not signed in — no role restriction, since Help
  * Guides is reachable from every role's own surface. What each viewer
