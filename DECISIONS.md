@@ -5672,3 +5672,41 @@ the full 10-spec suite — confirmed clean on 3 of 4 full-suite runs; the
 one blip was a plain timeout under heavier load, not a hang, consistent
 with this sandbox's already-documented Docker/resource flakiness rather
 than a logic problem in either fix.
+
+## Addendum, 2026-09-16 — Drive folder sync restructured: Project dropped as a folder level
+
+Live use surfaced that the original hierarchy (Customer Jobs New /
+Client / Project / Site / Job) didn't match how the business actually
+thinks about its own folders: browsing by site first, not by project
+first, and — per the business's own confirmation — many clients are
+multi-site chains where a single project can genuinely span several of
+those sites (a rollout touching many stores, not one). Project nesting
+under Site would face the exact mirror problem Phase 2 already solved
+for Site nesting under Project: the same project's folder would need to
+be duplicated under every site it touches, since Drive (a Shared Drive
+specifically) only allows a single parent per item.
+
+Rather than accept that duplication, Project is dropped as a folder
+level entirely. New structure: Customer Jobs New / Client / Site / Job.
+Where a job has a project, its name is folded into the job folder's own
+name instead — e.g. `UXG-2026-0061 — Signage Rollout Phase 1` — so it's
+still visible without being its own nesting level.
+
+This also simplifies something that was previously awkward: Site now
+always has exactly one parent (its Client), so unlike the original
+Phase 2 design — where Site's parent varied depending on which Project
+(or none, for an SLA job) put it there, and its folder was deliberately
+never cached for that reason — Site's folder genuinely is 1:1 with its
+row now, and `ensureSiteDriveFolder` caches it in `sites.drive_folder_id`
+the same way client and job folders already were. `ensureProjectDriveFolder`
+is gone; `projects.drive_folder_id` (added by the original Phase 1
+migration) is left in place, unused — dropping a live production
+column is a separate call this migration isn't making, and the column
+is harmless sitting empty.
+
+One real-world consequence worth being upfront about: the one client
+folder created during testing under the *old* structure (with a Project
+level) is now a stray, orphaned artifact under Customer Jobs New — it
+won't be moved or cleaned up automatically. Grow-as-you-go was always
+the deal (no backfill), so this is the same kind of one-off manual
+tidy-up as any naming change would have caused, not a new risk.

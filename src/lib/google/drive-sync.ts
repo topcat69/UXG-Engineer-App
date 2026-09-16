@@ -44,55 +44,53 @@ export async function ensureClientDriveFolder(supabase: AnySupabaseClient, clien
 }
 
 /**
- * Creates (or fetches) the project's Drive folder inside its client's
- * folder — ensuring the client's folder first, since a project can be
- * created before its client has ever needed one. Same best-effort
- * contract as ensureClientDriveFolder.
+ * Creates (or fetches) the site's Drive folder inside its client's
+ * folder — ensuring the client's folder first, since a site can be
+ * created before its client has ever needed one. Site always has
+ * exactly one parent (its client), so its folder id is genuinely 1:1
+ * with its row and safe to cache, same as the client/job folders. Same
+ * best-effort contract as ensureClientDriveFolder.
  */
-export async function ensureProjectDriveFolder(supabase: AnySupabaseClient, projectId: string): Promise<void> {
+export async function ensureSiteDriveFolder(supabase: AnySupabaseClient, siteId: string): Promise<void> {
   try {
     if (!customerJobsRootFolderId()) return;
 
-    const { data: project, error: projectError } = await supabase
-      .from("projects")
+    const { data: site, error: siteError } = await supabase
+      .from("sites")
       .select("name, client_id, drive_folder_id")
-      .eq("id", projectId)
+      .eq("id", siteId)
       .single();
-    if (projectError) throw projectError;
-    if (!project || project.drive_folder_id || !project.client_id) return;
+    if (siteError) throw siteError;
+    if (!site || site.drive_folder_id) return;
 
-    await ensureClientDriveFolder(supabase, project.client_id);
+    await ensureClientDriveFolder(supabase, site.client_id);
     const { data: client, error: clientError } = await supabase
       .from("clients")
       .select("drive_folder_id")
-      .eq("id", project.client_id)
+      .eq("id", site.client_id)
       .single();
     if (clientError) throw clientError;
     if (!client?.drive_folder_id) return;
 
-    const folderId = await createOrFetchFolder(project.name, client.drive_folder_id);
+    const folderId = await createOrFetchFolder(site.name, client.drive_folder_id);
     if (!folderId) return;
-    const { error: updateError } = await supabase.from("projects").update({ drive_folder_id: folderId }).eq("id", projectId);
+    const { error: updateError } = await supabase.from("sites").update({ drive_folder_id: folderId }).eq("id", siteId);
     if (updateError) throw updateError;
   } catch (error) {
-    console.error(`Drive project folder sync failed for project ${projectId}`, error);
+    console.error(`Drive site folder sync failed for site ${siteId}`, error);
   }
 }
 
 /**
- * Creates (or fetches) the job's own Drive folder, nested under a Site
- * folder, nested under the job's Project folder — or, for job_type "sla"
- * (always created with project_id null, see office/sla/actions.ts's own
- * comment), directly under the Client folder, skipping the Project level
- * entirely, since there's no project to nest it under.
- *
- * Unlike the client/project folders, the Site-level folder here is never
- * cached: the same site can legitimately sit under more than one Project
- * folder (or under Client directly for an SLA job) depending on which job
- * put it there — see this migration's own comment — so it's found-or-created
- * fresh every time, which is idempotent and cheap at job-creation volume.
- * Only the job's own leaf folder, genuinely 1:1 with its row, gets cached.
- * Same best-effort, non-blocking contract as the client/project folders.
+ * Creates (or fetches) the job's own Drive folder, nested directly under
+ * its Site's folder — Project is deliberately not a folder level (see
+ * the 2026-09-16 restructure migration's own comment: a project can span
+ * several sites for the same client, which would mean duplicating its
+ * folder under every one of them). Where the job has a project, its name
+ * is folded into the job folder's own name instead — e.g. "UXG-2026-0061
+ * — Signage Rollout Phase 1" — so it's still visible without being its
+ * own nesting level. Same best-effort, non-blocking contract as the
+ * client/site folders.
  */
 export async function ensureJobDriveFolder(supabase: AnySupabaseClient, jobId: string): Promise<void> {
   try {
@@ -106,36 +104,19 @@ export async function ensureJobDriveFolder(supabase: AnySupabaseClient, jobId: s
     if (jobError) throw jobError;
     if (!job || job.drive_folder_id) return;
 
-    const { data: site, error: siteError } = await supabase.from("sites").select("name, client_id").eq("id", job.site_id).single();
+    await ensureSiteDriveFolder(supabase, job.site_id);
+    const { data: site, error: siteError } = await supabase.from("sites").select("drive_folder_id").eq("id", job.site_id).single();
     if (siteError) throw siteError;
-    if (!site) return;
+    if (!site?.drive_folder_id) return;
 
-    let siteParentFolderId: string | null;
+    let jobFolderName = job.job_number;
     if (job.project_id) {
-      await ensureProjectDriveFolder(supabase, job.project_id);
-      const { data: project, error: projectError } = await supabase
-        .from("projects")
-        .select("drive_folder_id")
-        .eq("id", job.project_id)
-        .single();
+      const { data: project, error: projectError } = await supabase.from("projects").select("name").eq("id", job.project_id).single();
       if (projectError) throw projectError;
-      siteParentFolderId = project?.drive_folder_id ?? null;
-    } else {
-      await ensureClientDriveFolder(supabase, site.client_id);
-      const { data: client, error: clientError } = await supabase
-        .from("clients")
-        .select("drive_folder_id")
-        .eq("id", site.client_id)
-        .single();
-      if (clientError) throw clientError;
-      siteParentFolderId = client?.drive_folder_id ?? null;
+      if (project?.name) jobFolderName = `${job.job_number} — ${project.name}`;
     }
-    if (!siteParentFolderId) return;
 
-    const siteFolderId = await createOrFetchFolder(site.name, siteParentFolderId);
-    if (!siteFolderId) return;
-
-    const jobFolderId = await createOrFetchFolder(job.job_number, siteFolderId);
+    const jobFolderId = await createOrFetchFolder(jobFolderName, site.drive_folder_id);
     if (!jobFolderId) return;
     const { error: updateError } = await supabase.from("jobs").update({ drive_folder_id: jobFolderId }).eq("id", jobId);
     if (updateError) throw updateError;

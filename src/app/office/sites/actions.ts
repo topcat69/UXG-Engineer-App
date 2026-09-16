@@ -1,9 +1,11 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { geocodePostcode } from "@/lib/geo/postcode";
 import { titleCase } from "@/lib/format/text";
+import { ensureSiteDriveFolder } from "@/lib/google/drive-sync";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type SiteRow = Database["public"]["Tables"]["sites"]["Row"];
@@ -48,6 +50,11 @@ export async function createSite(input: {
     .select("*")
     .single();
   if (error) return { ok: false, message: error.message };
+
+  // Best-effort, non-blocking — same reason ensureClientDriveFolder runs
+  // via after() on client creation: creating a site must succeed
+  // whether or not Drive is configured or reachable.
+  after(() => ensureSiteDriveFolder(supabase, data.id));
 
   revalidatePath("/office/sites");
   revalidatePath(`/office/clients/${input.client_id}`);

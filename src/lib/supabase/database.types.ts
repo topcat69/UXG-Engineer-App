@@ -1813,6 +1813,7 @@ export type Database = {
           contact_name: string | null
           contact_phone: string | null
           created_at: string | null
+          drive_folder_id: string | null
           id: string
           latitude: number | null
           longitude: number | null
@@ -1830,6 +1831,7 @@ export type Database = {
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          drive_folder_id?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
@@ -1847,6 +1849,7 @@ export type Database = {
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          drive_folder_id?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
