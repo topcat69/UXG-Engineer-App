@@ -5759,3 +5759,60 @@ Phases 2 (cron heartbeats) and 3 (integration failure checks) are
 scoped in the same memo but not started — Phase 1 is a complete,
 independently-useful slice on its own (database reachability + schema
 drift are exactly what caused this week's incident).
+
+Deployed the same day: migration applied in production, app rebuilt,
+crontab entry added (every 15 minutes). Manually triggered once to
+confirm: `{"checks":[{"key":"db","ok":true},{"key":"schema","ok":true}],
+"notified":0}` — healthy, no email, exactly as designed for a clean
+first run.
+
+## Addendum, 2026-09-16 — Watchdog Phase 2: cron heartbeats
+
+Adds `cron_heartbeats` (one row per existing cron route, written on
+every invocation via `recordCronHeartbeat`) and wires it into all four:
+`day-before-reminders`, `weekly-summary`, `media-lifecycle`,
+`drive-media-sync`. `/api/cron/health-check` now reports six checks
+instead of two — `db`, `schema`, and one `cron:<name>` per route,
+each judged against that cron's own cadence with generous slack
+(`evaluateCronHeartbeat`, `cron-heartbeat-logic.ts`): 26h for the two
+daily crons, 8 days for the weekly one, 45 minutes for
+`drive-media-sync`'s 15-minute cadence.
+
+Two judgment calls worth recording, since neither was obvious from the
+scoping memo alone:
+
+- **A cron that's never recorded a heartbeat is treated as healthy,
+  not failing.** Right after this shipped — or after any fresh deploy —
+  none of the four crons have had their first scheduled fire yet
+  (`weekly-summary` only fires Mondays; up to 7 days). Flagging that as
+  a failure would mean this feature pages someone the moment it ships,
+  for a check that hasn't actually run yet. Absence isn't evidence of
+  failure, just of "hasn't had its chance."
+- **`drive-media-sync`'s "Drive isn't configured" early return still
+  records a heartbeat.** Drive being unconfigured in some environment
+  is a deliberate setting (see the original Drive Folder Sync memo's
+  Option A), not a fault — but the *cron itself* still needs to prove
+  it's firing on schedule regardless. Recording the heartbeat there
+  too keeps those two facts (is the crontab entry alive vs. is Drive
+  turned on) from getting conflated into one signal.
+
+The per-cron staleness math is a pure function
+(`evaluateCronHeartbeat`), same split as Phase 1's
+`decideHealthCheckTransition` — unit tested (5 new tests) without a
+live database.
+
+Verified against a real local Postgres and the actual routes (not just
+unit tests): built and started the app for real, hit all four cron
+routes plus `/api/cron/health-check` with real `curl` requests, and
+confirmed all six checks came back healthy with `cron_heartbeats`
+populated exactly as expected — including the "Drive not configured"
+skip path correctly still writing `last_ok: true`. Full Playwright
+suite (10/10) and unit suite (509/509) green; typecheck/lint clean.
+
+Still needed before this does anything in production: apply the
+migration (SQL Editor + `supabase migration repair 20260916020000
+--status applied`) and rebuild the app container — no crontab changes
+needed, this rides on the existing four crontab entries plus the
+health-check one already added for Phase 1.
+
+Phase 3 (integration failure checks) remains scoped but not started.

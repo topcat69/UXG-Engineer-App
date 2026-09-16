@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendDayBeforeEmail } from "@/lib/email/send-job-emails";
 import { isScheduledForTomorrow } from "@/lib/email/day-before";
 import { verifyWebhookSecret } from "@/lib/webhooks/verify-secret";
+import { recordCronHeartbeat, CRON_NAMES } from "@/lib/health/heartbeat";
 
 /**
  * Meant to be hit once a day by an external scheduler — this sandbox has no
@@ -19,17 +20,23 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const { data: jobs } = await supabase
-    .from("jobs")
-    .select("id, scheduled_start")
-    .not("scheduled_start", "is", null)
-    .not("assigned_to", "is", null)
-    .not("status", "in", "(draft,cancelled,closed)");
+  try {
+    const { data: jobs } = await supabase
+      .from("jobs")
+      .select("id, scheduled_start")
+      .not("scheduled_start", "is", null)
+      .not("assigned_to", "is", null)
+      .not("status", "in", "(draft,cancelled,closed)");
 
-  const now = new Date().toISOString();
-  const dueJobs = (jobs ?? []).filter((job) => isScheduledForTomorrow(job.scheduled_start!, now));
+    const now = new Date().toISOString();
+    const dueJobs = (jobs ?? []).filter((job) => isScheduledForTomorrow(job.scheduled_start!, now));
 
-  await Promise.all(dueJobs.map((job) => sendDayBeforeEmail(supabase, job.id)));
+    await Promise.all(dueJobs.map((job) => sendDayBeforeEmail(supabase, job.id)));
 
-  return NextResponse.json({ sent: dueJobs.length });
+    await recordCronHeartbeat(supabase, CRON_NAMES.dayBeforeReminders, true, `sent: ${dueJobs.length}`);
+    return NextResponse.json({ sent: dueJobs.length });
+  } catch (error) {
+    await recordCronHeartbeat(supabase, CRON_NAMES.dayBeforeReminders, false, error instanceof Error ? error.message : String(error));
+    throw error;
+  }
 }

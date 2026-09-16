@@ -9,6 +9,7 @@ import {
   syncCompletionReportToDrive,
   type JobDocumentKind,
 } from "@/lib/google/drive-media-sync";
+import { recordCronHeartbeat, CRON_NAMES } from "@/lib/health/heartbeat";
 
 /**
  * Meant to be hit periodically by an external scheduler, same shape as
@@ -39,11 +40,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const supabase = createAdminClient();
+
   if (!customerJobsRootFolderId()) {
+    // Still a heartbeat, not a no-op for Watchdog's purposes: the cron
+    // infrastructure itself (the VM crontab entry) is firing on
+    // schedule regardless of whether Drive happens to be configured in
+    // this environment — conflating the two would mean an intentionally
+    // unconfigured Drive integration eventually reads as "the cron
+    // stopped running," which is exactly the false-positive noise the
+    // Watchdog scoping memo's curated-critical-set decision was meant
+    // to avoid.
+    await recordCronHeartbeat(supabase, CRON_NAMES.driveMediaSync, true, "skipped: Drive folder sync isn't configured");
     return NextResponse.json({ skipped: "Drive folder sync isn't configured" });
   }
 
-  const supabase = createAdminClient();
   // supabase-js never throws on a query error (it returns `{ data: null,
   // error }`), so each of the four "what's pending" queries below is
   // checked explicitly — otherwise a real failure (e.g. a genuinely
@@ -118,6 +129,13 @@ export async function POST(request: Request) {
   for (const job of completionReports ?? []) {
     await syncCompletionReportToDrive(supabase, job.id);
   }
+
+  await recordCronHeartbeat(
+    supabase,
+    CRON_NAMES.driveMediaSync,
+    queryErrors.length === 0,
+    queryErrors.length > 0 ? queryErrors.join("; ") : `media: ${mediaAssets?.length ?? 0}, signatures: ${signatures?.length ?? 0}`,
+  );
 
   return NextResponse.json(
     {

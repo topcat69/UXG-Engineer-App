@@ -1,4 +1,4 @@
-import type { HealthCheckResult } from "./checks";
+import type { HealthCheckResult } from "./types";
 
 export type NotifyItem = { key: string; kind: "new_failure" | "still_failing" | "recovered"; detail: string };
 

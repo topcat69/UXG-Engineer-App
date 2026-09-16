@@ -337,6 +337,27 @@ export type Database = {
         }
         Relationships: []
       }
+      cron_heartbeats: {
+        Row: {
+          last_detail: string | null
+          last_ok: boolean
+          last_run_at: string
+          name: string
+        }
+        Insert: {
+          last_detail?: string | null
+          last_ok: boolean
+          last_run_at: string
+          name: string
+        }
+        Update: {
+          last_detail?: string | null
+          last_ok?: boolean
+          last_run_at?: string
+          name?: string
+        }
+        Relationships: []
+      }
       damaged_equipment: {
         Row: {
           asset_register_id: string | null

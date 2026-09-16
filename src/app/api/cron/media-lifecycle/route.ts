@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyWebhookSecret } from "@/lib/webhooks/verify-secret";
 import { selectLifecycleEligibleJobIds } from "@/lib/storage/media-lifecycle";
+import { recordCronHeartbeat, CRON_NAMES } from "@/lib/health/heartbeat";
 
 /**
  * Meant to be hit periodically by an external scheduler, same as the
@@ -20,32 +21,43 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const { data: jobs } = await supabase.from("jobs").select("id, status, updated_at").in("status", ["draft", "cancelled"]);
-  const eligibleJobIds = selectLifecycleEligibleJobIds(jobs ?? [], new Date().toISOString());
+  try {
+    const { data: jobs } = await supabase.from("jobs").select("id, status, updated_at").in("status", ["draft", "cancelled"]);
+    const eligibleJobIds = selectLifecycleEligibleJobIds(jobs ?? [], new Date().toISOString());
 
-  let objectsDeleted = 0;
-  let mediaAssetsDeleted = 0;
-  let signaturesDeleted = 0;
+    let objectsDeleted = 0;
+    let mediaAssetsDeleted = 0;
+    let signaturesDeleted = 0;
 
-  for (const jobId of eligibleJobIds) {
-    const prefix = `jobs/${jobId}`;
-    const { data: files } = await supabase.storage.from("media").list(prefix);
-    if (files && files.length > 0) {
-      const { data: removed } = await supabase.storage.from("media").remove(files.map((f) => `${prefix}/${f.name}`));
-      objectsDeleted += removed?.length ?? 0;
+    for (const jobId of eligibleJobIds) {
+      const prefix = `jobs/${jobId}`;
+      const { data: files } = await supabase.storage.from("media").list(prefix);
+      if (files && files.length > 0) {
+        const { data: removed } = await supabase.storage.from("media").remove(files.map((f) => `${prefix}/${f.name}`));
+        objectsDeleted += removed?.length ?? 0;
+      }
+
+      const { data: deletedMedia } = await supabase.from("media_assets").delete().eq("job_id", jobId).select("id");
+      mediaAssetsDeleted += deletedMedia?.length ?? 0;
+
+      const { data: deletedSignatures } = await supabase.from("signatures").delete().eq("job_id", jobId).select("id");
+      signaturesDeleted += deletedSignatures?.length ?? 0;
     }
 
-    const { data: deletedMedia } = await supabase.from("media_assets").delete().eq("job_id", jobId).select("id");
-    mediaAssetsDeleted += deletedMedia?.length ?? 0;
-
-    const { data: deletedSignatures } = await supabase.from("signatures").delete().eq("job_id", jobId).select("id");
-    signaturesDeleted += deletedSignatures?.length ?? 0;
+    await recordCronHeartbeat(
+      supabase,
+      CRON_NAMES.mediaLifecycle,
+      true,
+      `jobs: ${eligibleJobIds.length}, objects: ${objectsDeleted}`,
+    );
+    return NextResponse.json({
+      jobsProcessed: eligibleJobIds.length,
+      objectsDeleted,
+      mediaAssetsDeleted,
+      signaturesDeleted,
+    });
+  } catch (error) {
+    await recordCronHeartbeat(supabase, CRON_NAMES.mediaLifecycle, false, error instanceof Error ? error.message : String(error));
+    throw error;
   }
-
-  return NextResponse.json({
-    jobsProcessed: eligibleJobIds.length,
-    objectsDeleted,
-    mediaAssetsDeleted,
-    signaturesDeleted,
-  });
 }
