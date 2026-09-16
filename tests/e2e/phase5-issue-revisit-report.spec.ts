@@ -21,11 +21,7 @@ function adminClient() {
   );
 }
 
-// See DECISIONS.md's "known-skipped E2E specs" addendum: the auto-revisit webhook
-// (pg_net -> HTTP -> revisit job creation) hasn't linked within 30s across
-// two consecutive CI runs, with nothing suspicious in the trigger or the
-// polling logic itself. Task #163 tracks a real investigation.
-test.fixme("a failed check produces a blocking issue, a linked revisit job, and approving produces a real completion PDF", async ({
+test("a failed check produces a blocking issue, a linked revisit job, and approving produces a real completion PDF", async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -176,7 +172,7 @@ test.fixme("a failed check produces a blocking issue, a linked revisit job, and 
   expect(parsed.text).toContain(tag); // job number
   expect(parsed.text).toContain("PLR-P5-1"); // form answer
   expect(parsed.text).toContain("Player boot test failed."); // the issue itself
-  expect(parsed.text).toContain("Hash manifest");
+  expect(parsed.text).toContain("VERIFICATION"); // the manifest section's actual heading (drawSectionBar(doc, "Verification"))
   expect(parsed.text).toMatch(/[0-9a-f]{64}/); // an actual sha256 hex digest in the manifest
 
   await officePage.close();
