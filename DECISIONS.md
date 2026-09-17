@@ -6047,3 +6047,44 @@ To mothball it: unset those two env vars on the production VM and
 restart the app container. That's the entire action — the client,
 `sync-issue.ts`, the migration, and the Watchdog check all stay
 exactly as they are, dormant.
+
+## Support Desk Blueprint — scoping only, no build scheduled
+
+Prompted by an exploratory customer-support-ticketing scope (drafted
+elsewhere, fed in for review) plus a follow-up question about
+standing it up as a separate deployment instead of a new role inside
+this app. No code changed.
+
+The reviewed draft's core call — Supabase as the source of truth,
+Monday optional/downstream, Server Actions not the Field PWA's
+direct-SDK pattern — holds up. Two corrections made against this
+actual codebase: there is no Google Workspace-domain restriction on
+login today (confirmed via the `gate_self_provisioned_users.sql`
+comment, already established during the multi-tenancy scoping), so
+the isolation argument can't lean on a Workspace boundary that
+doesn't exist; and `projects` is explicitly not client-scoped
+(a time container spanning many clients), so a company link belongs
+on `clients` directly, not `projects`.
+
+The bigger finding: the draft's RLS section only covers the *new*
+ticket tables. The moment any `customer` role can authenticate into
+the *same* Supabase project as staff, every existing reference-data
+policy that's `using (true)` today — because "authenticated" has
+only ever meant internal staff — stops meaning that. That risk is
+what motivated scoping this as a **separate deployment** instead: a
+second Supabase project (Postgres has no cross-database foreign
+keys, so this was always going to be a mirror-plus-sync, not a live
+join either way) with its own `companies` mirror (id + name only,
+kept current by a one-way secret-gated sync from the main app — same
+pattern as the existing webhook/cron routes) and its own ticket
+tables, so a mistake in its RLS can only ever expose its own data,
+never `clients`/`sites`/`jobs`. Recommended shape: same VM, a second
+container + a second Caddy site block — the isolation that matters is
+the database split, not the hardware; splitting onto a second VM
+later is the same "Fleet" pattern already scoped for multi-tenancy,
+trivial to do if it's ever needed. Monday.com is skipped entirely for
+this, consistent with yesterday's mothball decision.
+
+Full scoping memo (architecture diagram, what's reused vs new,
+open decisions, phased roadmap):
+https://claude.ai/artifact/Eec2P8bAFefrgJZtLwKMLt
