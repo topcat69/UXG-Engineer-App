@@ -5980,6 +5980,13 @@ Full scoping memo (path comparison, subsystem-by-subsystem breakdown,
 phased roadmap, current-architecture appendix):
 https://claude.ai/artifact/HLZABtzfsNTEwdrdwtxAzK
 
+Diagrams added after the fact (same artifact, republished in place —
+link above still resolves to the current version): today's single-
+VM/single-Supabase-project layout, Path A (Fleet) as two of those
+stamped from one template, and Path B (shared tenancy) as one
+deployment fanning out to a per-org settings store and `org_id`-
+scoped rows in one database.
+
 ## Return Leg Blueprint — scoping only, no build scheduled
 
 Prompted by a conversation about how the return leg (Home/Office/N/A
