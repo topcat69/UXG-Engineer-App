@@ -6088,3 +6088,26 @@ this, consistent with yesterday's mothball decision.
 Full scoping memo (architecture diagram, what's reused vs new,
 open decisions, phased roadmap):
 https://claude.ai/artifact/Eec2P8bAFefrgJZtLwKMLt
+
+**Update — decisions locked in, site-level added, put on hold.** The
+memo above assumed a `companies`-only mirror; corrected to also
+mirror `sites` one level down, since support calls are nearly always
+about a specific site, not just "the company" — `support_tickets`
+now carries a nullable `site_id` alongside `company_id`, and the
+main-app sync exposes site id/name/client-link as well as client
+id/name (still nothing about jobs, RAMS, or anything else a site
+record carries). The four open questions are now answered: per-
+company visibility (hard boundary, no cross-company access at all);
+attachments in v1 (yes); SLA tracking in v1 (yes, but the tiers
+themselves — response-time targets per category/priority, and what a
+breach does — still need defining, now the memo's Phase 0); and a
+separate staff login (confirmed, and for a stronger reason than
+isolation alone — some staff who'd work this desk don't have
+Engineering App access at all today).
+
+**Explicitly on hold:** no work starts on this until the Engineering
+App itself is signed off as V1 and its own outstanding points are
+closed. The memo's eyebrow/footer and a callout now say so directly —
+this is groundwork, not a queue entry.
+
+Same link, updated in place: https://claude.ai/artifact/Eec2P8bAFefrgJZtLwKMLt
