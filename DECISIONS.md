@@ -6019,3 +6019,31 @@ questions.
 Full scoping memo (the fork diagram, what's reusable vs genuinely
 new, phased roadmap):
 https://claude.ai/artifact/KUcfbknQQnYn957k5gkWiD
+
+## Monday.com issue sync — dropped (mothballed, not removed)
+
+Resolves the open question this file has been carrying since Phase 3
+("Monday.com integration — do we still want this"). Decision: no —
+the sync only ever went one way (an app-side issue creates a
+Monday.com item; nothing comes back), so it duplicated a record that
+already lives in `/office/issues` for no benefit. Separately, some
+other, not-yet-scoped use of Monday.com's service desk is being
+looked at — contingent on the user's own research there, unrelated to
+this sync — so the architecture stays in place rather than being
+deleted, in case any of it is reusable for that later.
+
+No code changed, because none was needed: `createMondayIssueItem`
+(`src/lib/monday/client.ts:37-43`) already returns `{status:
+"skipped"}`, not a throw, when `MONDAY_API_TOKEN`/
+`MONDAY_ISSUES_BOARD_ID` are unset — the same non-blocking contract
+Calendar sync and Resend email already use. Watchdog's integration-
+failure check (`src/lib/health/checks.ts:76-83`) already excludes an
+unconfigured integration from its results entirely rather than
+reporting it healthy or unhealthy, so going dark raises zero alarms.
+There's no UI anywhere under `/office/issues` tied to Monday to hide
+either — the sync is pure fire-and-forget on the backend.
+
+To mothball it: unset those two env vars on the production VM and
+restart the app container. That's the entire action — the client,
+`sync-issue.ts`, the migration, and the Watchdog check all stay
+exactly as they are, dormant.
