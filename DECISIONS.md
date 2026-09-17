@@ -5979,3 +5979,36 @@ Two paths, not two steps of one path:
 Full scoping memo (path comparison, subsystem-by-subsystem breakdown,
 phased roadmap, current-architecture appendix):
 https://claude.ai/artifact/HLZABtzfsNTEwdrdwtxAzK
+
+## Return Leg Blueprint — scoping only, no build scheduled
+
+Prompted by a conversation about how the return leg (Home/Office/N/A
+on a job, geofence-prompted submit) should work for Jobs and
+Timesheets. No code changed.
+
+Confirmed against the actual codebase rather than assumed: the
+distance/geofence math (`distanceMeters`, haversine) and postcode
+geocoding (`geocodePostcode`, postcodes.io + Eircode fallback, no
+Google Maps key needed) already exist and are already used for site
+coordinates and check-in variance — this reuses both rather than
+building new infrastructure. GPS capture is already tolerant of
+denied permission/offline, and the "foreground only, never on a
+timer" constraint isn't new here — it's an existing house rule
+(`media-capture.ts`, and Background Sync was already considered and
+deliberately skipped per this file's own Phase 3 notes).
+
+The one decision this needs before scheduling: does reaching Home/
+Office *gate job submission* (closer to the original ask, but changes
+what "submitted" means for the QA queue and completion emails,
+possibly by hours), or does it just stop a separately-tracked
+timesheet clock while submission stays exactly as manual as today
+(smaller, lower-risk, and directly answers the return-leg gap
+`worked-duration.ts` already flags in its own comments as deferred to
+"Phase 2"). Office-location shape (one fixed address vs a proper
+depot list) and whether this applies to every job or just an
+engineer's last job of the day are the other two open product
+questions.
+
+Full scoping memo (the fork diagram, what's reusable vs genuinely
+new, phased roadmap):
+https://claude.ai/artifact/KUcfbknQQnYn957k5gkWiD
