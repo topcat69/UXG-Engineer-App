@@ -6186,14 +6186,24 @@ since that could strand an engineer mid-job. Recommended a guard
 (confirm-through or hard block on non-terminal jobs) as its own
 phase, landing *before* hiding anything — not an afterthought.
 
-Three open decisions flagged for whoever picks this up: whether
-Reports (already finished-jobs-only) is affected at all — recommended
-no; whether a superadmin still sees archived-project jobs in the
-*ordinary* Jobs list too — recommended yes, labeled, same as today;
-and query-level filtering vs a hard RLS lock — recommended query-level
-first, RLS as a later hardening step once the open-jobs guard removes
-most of the reason anyone would still reach a hidden job directly.
+**Update — "assets" confirmed, Reports included.** The user clarified
+directly: "assets" meant jobs and their reports, explicitly not the
+Asset Register (site-scoped, a live thing, correctly excluded above).
+That resolves one of the memo's three open questions outright —
+Reports moves too, same as Jobs/Job Sheets, since a completion PDF/
+zip isn't a stored row anywhere (`/api/jobs/[id]/report/{pdf,zip}`
+generates it fresh from the job every time) — so this was never a
+fourth table to touch, just the same hiding mechanism applied to
+Reports' own list, with the new superadmin-only menu linking back
+into those same existing report routes rather than building new ones.
+
+Two decisions remain open for whoever picks this up: whether a
+superadmin still sees archived-project jobs/reports in the *ordinary*
+pages too — recommended yes, labeled, same as today; and query-level
+filtering vs a hard RLS lock — recommended query-level first, RLS as
+a later hardening step once the open-jobs guard removes most of the
+reason anyone would still reach a hidden job directly.
 
 Full scoping memo (the associated-tables table, the shape-fork
-diagram, the open-jobs risk, phased roadmap):
+diagram, the open-jobs risk, phased roadmap), updated in place:
 https://claude.ai/artifact/13ZFpd64GuBypBu4sPjhJw
