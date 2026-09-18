@@ -6111,3 +6111,44 @@ closed. The memo's eyebrow/footer and a callout now say so directly —
 this is groundwork, not a queue entry.
 
 Same link, updated in place: https://claude.ai/artifact/Eec2P8bAFefrgJZtLwKMLt
+
+## Project archiving (superadmin-only) — built
+
+End-of-project/end-of-year housekeeping: a superadmin can archive a
+project on `/office/projects`. Nothing is deleted — a project's jobs,
+sites, and Drive files stay exactly where they are; the point is
+purely to keep it out of the pickers used for *new* work (job
+creation, job sheets, CSV import) while it stays visible on its own
+row (behind an Active/Archived/All filter) and in every other filter
+that already listed projects (Jobs list, Reports, Dashboard),
+labeled "(archived)" where relevant.
+
+`projects` gets two new nullable columns, `archived_at`/`archived_by`
+— a timestamp rather than a plain boolean (unlike `users.active`),
+deliberately, so there's a "when" to show and an easy reversible
+unarchive (null both back out). Enforced twice over: the new
+`archiveProject`/`unarchiveProject` Server Actions call
+`requireSuperadminUser()` first, and the `archive_project`/
+`unarchive_project` RPCs themselves re-check the role — same
+SECURITY DEFINER shape as `set_own_theme`, because `projects_update`
+RLS already lets manager-or-superadmin write *any* column on
+`projects` (RLS can't be scoped to just these two), so relying on the
+Server Action alone would leave a manager able to archive by calling
+the table update directly.
+
+Verified against a real local Postgres, not assumed: set the JWT
+claim to a manager's id and called `archive_project` directly —
+rejected with "Only a superadmin can archive a project." Same call
+as the superadmin succeeded, and `unarchive_project` cleanly reversed
+it. Verified in a real browser: a manager account sees no Archive/
+Unarchive control anywhere on the page; a superadmin can archive a
+project, watch it drop out of the default "Active" view, find it
+under "Archived" with an Unarchive button, and confirm it's gone from
+the New Job form's project picker while still present (and labeled)
+in the Jobs list's filter dropdown. Full suite green (524/524 unit,
+9/10 e2e — the one failure, `job-reports.spec.ts`, reproduced as
+flaky in isolation on its own, unrelated to anything this touched);
+typecheck/lint clean.
+
+Nothing else needed beyond the usual migration + rebuild — no new
+UI route, no changes to how existing jobs/reports work.
