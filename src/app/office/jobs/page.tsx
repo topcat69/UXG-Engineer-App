@@ -54,7 +54,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const [{ data: jobs, count, error }, { data: projects }, { data: engineers }, { data: sites }, { data: jobSheets }] =
     await Promise.all([
       query,
-      supabase.from("projects").select("id, name, client_id, client:clients(name)").order("name"),
+      supabase.from("projects").select("id, name, client_id, archived_at, client:clients(name)").order("name"),
       supabase.from("users").select("id, name").in("role", ["engineer", "manager", "superadmin"]).eq("active", true).order("name"),
       supabase.from("sites").select("id, name, client_id").order("name"),
       // Only sheets not already linked elsewhere — same "assigned" meaning
@@ -65,6 +65,14 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   if (error) {
     return <p className="text-destructive">Failed to load jobs: {error.message}</p>;
   }
+
+  const allProjects = projects ?? [];
+  // New jobs only get created against active projects — archiving a
+  // project is meant to keep it out of the way for new work, while its
+  // existing jobs stay exactly where they are and this filter dropdown
+  // (below) still offers every project, archived included, so past work
+  // stays findable.
+  const activeProjects = allProjects.filter((p) => !p.archived_at);
 
   const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -86,7 +94,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         </div>
       </div>
 
-      <CreateJobForm projects={projects ?? []} sites={sites ?? []} jobSheets={jobSheets ?? []} />
+      <CreateJobForm projects={activeProjects} sites={sites ?? []} jobSheets={jobSheets ?? []} />
 
       <form className="flex flex-wrap items-end gap-2" method="get">
         <div className="flex flex-col gap-1">
@@ -148,9 +156,10 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
             className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
           >
             <option value="">All</option>
-            {(projects ?? []).map((p) => (
+            {allProjects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
+                {p.archived_at ? " (archived)" : ""}
               </option>
             ))}
           </select>

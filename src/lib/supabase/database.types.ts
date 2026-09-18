@@ -1740,6 +1740,8 @@ export type Database = {
       }
       projects: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
           client_id: string | null
           created_at: string | null
           drive_folder_id: string | null
@@ -1750,6 +1752,8 @@ export type Database = {
           status: string | null
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
           client_id?: string | null
           created_at?: string | null
           drive_folder_id?: string | null
@@ -1760,6 +1764,8 @@ export type Database = {
           status?: string | null
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
           client_id?: string | null
           created_at?: string | null
           drive_folder_id?: string | null
@@ -1770,6 +1776,13 @@ export type Database = {
           status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_client_id_fkey"
             columns: ["client_id"]
@@ -2528,6 +2541,7 @@ export type Database = {
         Args: { p_delta: number; p_job_id: string }
         Returns: undefined
       }
+      archive_project: { Args: { project_id: string }; Returns: undefined }
       check_expected_columns: {
         Args: never
         Returns: string[]
@@ -2537,6 +2551,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       set_own_theme: { Args: { new_theme: string }; Returns: undefined }
+      unarchive_project: { Args: { project_id: string }; Returns: undefined }
     }
     Enums: {
       asset_source: "goods_in" | "import" | "manual"

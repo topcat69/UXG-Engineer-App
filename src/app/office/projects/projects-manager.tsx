@@ -1,26 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { humanize } from "@/lib/format/text";
-import { deleteProject, updateProject, type ProjectRow } from "./actions";
+import { archiveProject, deleteProject, unarchiveProject, updateProject, type ProjectRow } from "./actions";
 
 const STATUSES = ["active", "on_hold", "completed"];
+type ArchiveFilter = "active" | "archived" | "all";
 
 export function ProjectsManager({
   projects: initialProjects,
   jobCounts,
   clients,
+  isSuperadmin,
 }: {
   projects: ProjectRow[];
   jobCounts: Record<string, number>;
   clients: { id: string; name: string }[];
+  isSuperadmin: boolean;
 }) {
   const [projects, setProjects] = useState(initialProjects);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("active");
+
+  const visibleProjects = useMemo(() => {
+    if (archiveFilter === "all") return projects;
+    if (archiveFilter === "archived") return projects.filter((p) => p.archived_at);
+    return projects.filter((p) => !p.archived_at);
+  }, [projects, archiveFilter]);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -59,6 +69,31 @@ export function ProjectsManager({
     });
   }
 
+  function handleArchive(id: string) {
+    if (!window.confirm("Archive this project? It'll drop out of the pickers used for new work, but nothing is deleted.")) return;
+    startTransition(async () => {
+      const result = await archiveProject(id);
+      if (result.ok) {
+        setProjects((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, archived_at: new Date().toISOString() } : p)),
+        );
+      } else {
+        setMessage(result.message);
+      }
+    });
+  }
+
+  function handleUnarchive(id: string) {
+    startTransition(async () => {
+      const result = await unarchiveProject(id);
+      if (result.ok) {
+        setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, archived_at: null, archived_by: null } : p)));
+      } else {
+        setMessage(result.message);
+      }
+    });
+  }
+
   function handleSaveEdit() {
     if (!editingId) return;
     const id = editingId;
@@ -81,6 +116,19 @@ export function ProjectsManager({
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex gap-2">
+        {(["active", "archived", "all"] as const).map((f) => (
+          <Button
+            key={f}
+            type="button"
+            size="sm"
+            variant={archiveFilter === f ? "default" : "outline"}
+            onClick={() => setArchiveFilter(f)}
+          >
+            {humanize(f)}
+          </Button>
+        ))}
+      </div>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left">
@@ -93,7 +141,7 @@ export function ProjectsManager({
           </tr>
         </thead>
         <tbody>
-          {projects.map((p) => (
+          {visibleProjects.map((p) => (
             <tr key={p.id} className="border-b">
               <td className="py-2 font-medium">
                 <Link href={`/office/jobs?project_id=${p.id}`} className="hover:underline">
@@ -110,7 +158,14 @@ export function ProjectsManager({
                 )}
               </td>
               <td className="py-2">
-                <Badge variant="secondary">{humanize(p.status ?? "")}</Badge>
+                <div className="flex flex-wrap gap-1">
+                  <Badge variant="secondary">{humanize(p.status ?? "")}</Badge>
+                  {p.archived_at && (
+                    <Badge variant="outline" title={`Archived ${new Date(p.archived_at).toLocaleDateString()}`}>
+                      Archived
+                    </Badge>
+                  )}
+                </div>
               </td>
               <td className="py-2 text-muted-foreground">
                 {[p.start_date, p.end_date].filter(Boolean).join(" – ") || "—"}
@@ -128,11 +183,21 @@ export function ProjectsManager({
                   <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleDelete(p.id)}>
                     Delete
                   </Button>
+                  {isSuperadmin &&
+                    (p.archived_at ? (
+                      <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleUnarchive(p.id)}>
+                        Unarchive
+                      </Button>
+                    ) : (
+                      <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleArchive(p.id)}>
+                        Archive
+                      </Button>
+                    ))}
                 </div>
               </td>
             </tr>
           ))}
-          {projects.length === 0 && (
+          {visibleProjects.length === 0 && (
             <tr>
               <td colSpan={6} className="text-muted-foreground py-4 text-center">
                 No projects yet. Add one from a client&apos;s page.

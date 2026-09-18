@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireSuperadminUser } from "@/lib/auth/current-user";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
@@ -74,6 +75,40 @@ export async function updateProject(
   revalidatePath("/office/projects");
   revalidatePath(`/office/clients/${input.client_id}`);
   return { ok: true, project: data };
+}
+
+export type ArchiveProjectResult = { ok: true } | { ok: false; message: string };
+
+/**
+ * End-of-project/end-of-year housekeeping — takes a project out of the
+ * "active" pickers used when creating new work (job creation, job
+ * sheets, import), but changes nothing else: its jobs, sites, and Drive
+ * files stay exactly where they are, and it stays visible here and in
+ * Reports. Superadmin-only, enforced twice over: requireSuperadminUser
+ * below (so a manager never even sees this succeed), and the
+ * archive_project RPC itself re-checks the role server-side — RLS's
+ * projects_update policy alone would let a manager do this too, since it
+ * can't be scoped to just these two columns (same reasoning as
+ * set_own_theme).
+ */
+export async function archiveProject(id: string): Promise<ArchiveProjectResult> {
+  await requireSuperadminUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("archive_project", { project_id: id });
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/office/projects");
+  return { ok: true };
+}
+
+export async function unarchiveProject(id: string): Promise<ArchiveProjectResult> {
+  await requireSuperadminUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("unarchive_project", { project_id: id });
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/office/projects");
+  return { ok: true };
 }
 
 export type DeleteProjectResult = { ok: true } | { ok: false; message: string };

@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requireOfficeUser } from "@/lib/auth/current-user";
 import { ProjectsManager } from "./projects-manager";
 
 export default async function ProjectsPage() {
+  const user = await requireOfficeUser();
   const supabase = await createClient();
   const [{ data: projects }, { data: jobs }, { data: clients }] = await Promise.all([
     supabase.from("projects").select("*").order("created_at", { ascending: false }),
@@ -29,7 +31,12 @@ export default async function ProjectsPage() {
           first — edit an existing project&apos;s name, dates, status, or customer here.
         </p>
       </div>
-      <ProjectsManager projects={projects ?? []} jobCounts={Object.fromEntries(jobCounts)} clients={clients ?? []} />
+      <ProjectsManager
+        projects={projects ?? []}
+        jobCounts={Object.fromEntries(jobCounts)}
+        clients={clients ?? []}
+        isSuperadmin={user.role === "superadmin"}
+      />
     </div>
   );
 }

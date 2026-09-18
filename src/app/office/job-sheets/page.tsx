@@ -27,7 +27,7 @@ export default async function JobSheetsPage() {
       )
       .order("created_at", { ascending: false })
       .range(0, PAGE_SIZE - 1),
-    supabase.from("projects").select("id, name, client_id").order("name"),
+    supabase.from("projects").select("id, name, client_id, archived_at").order("name"),
     supabase.from("sites").select("id, name, client_id").order("name"),
   ]);
 
@@ -48,7 +48,8 @@ export default async function JobSheetsPage() {
         <span className="text-muted-foreground text-sm">{count ?? 0} total</span>
       </div>
 
-      <CreateJobSheetForm projects={projects ?? []} sites={sites ?? []} />
+      {/* New job sheets only get created against active projects, same reasoning as jobs/page.tsx's activeProjects. */}
+      <CreateJobSheetForm projects={(projects ?? []).filter((p) => !p.archived_at)} sites={sites ?? []} />
 
       <Table>
         <TableHeader>
