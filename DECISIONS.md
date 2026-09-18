@@ -6152,3 +6152,48 @@ typecheck/lint clean.
 
 Nothing else needed beyond the usual migration + rebuild — no new
 UI route, no changes to how existing jobs/reports work.
+
+## Archive Vault Blueprint — scoping only, no build scheduled
+
+Follow-up to the project archiving above: cascading that archive onto
+a project's jobs/job sheets/share links and relocating them into a
+superadmin-only menu, rather than just excluding the project from
+"new work" pickers as shipped. No code changed.
+
+Clarified against the actual schema, not assumed: only `jobs`,
+`job_sheets`, and `share_links` are foreign-keyed to `project_id`.
+The literal Asset Register (`assets`/`asset_register`) is keyed to
+`site_id`, not `project_id` — a site's equipment outlives any one
+project run against it, so cascading an archive there risks hiding
+kit still in service under a different, still-active project at the
+same site. Recommendation: this cascade should touch jobs/job-sheets/
+share-links only; if "assets" meant the register literally, that's a
+separate, riskier feature to scope on its own.
+
+Two shapes considered: **derived** (a job's archived state is never
+stored — computed by joining to its project's `archived_at` at query
+time, same join the shipped filter dropdown already uses) vs
+**stamped** (cascade a write onto every child row, giving each its
+own timestamp but needing a second cascading write to reverse
+cleanly). Recommended derived — nothing has asked for "restore one
+job independently of its project," and the derived version can't
+drift out of sync.
+
+The one real risk flagged: a project can be archived today even with
+open jobs under it — harmless while those jobs stay visible, not
+harmless once they'd actually disappear from the normal Jobs list,
+since that could strand an engineer mid-job. Recommended a guard
+(confirm-through or hard block on non-terminal jobs) as its own
+phase, landing *before* hiding anything — not an afterthought.
+
+Three open decisions flagged for whoever picks this up: whether
+Reports (already finished-jobs-only) is affected at all — recommended
+no; whether a superadmin still sees archived-project jobs in the
+*ordinary* Jobs list too — recommended yes, labeled, same as today;
+and query-level filtering vs a hard RLS lock — recommended query-level
+first, RLS as a later hardening step once the open-jobs guard removes
+most of the reason anyone would still reach a hidden job directly.
+
+Full scoping memo (the associated-tables table, the shape-fork
+diagram, the open-jobs risk, phased roadmap):
+https://claude.ai/artifact/13ZFpd64GuBypBu4sPjhJw
