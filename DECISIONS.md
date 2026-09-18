@@ -6110,6 +6110,25 @@ App itself is signed off as V1 and its own outstanding points are
 closed. The memo's eyebrow/footer and a callout now say so directly —
 this is groundwork, not a queue entry.
 
+**Update — a business case against buying monday Service instead.**
+Added a section confronting the obvious alternative: Monday.com sells
+a real, working ticketing product (monday Service) that could replace
+this whole build with zero engineering effort. Checked current
+pricing/features rather than assumed: Standard is $26/agent-seat/month
+(billed annually) and caps customer portal access at 10 users; Pro is
+$38/seat/month, capping at 100; only quote-priced Enterprise is
+uncapped. That's the crux of the business case — the recurring cost
+scales with how many of *your customers'* contacts sign up, not with
+your own team size, a number this business doesn't control. Paired
+with the direct precedent already on record above (the one-way
+Issues→Monday.com sync, mothballed for being redundant and
+one-directional) as evidence a Monday-board shape didn't hold up as
+a system of record here before, at lower stakes than customer-facing
+ticket data. Recommendation stands: build in-house; buying is a
+legitimate but different tradeoff (fast to launch, cedes data/
+isolation control, recurring cost that grows with client base rather
+than team size).
+
 Same link, updated in place: https://claude.ai/artifact/Eec2P8bAFefrgJZtLwKMLt
 
 ## Project archiving (superadmin-only) — built
