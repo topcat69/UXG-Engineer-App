@@ -2,18 +2,15 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { StatTile } from "@/components/office/stat-tile";
 import { createClient } from "@/lib/supabase/server";
-import { classifySlaJob, type SlaJobOutcome } from "@/lib/reports/sla-compliance";
+import { type SlaJobOutcome } from "@/lib/reports/sla-compliance";
+import {
+  fetchSlaComplianceReportData,
+  complianceRate,
+  GROUP_BY_OPTIONS,
+  type GroupBy,
+} from "@/lib/reports/sla-compliance-data";
 
 type SearchParams = Record<string, string | string[] | undefined>;
-
-type GroupBy = "engineer" | "site" | "fixture_type" | "client" | "reason";
-const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
-  { value: "fixture_type", label: "Fixture type" },
-  { value: "reason", label: "SLA reason" },
-  { value: "engineer", label: "Engineer" },
-  { value: "site", label: "Site" },
-  { value: "client", label: "Customer" },
-];
 
 function param(sp: SearchParams, key: string): string {
   const value = sp[key];
@@ -34,26 +31,15 @@ function formatHours(hours: number | null): string {
   return hours == null ? "—" : `${hours.toFixed(1)}h`;
 }
 
-type Bucket = { met: number; breached: number; open: number };
-function emptyBucket(): Bucket {
-  return { met: 0, breached: 0, open: 0 };
-}
-function addToBucket(bucket: Bucket, outcome: SlaJobOutcome) {
-  bucket[outcome] += 1;
-}
-function complianceRate(bucket: Bucket): string {
-  const classified = bucket.met + bucket.breached;
-  return classified === 0 ? "—" : `${Math.round((bucket.met / classified) * 100)}%`;
-}
-
 /**
  * SLA compliance report — Report Generator Phase 1, per the Report
  * Generator Blueprint. Scoped to job_type "sla" only (see createSlaJob in
  * office/sla/actions.ts — the only jobs a per-client SLA target means
  * anything for). Classification itself (met/breached/open, the clock,
  * pauses counting against it) lives in lib/reports/sla-compliance.ts,
- * unit-tested there; this page is query + grouping + presentation, same
- * split as worked-duration.ts feeding the Timesheets page.
+ * unit-tested there; the query/grouping shared with every export format
+ * lives in lib/reports/sla-compliance-data.ts. This page is filter-form +
+ * presentation only.
  *
  * Date range filters on jobs.created_at (the logging/cohort question) —
  * deliberately separate from the clock the classification itself measures
@@ -74,119 +60,31 @@ export default async function SlaComplianceReportPage({ searchParams }: { search
 
   const supabase = await createClient();
 
-  const clientSiteIds = clientId
-    ? ((await supabase.from("sites").select("id").eq("client_id", clientId)).data?.map((s) => s.id) ?? [])
-    : null;
-
-  let query = supabase
-    .from("jobs")
-    .select(
-      `id, job_number, created_at, actual_start, assigned_to,
-       assigned:users!jobs_assigned_to_fkey(id, name),
-       site:sites(id, name, client:clients(id, name, sla_target_hours)),
-       job_details(submitted_at, fixture_type_id, reason_id,
-         fixture_type:client_sla_fixture_types(id, name),
-         reason:client_sla_reasons(id, name))`,
-    )
-    .eq("job_type", "sla")
-    .gte("created_at", `${dateFrom}T00:00:00`)
-    .lte("created_at", `${dateTo}T23:59:59`)
-    .order("created_at", { ascending: false });
-  if (siteId) query = query.eq("site_id", siteId);
-  if (assignedTo) query = query.eq("assigned_to", assignedTo);
-  if (projectId) query = query.eq("project_id", projectId);
-  if (clientSiteIds) query = query.in("site_id", clientSiteIds.length > 0 ? clientSiteIds : ["00000000-0000-0000-0000-000000000000"]);
-
-  const [{ data: jobs, error }, { data: clients }, { data: sites }, { data: engineers }, { data: projects }] = await Promise.all([
-    query,
+  const [result, { data: clients }, { data: sites }, { data: engineers }, { data: projects }] = await Promise.all([
+    fetchSlaComplianceReportData(supabase, { dateFrom, dateTo, clientId, siteId, fixtureTypeId, reasonId, assignedTo, projectId, groupBy }),
     supabase.from("clients").select("id, name").order("name"),
     supabase.from("sites").select("id, name, client_id").order("name"),
     supabase.from("users").select("id, name").in("role", ["engineer", "manager", "superadmin"]).eq("active", true).order("name"),
     supabase.from("projects").select("id, name").order("name"),
   ]);
 
-  if (error) {
-    return <p className="text-destructive">Failed to load the SLA compliance report: {error.message}</p>;
+  if (!result.ok) {
+    return <p className="text-destructive">Failed to load the SLA compliance report: {result.message}</p>;
   }
-
-  // fixture_type_id/reason_id live on job_details (a child table), so
-  // they're applied here rather than as query filters — same reasoning
-  // list-query.ts documents for clientId not being a jobs column: nothing
-  // to .eq() against on the jobs table itself.
-  const allRows = jobs ?? [];
-  const filteredRows = allRows.filter((job) => {
-    const details = job.job_details;
-    if (fixtureTypeId && details?.fixture_type_id !== fixtureTypeId) return false;
-    if (reasonId && details?.reason_id !== reasonId) return false;
-    return true;
-  });
-
-  const now = new Date();
-  const rows = filteredRows.map((job) => {
-    const details = job.job_details;
-    const targetHours = job.site?.client?.sla_target_hours ?? null;
-    const result = classifySlaJob({ actualStart: job.actual_start, submittedAt: details?.submitted_at ?? null, targetHours }, now);
-    return { job, details, targetHours, ...result };
-  });
-
-  const headline = emptyBucket();
-  rows.forEach((r) => addToBucket(headline, r.outcome));
-
-  const groupKeyLabel = new Map<string, string>();
-  function groupKeyFor(r: (typeof rows)[number]): string {
-    switch (groupBy) {
-      case "engineer":
-        return r.job.assigned?.id ?? "unassigned";
-      case "site":
-        return r.job.site?.id ?? "unknown";
-      case "client":
-        return r.job.site?.client?.id ?? "unknown";
-      case "reason":
-        return r.details?.reason?.id ?? "none";
-      case "fixture_type":
-      default:
-        return r.details?.fixture_type?.id ?? "none";
-    }
-  }
-  function groupLabelFor(r: (typeof rows)[number]): string {
-    switch (groupBy) {
-      case "engineer":
-        return r.job.assigned?.name ?? "Unassigned";
-      case "site":
-        return r.job.site?.name ?? "Unknown site";
-      case "client":
-        return r.job.site?.client?.name ?? "Unknown customer";
-      case "reason":
-        return r.details?.reason?.name ?? "No reason set";
-      case "fixture_type":
-      default:
-        return r.details?.fixture_type?.name ?? "No fixture type set";
-    }
-  }
-
-  const groupBuckets = new Map<string, Bucket>();
-  for (const r of rows) {
-    const key = groupKeyFor(r);
-    groupKeyLabel.set(key, groupLabelFor(r));
-    const bucket = groupBuckets.get(key) ?? emptyBucket();
-    addToBucket(bucket, r.outcome);
-    groupBuckets.set(key, bucket);
-  }
-  const groupBreakdown = Array.from(groupBuckets.entries())
-    .map(([key, bucket]) => ({ key, label: groupKeyLabel.get(key)!, bucket }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-
-  const reasonBuckets = new Map<string, { label: string; bucket: Bucket }>();
-  for (const r of rows) {
-    const key = r.details?.reason?.id ?? "none";
-    const label = r.details?.reason?.name ?? "No reason set";
-    const entry = reasonBuckets.get(key) ?? { label, bucket: emptyBucket() };
-    addToBucket(entry.bucket, r.outcome);
-    reasonBuckets.set(key, entry);
-  }
-  const reasonBreakdown = Array.from(reasonBuckets.values()).sort((a, b) => a.label.localeCompare(b.label));
+  const { headline, groupBreakdown, reasonBreakdown, rows, groupByLabel } = result.data;
 
   const hasFilters = !!(clientId || siteId || fixtureTypeId || reasonId || assignedTo || projectId);
+  const exportParams = new URLSearchParams({
+    date_from: dateFrom,
+    date_to: dateTo,
+    ...(clientId && { client_id: clientId }),
+    ...(siteId && { site_id: siteId }),
+    ...(fixtureTypeId && { fixture_type_id: fixtureTypeId }),
+    ...(reasonId && { reason_id: reasonId }),
+    ...(assignedTo && { assigned_to: assignedTo }),
+    ...(projectId && { project_id: projectId }),
+    group_by: groupBy,
+  }).toString();
   const baseParams = { date_from: dateFrom, date_to: dateTo, group_by: groupBy };
 
   return (
@@ -308,6 +206,22 @@ export default async function SlaComplianceReportPage({ searchParams }: { search
         )}
       </form>
 
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <span className="text-muted-foreground">Export this view:</span>
+        <a href={`/api/reports/sla-compliance/pdf?${exportParams}`} className="border-input rounded-md border px-3 py-1.5 hover:bg-accent">
+          PDF
+        </a>
+        <a href={`/api/reports/sla-compliance/xlsx?${exportParams}`} className="border-input rounded-md border px-3 py-1.5 hover:bg-accent">
+          Excel
+        </a>
+        <a href={`/api/reports/sla-compliance/csv?${exportParams}`} className="border-input rounded-md border px-3 py-1.5 hover:bg-accent">
+          CSV
+        </a>
+        <a href={`/api/reports/sla-compliance/zip?${exportParams}`} className="border-input rounded-md border px-3 py-1.5 hover:bg-accent">
+          Zip (all formats)
+        </a>
+      </div>
+
       <div className="flex flex-wrap gap-4">
         <StatTile label="Compliance rate" value={complianceRate(headline)} detail={`${headline.met} met, ${headline.breached} breached`} />
         <StatTile label="Open / in flight" value={String(headline.open)} />
@@ -315,14 +229,12 @@ export default async function SlaComplianceReportPage({ searchParams }: { search
       </div>
 
       <div>
-        <h2 className="mb-2 text-lg font-semibold">
-          Breakdown by {GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label.toLowerCase()}
-        </h2>
+        <h2 className="mb-2 text-lg font-semibold">Breakdown by {groupByLabel.toLowerCase()}</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left">
-                <th className="py-2 font-medium">{GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label}</th>
+                <th className="py-2 font-medium">{groupByLabel}</th>
                 <th className="py-2 font-medium">Met</th>
                 <th className="py-2 font-medium">Breached</th>
                 <th className="py-2 font-medium">Open</th>
@@ -373,7 +285,7 @@ export default async function SlaComplianceReportPage({ searchParams }: { search
                 </tr>
               )}
               {reasonBreakdown.map((g) => (
-                <tr key={g.label} className="border-b">
+                <tr key={g.key} className="border-b">
                   <td className="py-2">{g.label}</td>
                   <td className="py-2 tabular-nums">{g.bucket.met}</td>
                   <td className="py-2 tabular-nums">{g.bucket.breached}</td>
@@ -411,16 +323,16 @@ export default async function SlaComplianceReportPage({ searchParams }: { search
                 </tr>
               )}
               {rows.map((r) => (
-                <tr key={r.job.id} className="border-b">
+                <tr key={r.jobId} className="border-b">
                   <td className="py-2">
-                    <Link href={`/office/jobs/${r.job.id}`} className="font-medium underline-offset-2 hover:underline">
-                      {r.job.job_number}
+                    <Link href={`/office/jobs/${r.jobId}`} className="font-medium underline-offset-2 hover:underline">
+                      {r.jobNumber}
                     </Link>
                   </td>
-                  <td className="py-2 text-muted-foreground">{r.job.site?.client?.name ?? "—"}</td>
-                  <td className="py-2 text-muted-foreground">{r.job.site?.name ?? "—"}</td>
-                  <td className="py-2 text-muted-foreground">{r.details?.fixture_type?.name ?? "—"}</td>
-                  <td className="py-2 text-muted-foreground">{r.job.assigned?.name ?? "Unassigned"}</td>
+                  <td className="py-2 text-muted-foreground">{r.clientName}</td>
+                  <td className="py-2 text-muted-foreground">{r.siteName}</td>
+                  <td className="py-2 text-muted-foreground">{r.fixtureTypeName}</td>
+                  <td className="py-2 text-muted-foreground">{r.engineerName}</td>
                   <td className="py-2 tabular-nums">{r.targetHours == null ? "No target set" : `${r.targetHours}h`}</td>
                   <td className="py-2 tabular-nums">{formatHours(r.durationHours)}</td>
                   <td className="py-2">{outcomeBadge(r.outcome)}</td>

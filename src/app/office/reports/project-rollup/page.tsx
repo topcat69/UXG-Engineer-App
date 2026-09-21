@@ -2,38 +2,11 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { StatTile } from "@/components/office/stat-tile";
 import { createClient } from "@/lib/supabase/server";
-import type { Database } from "@/lib/supabase/database.types";
-import { computeWorkedMinutes, computeTravelMinutes, roundToNearest15Minutes } from "@/lib/jobs/worked-duration";
-import { isoDate, mondayOf } from "@/lib/scheduler/week";
+import { fetchProjectRollupReportData, ALL_JOB_STATUSES, GROUP_BY_OPTIONS, type GroupBy } from "@/lib/reports/project-rollup-data";
 import { JOB_TYPES, JOB_TYPE_LABELS } from "@/lib/forms/job-form";
 import { humanize } from "@/lib/format/text";
 
 type SearchParams = Record<string, string | string[] | undefined>;
-type JobStatus = Database["public"]["Enums"]["job_status"];
-const ALL_JOB_STATUSES: JobStatus[] = [
-  "draft",
-  "provisional",
-  "scheduled",
-  "dispatched",
-  "accepted",
-  "travelling",
-  "on_site",
-  "in_progress",
-  "submitted",
-  "under_review",
-  "approved",
-  "closed",
-  "on_hold",
-  "cancelled",
-  "revisit",
-];
-
-type GroupBy = "status" | "engineer" | "site";
-const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
-  { value: "status", label: "Status" },
-  { value: "engineer", label: "Engineer" },
-  { value: "site", label: "Site" },
-];
 
 function param(sp: SearchParams, key: string): string {
   const value = sp[key];
@@ -57,6 +30,9 @@ function formatMinutes(minutes: number): string {
  * project belonging to a client (rolled up). Archived projects stay
  * visible here on purpose (see 20260918000000_project_archive.sql —
  * archiving hides a project from active pickers, not from reporting).
+ * Query/aggregation is shared with every export format via
+ * lib/reports/project-rollup-data.ts — this page is filter-form +
+ * presentation only.
  */
 export default async function ProjectRollupReportPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
@@ -79,115 +55,30 @@ export default async function ProjectRollupReportPage({ searchParams }: { search
     supabase.from("users").select("id, name").in("role", ["engineer", "manager", "superadmin"]).eq("active", true).order("name"),
   ]);
 
-  const hasScope = !!(projectId || clientId);
-  let projectIds: string[] | null = null;
-  if (projectId) {
-    projectIds = [projectId];
-  } else if (clientId) {
-    projectIds = (allProjects ?? []).filter((p) => p.client_id === clientId).map((p) => p.id);
-    if (projectIds.length === 0) projectIds = ["00000000-0000-0000-0000-000000000000"];
+  const result = await fetchProjectRollupReportData(
+    supabase,
+    { projectId, clientId, status, jobType, siteId, assignedTo, dateFrom, dateTo, groupBy },
+    allProjects ?? [],
+  );
+
+  if (!result.ok) {
+    return <p className="text-destructive">Failed to load the project rollup report: {result.message}</p>;
   }
-
-  function scopedJobsQuery(ids: string[]) {
-    let query = supabase
-      .from("jobs")
-      .select(
-        `id, job_number, status, scheduled_start, assigned_to, site_id,
-         site:sites(name), assigned:users!jobs_assigned_to_fkey(name),
-         status_events(to_status, occurred_at), job_details(submitted_at)`,
-      )
-      .in("project_id", ids)
-      .order("created_at", { ascending: false });
-    if (status) query = query.eq("status", status as JobStatus);
-    if (jobType) query = query.eq("job_type", jobType);
-    if (siteId) query = query.eq("site_id", siteId);
-    if (assignedTo) query = query.eq("assigned_to", assignedTo);
-    if (dateFrom) query = query.gte("created_at", `${dateFrom}T00:00:00`);
-    if (dateTo) query = query.lte("created_at", `${dateTo}T23:59:59`);
-    return query;
-  }
-
-  let jobs: Awaited<ReturnType<typeof scopedJobsQuery>>["data"] = [];
-  let error: string | null = null;
-
-  if (hasScope && projectIds) {
-    const result = await scopedJobsQuery(projectIds);
-    if (result.error) error = result.error.message;
-    else jobs = result.data ?? [];
-  }
-
-  if (error) {
-    return <p className="text-destructive">Failed to load the project rollup report: {error}</p>;
-  }
-
-  const rows = jobs ?? [];
-  const jobIds = rows.map((j) => j.id);
-  const { data: issues } = jobIds.length > 0 ? await supabase.from("issues").select("status, job_id").in("job_id", jobIds) : { data: [] };
-
-  const statusCounts = new Map<JobStatus, number>();
-  for (const r of rows) statusCounts.set(r.status, (statusCounts.get(r.status) ?? 0) + 1);
-
-  // Throughput: jobs the engineer has submitted, bucketed by the ISO week
-  // (Monday) of that submission — same week-key convention as the
-  // Timesheets board (scheduler/week.ts), so this lines up with it if
-  // compared side by side.
-  const throughputByWeek = new Map<string, number>();
-  for (const r of rows) {
-    const submittedAt = r.job_details?.submitted_at;
-    if (!submittedAt) continue;
-    const weekKey = isoDate(mondayOf(new Date(submittedAt)));
-    throughputByWeek.set(weekKey, (throughputByWeek.get(weekKey) ?? 0) + 1);
-  }
-  const throughputWeeks = Array.from(throughputByWeek.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-
-  // Raw (unrounded) minutes summed across every job first, rounded once at
-  // the end — the same principle worked-duration.ts documents for
-  // computeEngineerDayMinutes: summing already-rounded per-job figures
-  // would compound each job's independent rounding error.
-  let rawWorkedTotal = 0;
-  let rawTravelTotal = 0;
-  const rawByEngineer = new Map<string, { label: string; worked: number; travel: number; jobCount: number }>();
-  const bySite = new Map<string, { label: string; worked: number; travel: number; jobCount: number }>();
-  const byStatusForGroup = new Map<string, { label: string; worked: number; travel: number; jobCount: number }>();
-
-  for (const r of rows) {
-    const worked = computeWorkedMinutes(r.status_events ?? []) ?? 0;
-    const travel = computeTravelMinutes(r.status_events ?? []) ?? 0;
-    rawWorkedTotal += worked;
-    rawTravelTotal += travel;
-
-    const engineerKey = r.assigned_to ?? "unassigned";
-    const engineerEntry = rawByEngineer.get(engineerKey) ?? { label: r.assigned?.name ?? "Unassigned", worked: 0, travel: 0, jobCount: 0 };
-    engineerEntry.worked += worked;
-    engineerEntry.travel += travel;
-    engineerEntry.jobCount += 1;
-    rawByEngineer.set(engineerKey, engineerEntry);
-
-    const siteEntry = bySite.get(r.site_id) ?? { label: r.site?.name ?? "Unknown site", worked: 0, travel: 0, jobCount: 0 };
-    siteEntry.worked += worked;
-    siteEntry.travel += travel;
-    siteEntry.jobCount += 1;
-    bySite.set(r.site_id, siteEntry);
-
-    const statusEntry = byStatusForGroup.get(r.status) ?? { label: humanize(r.status), worked: 0, travel: 0, jobCount: 0 };
-    statusEntry.worked += worked;
-    statusEntry.travel += travel;
-    statusEntry.jobCount += 1;
-    byStatusForGroup.set(r.status, statusEntry);
-  }
-
-  const groupMap = groupBy === "engineer" ? rawByEngineer : groupBy === "site" ? bySite : byStatusForGroup;
-  const groupBreakdown = Array.from(groupMap.values())
-    .map((g) => ({ ...g, workedRounded: roundToNearest15Minutes(g.worked), travelRounded: roundToNearest15Minutes(g.travel) }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-
-  const issueStatusCounts = new Map<string, number>();
-  for (const i of issues ?? []) issueStatusCounts.set(i.status ?? "unknown", (issueStatusCounts.get(i.status ?? "unknown") ?? 0) + 1);
 
   const hasFilters = !!(status || jobType || siteId || assignedTo || dateFrom || dateTo);
   const scopeParams: Record<string, string> = {};
   if (projectId) scopeParams.project_id = projectId;
   if (clientId) scopeParams.client_id = clientId;
+  const exportParams = new URLSearchParams({
+    ...scopeParams,
+    ...(status && { status }),
+    ...(jobType && { job_type: jobType }),
+    ...(siteId && { site_id: siteId }),
+    ...(assignedTo && { assigned_to: assignedTo }),
+    ...(dateFrom && { date_from: dateFrom }),
+    ...(dateTo && { date_to: dateTo }),
+    group_by: groupBy,
+  }).toString();
 
   return (
     <div className="flex flex-col gap-4">
@@ -321,36 +212,52 @@ export default async function ProjectRollupReportPage({ searchParams }: { search
         )}
       </form>
 
-      {!hasScope && (
+      {!result.hasScope && (
         <p className="text-muted-foreground rounded-md border p-6 text-center text-sm">
           Choose a customer and/or a project above, then run the report.
         </p>
       )}
 
-      {hasScope && (
+      {result.hasScope && (
         <>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="text-muted-foreground">Export this view:</span>
+            <a href={`/api/reports/project-rollup/pdf?${exportParams}`} className="border-input rounded-md border px-3 py-1.5 hover:bg-accent">
+              PDF
+            </a>
+            <a href={`/api/reports/project-rollup/xlsx?${exportParams}`} className="border-input rounded-md border px-3 py-1.5 hover:bg-accent">
+              Excel
+            </a>
+            <a href={`/api/reports/project-rollup/csv?${exportParams}`} className="border-input rounded-md border px-3 py-1.5 hover:bg-accent">
+              CSV
+            </a>
+            <a href={`/api/reports/project-rollup/zip?${exportParams}`} className="border-input rounded-md border px-3 py-1.5 hover:bg-accent">
+              Zip (all formats)
+            </a>
+          </div>
+
           <div className="flex flex-wrap gap-4">
-            <StatTile label="Jobs in scope" value={String(rows.length)} />
-            <StatTile label="Worked time" value={formatMinutes(roundToNearest15Minutes(rawWorkedTotal))} />
-            <StatTile label="Travel time" value={formatMinutes(roundToNearest15Minutes(rawTravelTotal))} />
-            <StatTile label="Issues raised" value={String((issues ?? []).length)} />
+            <StatTile label="Jobs in scope" value={String(result.data.jobCount)} />
+            <StatTile label="Worked time" value={formatMinutes(result.data.workedMinutesTotal)} />
+            <StatTile label="Travel time" value={formatMinutes(result.data.travelMinutesTotal)} />
+            <StatTile label="Issues raised" value={String(result.data.issueCount)} />
           </div>
 
           <div>
             <h2 className="mb-2 text-lg font-semibold">Jobs by status</h2>
             <div className="flex flex-wrap gap-2">
-              {ALL_JOB_STATUSES.filter((s) => (statusCounts.get(s) ?? 0) > 0).map((s) => (
-                <Badge key={s} variant="secondary">
-                  {humanize(s)}: {statusCounts.get(s)}
+              {result.data.statusCounts.map((s) => (
+                <Badge key={s.status} variant="secondary">
+                  {s.label}: {s.count}
                 </Badge>
               ))}
-              {rows.length === 0 && <span className="text-muted-foreground text-sm">No jobs in scope yet.</span>}
+              {result.data.statusCounts.length === 0 && <span className="text-muted-foreground text-sm">No jobs in scope yet.</span>}
             </div>
           </div>
 
           <div>
             <h2 className="mb-2 text-lg font-semibold">Throughput (jobs submitted per week)</h2>
-            {throughputWeeks.length === 0 ? (
+            {result.data.throughputByWeek.length === 0 ? (
               <p className="text-muted-foreground text-sm">No jobs submitted yet in scope.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -362,7 +269,7 @@ export default async function ProjectRollupReportPage({ searchParams }: { search
                     </tr>
                   </thead>
                   <tbody>
-                    {throughputWeeks.map(([week, count]) => (
+                    {result.data.throughputByWeek.map(({ week, count }) => (
                       <tr key={week} className="border-b">
                         <td className="py-2">{new Date(week).toLocaleDateString()}</td>
                         <td className="py-2 tabular-nums">{count}</td>
@@ -375,33 +282,31 @@ export default async function ProjectRollupReportPage({ searchParams }: { search
           </div>
 
           <div>
-            <h2 className="mb-2 text-lg font-semibold">
-              Breakdown by {GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label.toLowerCase()}
-            </h2>
+            <h2 className="mb-2 text-lg font-semibold">Breakdown by {result.data.groupByLabel.toLowerCase()}</h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left">
-                    <th className="py-2 font-medium">{GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label}</th>
+                    <th className="py-2 font-medium">{result.data.groupByLabel}</th>
                     <th className="py-2 font-medium">Jobs</th>
                     <th className="py-2 font-medium">Worked</th>
                     <th className="py-2 font-medium">Travel</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {groupBreakdown.length === 0 && (
+                  {result.data.groupBreakdown.length === 0 && (
                     <tr>
                       <td colSpan={4} className="text-muted-foreground py-4 text-center">
                         No jobs match these filters.
                       </td>
                     </tr>
                   )}
-                  {groupBreakdown.map((g) => (
+                  {result.data.groupBreakdown.map((g) => (
                     <tr key={g.label} className="border-b">
                       <td className="py-2">{g.label}</td>
                       <td className="py-2 tabular-nums">{g.jobCount}</td>
-                      <td className="py-2 tabular-nums">{formatMinutes(g.workedRounded)}</td>
-                      <td className="py-2 tabular-nums">{formatMinutes(g.travelRounded)}</td>
+                      <td className="py-2 tabular-nums">{formatMinutes(g.workedMinutes)}</td>
+                      <td className="py-2 tabular-nums">{formatMinutes(g.travelMinutes)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -412,12 +317,12 @@ export default async function ProjectRollupReportPage({ searchParams }: { search
           <div>
             <h2 className="mb-2 text-lg font-semibold">Issues by state</h2>
             <div className="flex flex-wrap gap-2">
-              {Array.from(issueStatusCounts.entries()).map(([s, count]) => (
+              {result.data.issueStatusCounts.map(({ status: s, count }) => (
                 <Badge key={s} variant="outline">
                   {humanize(s)}: {count}
                 </Badge>
               ))}
-              {(issues ?? []).length === 0 && <span className="text-muted-foreground text-sm">No issues raised in scope.</span>}
+              {result.data.issueStatusCounts.length === 0 && <span className="text-muted-foreground text-sm">No issues raised in scope.</span>}
             </div>
           </div>
 
@@ -435,26 +340,26 @@ export default async function ProjectRollupReportPage({ searchParams }: { search
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.length === 0 && (
+                  {result.data.rows.length === 0 && (
                     <tr>
                       <td colSpan={5} className="text-muted-foreground py-6 text-center">
                         No jobs match these filters.
                       </td>
                     </tr>
                   )}
-                  {rows.map((job) => (
-                    <tr key={job.id} className="border-b">
+                  {result.data.rows.map((job) => (
+                    <tr key={job.jobId} className="border-b">
                       <td className="py-2">
-                        <Link href={`/office/jobs/${job.id}`} className="font-medium underline-offset-2 hover:underline">
-                          {job.job_number}
+                        <Link href={`/office/jobs/${job.jobId}`} className="font-medium underline-offset-2 hover:underline">
+                          {job.jobNumber}
                         </Link>
                       </td>
-                      <td className="py-2 text-muted-foreground">{job.site?.name ?? "—"}</td>
+                      <td className="py-2 text-muted-foreground">{job.siteName}</td>
                       <td className="py-2">
                         <Badge variant="secondary">{humanize(job.status)}</Badge>
                       </td>
-                      <td className="py-2 text-muted-foreground">{job.assigned?.name ?? "Unassigned"}</td>
-                      <td className="py-2 text-muted-foreground">{job.scheduled_start ? new Date(job.scheduled_start).toLocaleString() : "—"}</td>
+                      <td className="py-2 text-muted-foreground">{job.engineerName}</td>
+                      <td className="py-2 text-muted-foreground">{job.scheduledStart ? new Date(job.scheduledStart).toLocaleString() : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
