@@ -6353,3 +6353,69 @@ Consolidated into a single finalized scoping memo (both P1 reports in
 full — parameters, contents, the resolved clock/target decisions —
 plus the data map and phased roadmap):
 https://claude.ai/artifact/EnkHHx5rD3D2EjuzaViXej
+
+## Report Generator Phase 1 — SLA compliance + Project rollup, built
+
+Built per the finalized Blueprint above, on the branch it was
+resolved for. One migration
+(`20260921000000_client_sla_target.sql`) adds the structured field
+the scoping found missing — `clients.sla_target_hours`, nullable
+numeric, `> 0` when set — edited from a new "SLA target" section on
+the client detail page (`office/clients/[id]/sla-target-form.tsx`,
+next to the existing Fixture Types/Reasons lists), via a dedicated
+`updateClientSlaTarget` action rather than folding it into the
+general customer-edit form, since it's SLA-specific config, not a
+contact detail.
+
+**SLA compliance report** (`office/reports/sla-compliance`): scoped
+to `job_type = "sla"` jobs only — the only jobs a per-client target
+means anything for. Classification (met/breached/open, and the
+elapsed-hours calculation) is a pure function in
+`lib/reports/sla-compliance.ts`, unit-tested independently of the
+query/page code (same split as `worked-duration.ts`/Timesheets):
+`actual_start` → `job_details.submitted_at`, wall-clock elapsed
+(pauses count against the clock, per the resolved scoping — this is
+deliberately *not* the pause-aware `computeWorkedMinutes`), compared
+against the client's `sla_target_hours`. A job with no target set,
+or not yet submitted, comes back "open" rather than misclassified —
+the report surfaces it in a dedicated "Open / in flight" stat rather
+than silently excluding it. Filters: date range (cohort, on
+`created_at`), client, site, fixture type, SLA reason, engineer,
+project; group-by: fixture type, reason, engineer, site, or
+customer. Fixture type/reason live on `job_details` (a child table),
+so — same reasoning `list-query.ts` already documents for why
+`clientId` isn't a `jobs` column — they're applied as a JS filter
+after the fetch rather than fought into a PostgREST embedded-filter.
+
+**Project rollup report** (`office/reports/project-rollup`): scoped
+to a project and/or a client (rolled up across every project
+belonging to that client); requires picking at least one before it
+runs anything, rather than defaulting to "every job everywhere."
+Status counts, weekly submission throughput, worked/travel time
+(raw unrounded minutes summed across every job *first*, rounded
+once at the end — the exact principle `worked-duration.ts` documents
+for `computeEngineerDayMinutes`, reused here rather than re-derived),
+an engineer/site/status breakdown, and issues-by-state, all from
+`jobs`/`status_events`/`issues` — no new tables needed beyond the one
+above. Archived projects are deliberately still selectable and
+included (archiving hides a project from *active* pickers, not from
+reporting — see the Project Archive entry above).
+
+Both pages copy the Asset Register report-page pattern exactly (plain
+`<form method="get">` filters, `StatTile` summary cards, plain
+`<table>` breakdowns, no client component) and are cross-linked with
+each other and the existing Completed Jobs page. **PDF/zip export for
+these two is explicitly not included in this pass** — confirmed by
+reading `lib/pdf/brand.ts`/`completion-report.ts` that no table-grid
+rendering primitive exists anywhere in the pdfkit pipeline (every
+helper there is shaped for one job's single-column narrative); adding
+that is real, separate engineering, not a checkbox on this work.
+
+Verified: 7 new unit tests for the classification function (boundary,
+open-for-no-target, open-for-not-yet-submitted, pauses counting
+against the clock), full `vitest` suite (531 tests) and full
+Playwright e2e suite (10 specs) green after a `supabase db reset`,
+`next build` clean, and both report pages checked in a real browser
+against seeded data plus temporary hand-inserted SLA jobs (met/
+breached/open) — screenshotted, then the temporary rows removed
+before the e2e run.
