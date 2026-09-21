@@ -6266,3 +6266,33 @@ for the seeded engineer account, opened each, selected N/A on the
 Reason dropdown and on the survey screen's Environment/Brightness
 dropdowns, confirmed the value round-trips correctly. Full suite
 green (524/524 unit, 10/10 e2e); typecheck/lint clean.
+
+## Platform Atlas — feature brief, prepared ahead of Report Generator scoping
+
+Not a proposal — a reference. Covers every surface (Office, Field
+app, Warehouse kiosk, Finance, Damaged Equipment, Watchdog), who
+reaches each one, the 5 cron jobs and 4 integrations, and a data-flow
+map of how the ~45-table schema actually connects, grouped by purpose
+rather than listed flat. Confirmed while researching it, not assumed:
+Asset Register and Job Sheets are scoped to a *site*, not a project
+(equipment/kit outlive any one project running at that site); Job
+Sheets and Timesheets: no dedicated timesheets table exists at all —
+worked/travel minutes are computed on the fly from `status_events`;
+Knowledge Base, Help Guides, and Watchdog are genuinely isolated, no
+foreign key crosses into the job/client data from any of the three.
+
+Closes with what this means for Report Generator specifically:
+Asset Register's existing financial/depreciation/warranty report
+sub-pages (also reused verbatim by Finance) are a working precedent
+for "a report page scoped to one data domain, parameterized by
+surface" worth reusing rather than designing report infrastructure
+from scratch. Flags what's reportable-in-principle but untouched by
+anything reporting-shaped today: Timesheets aggregation, SLA
+compliance breakdowns, Job Sheets/Stock throughput, Damaged Equipment
+resolution trends, and any cross-job/client-level rollup at all —
+today's `/office/reports` is strictly a per-job, on-demand PDF/zip
+pull (documented in full: scope, filters, exactly what's in the PDF
+vs. the zip, and what's explicitly not there).
+
+Full brief (both diagrams — roles/surfaces, and the data map):
+https://claude.ai/artifact/QJa9x6eGH4rXum94D7XMGi
