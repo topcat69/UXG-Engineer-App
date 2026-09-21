@@ -6419,3 +6419,60 @@ Playwright e2e suite (10 specs) green after a `supabase db reset`,
 against seeded data plus temporary hand-inserted SLA jobs (met/
 breached/open) — screenshotted, then the temporary rows removed
 before the e2e run.
+
+## Report Generator Phase 1 — PDF/XLSX/CSV/zip export added
+
+The export capability deliberately deferred above (no table-grid PDF
+primitive existed yet) is now built, on request, for both Phase 1
+reports. Refactored the query/classification/aggregation out of each
+page.tsx first — `lib/reports/sla-compliance-data.ts` and
+`lib/reports/project-rollup-data.ts` now own that logic, called by the
+on-screen page **and** every export route, so a PDF/XLSX/CSV can never
+show a different number than the page it was exported from (the same
+guarantee `/api/export/jobs`'s own comment already documents for the
+existing jobs-list CSV export).
+
+- **PDF**: `lib/pdf/report-table.ts` is the missing primitive —
+  a paginated table grid (header row + data rows, repeats the header
+  on each new page) built on the existing `brand.ts` banner/footer/
+  `pageAdded` pattern. Each report's PDF (`lib/pdf/sla-compliance-
+  report.ts`, `lib/pdf/project-rollup-report.ts`) renders the full
+  on-screen view — headline stats, every breakdown table, then the
+  per-job list — not just the flat job list, per the confirmed scope.
+- **XLSX**: added `exceljs` (no prior spreadsheet library in the
+  app). Each workbook is multi-sheet — Summary, one sheet per
+  breakdown, a Jobs sheet — built by `lib/xlsx/export.ts`. Caught and
+  fixed a real bug before commit: with the default group-by, the
+  dynamic breakdown sheet's name collided with a fixed summary
+  sheet's name (`ExcelJS` throws on duplicate sheet names) in
+  **both** reports — renamed the fixed sheets ("Status counts",
+  "Reason breakdown") to stop colliding with the dynamic "By ‹
+  dimension ›" sheet name.
+- **CSV**: two new functions in the existing `lib/csv/export.ts`
+  (`slaComplianceToCsv`, `projectRollupToCsv`), same
+  `Papa.unparse({fields, data})` shape as `jobsToCsv`/
+  `timesheetsToCsv` — the flat per-job line list, matching what the
+  jobs/timesheets CSV exports already do.
+- **Zip**: per the confirmed scoping decision (these aggregate
+  reports have no photos/originals to bundle, unlike the per-job zip
+  in `job-archive.ts`), "zip" here just means all three other formats
+  in one download — `lib/reports/report-zip.ts`.
+- One route per report (`/api/reports/{sla-compliance,project-
+  rollup}/[format]`, `format` one of `pdf`/`xlsx`/`csv`/`zip`) rather
+  than four routes each — superadmin/manager gated the same way as
+  every other `/api` report route, since `/api` is public at the
+  proxy layer.
+- Added `exceljs`; its transitive `uuid` dependency carried a known
+  moderate advisory (buffer bounds check, GHSA-w5hq-g745-h8pq, fixed
+  in `uuid` ≥11.1.1) — pinned via `pnpm.overrides`, the same mechanism
+  already used in this repo for `nanoid`/`fast-uri`/`js-yaml`/`qs`/
+  `hono`. `pnpm audit --prod` is clean after the pin.
+
+Verified: full `vitest` suite (531 tests) and full Playwright e2e
+suite (10 specs) green after a fresh `supabase db reset`, `next
+build` clean, and all 8 new export endpoints (2 reports × 4 formats)
+exercised against real seeded + hand-inserted SLA data — the PDF
+pagination/header-repeat and the sheet-naming bug above were both
+caught by actually rendering the output (`pdftoppm` screenshots of
+the generated PDFs, not just an HTTP 200 check) rather than trusting
+a green status code alone.
