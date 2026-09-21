@@ -82,7 +82,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Completed Jobs</h1>
-        <span className="text-muted-foreground text-sm">{total} jobs</span>
+        <div className="flex items-center gap-4">
+          <div className="flex gap-3 text-sm whitespace-nowrap">
+            <Link href="/office/reports/sla-compliance" className="underline-offset-2 hover:underline">
+              SLA compliance
+            </Link>
+            <Link href="/office/reports/project-rollup" className="underline-offset-2 hover:underline">
+              Project rollup
+            </Link>
+          </div>
+          <span className="text-muted-foreground text-sm">{total} jobs</span>
+        </div>
       </div>
 
       <form className="flex flex-wrap items-end gap-2" method="get">
