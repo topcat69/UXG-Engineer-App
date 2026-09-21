@@ -6296,3 +6296,55 @@ vs. the zip, and what's explicitly not there).
 
 Full brief (both diagrams — roles/surfaces, and the data map):
 https://claude.ai/artifact/QJa9x6eGH4rXum94D7XMGi
+
+## Report Generator — scoping brief reviewed, open questions resolved
+
+A separately-authored 7-page scoping brief ("Report Generator —
+Scoping Brief") was reviewed against the actual codebase rather than
+taken at face value — it builds directly on the Atlas above (SLA
+picklists, no dedicated timesheets table, Job Sheets/Asset Register
+site-scoped not project-scoped) and that all checked out. Scope as
+the brief lands it: one report generator, two P1 report types (SLA
+compliance, Project rollup) added to the kept-as-is per-job PDF/zip
+pull, reusing the Asset Register's report-sub-page pattern rather
+than building report infrastructure from scratch, PDF/zip only (no
+new export formats), superadmin/manager only (matching every other
+Office/job surface) — Finance's own Asset Register reports stay
+untouched and out of scope. Candidates for a later phase: engineer
+utilisation, goods-in throughput, damaged-equipment trends — all
+reportable from data that already exists, none built yet.
+
+Two things in the brief needed resolving before Phase 1, both
+checked against real code rather than assumed:
+
+- **SLA target for met/breached had no home.** No structured
+  target-duration field exists anywhere — the only candidate,
+  `job_details.sla_requirement_detail`, is free text (e.g. "4-hour
+  response") shared with the unrelated `maintenance` job type
+  (`job-form.ts:110-112`), not something safe to parse
+  automatically. **Resolved: a new structured target field, per
+  client** — a real schema addition the brief's "no schema changes
+  anticipated" needs to account for.
+- **The SLA clock's start point wasn't pinned to a field.** Checked
+  how an SLA job actually comes into being: created with `status:
+  "draft"` like any job (`office/sla/actions.ts:65`), scheduled
+  later as a separate step. **Resolved: the clock starts at
+  `jobs.actual_start`** — set by `checkIn` (`field-actions.ts:103`),
+  the moment the engineer actually begins the job on site — not at
+  creation/logging, because jobs can be scheduled weeks ahead and
+  measuring from there would say nothing real about response
+  performance. The clock's *end* stays at engineer-submit (not
+  manager-approval) as the brief already had it, with submit→
+  approved kept as a separate, worthwhile turnaround metric rather
+  than folded into the SLA clock itself.
+
+Also confirmed: the report's date-range parameter is cohort-based
+(which jobs are *included*, by when they were logged/created) — a
+different question from what the clock measures once a job is in
+that cohort, and both SLA compliance and Project rollup gain **both**
+a Client and a Project filter, so either can be run scoped to one
+project, one client rolled up across its projects, or both at once.
+
+Nothing built yet — this closes out the brief's open questions so
+Phase 1 (the two P1 reports, on the Asset Register pattern) can start
+from a clean scope whenever it's picked up.
