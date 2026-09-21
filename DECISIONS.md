@@ -6348,3 +6348,8 @@ project, one client rolled up across its projects, or both at once.
 Nothing built yet — this closes out the brief's open questions so
 Phase 1 (the two P1 reports, on the Asset Register pattern) can start
 from a clean scope whenever it's picked up.
+
+Consolidated into a single finalized scoping memo (both P1 reports in
+full — parameters, contents, the resolved clock/target decisions —
+plus the data map and phased roadmap):
+https://claude.ai/artifact/EnkHHx5rD3D2EjuzaViXej
