@@ -6226,3 +6226,43 @@ reason anyone would still reach a hidden job directly.
 Full scoping memo (the associated-tables table, the shape-fork
 diagram, the open-jobs risk, phased roadmap), updated in place:
 https://claude.ai/artifact/13ZFpd64GuBypBu4sPjhJw
+
+## N/A on every engineer-facing dropdown — built
+
+Surveyed every dropdown an engineer actually touches before writing
+anything — job details, survey form, KB submit. Most already had
+N/A (mount type, power source, network, wifi signal, both pass/fail
+fields, equipment damage) via install-form.ts's existing convention.
+Six survey-screen fields (environment, orientation, brightness tier,
+connection method, wifi security, IP addressing) and the SLA
+"Reason" picker didn't.
+
+Survey-screen fields are plain nullable text columns already, so
+adding "N/A"/"na" to their option arrays needed no schema change —
+just a new literal in an already-optional field. "Reason" is a
+required FK into a per-client `client_sla_reasons` table, so "N/A"
+can't be a real row there; added it as a UI-only sentinel in the
+select instead, converted to `null` at submit time (the nullable
+`reason_id` column already supports "no reason set") — an engineer
+can now explicitly say "none of these fit" without the literal string
+"N/A" ever reaching the uuid FK column.
+
+Left out on purpose: the KB category picker (organisational —
+should always have an answer, unlike an observation that can
+genuinely not apply to a given job) and the Yes/No toggle buttons
+(not dropdowns, and making them three-state is a different, bigger
+change than what was asked). The KB Manufacturer/Model-range pickers
+already have a functionally-equivalent "—" none-option, left as
+wording rather than behaviour to change.
+
+Documented the convention in situ, not just here — a comment on both
+dropdown-building helpers (`job-workflow.tsx`'s `Select`,
+`survey-form-section.tsx`'s `SelectInput`) saying every future option
+list should end with N/A too, so it isn't something that has to be
+remembered separately.
+
+Verified in a real browser: created a live SLA job and a survey job
+for the seeded engineer account, opened each, selected N/A on the
+Reason dropdown and on the survey screen's Environment/Brightness
+dropdowns, confirmed the value round-trips correctly. Full suite
+green (524/524 unit, 10/10 e2e); typecheck/lint clean.
