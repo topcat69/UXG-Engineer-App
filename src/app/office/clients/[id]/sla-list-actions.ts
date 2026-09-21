@@ -111,3 +111,30 @@ export async function deleteReason(clientId: string, itemId: string): Promise<De
 export async function importReasonsCsv(clientId: string, formData: FormData): Promise<ImportResult> {
   return importCsv("client_sla_reasons", clientId, formData);
 }
+
+export type UpdateSlaTargetResult = { ok: true; hours: number | null } | { ok: false; message: string };
+
+/**
+ * The SLA compliance report's own target, per the Report Generator
+ * Blueprint's resolved scoping — one structured number per customer, not
+ * a per-job field, since it applies uniformly to every SLA job logged
+ * against that customer. Blank clears it back to null (a customer with
+ * no target on file simply can't be classified met/breached yet).
+ */
+export async function updateClientSlaTarget(clientId: string, hoursInput: string): Promise<UpdateSlaTargetResult> {
+  const trimmed = hoursInput.trim();
+  let hours: number | null = null;
+  if (trimmed) {
+    hours = Number(trimmed);
+    if (!Number.isFinite(hours) || hours <= 0) {
+      return { ok: false, message: "Enter a positive number of hours, or leave blank to clear the target." };
+    }
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("clients").update({ sla_target_hours: hours }).eq("id", clientId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/office/clients/${clientId}`);
+  return { ok: true, hours };
+}

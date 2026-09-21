@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ClientSites } from "./client-sites";
 import { ClientProjects } from "./client-projects";
 import { SlaListsManager } from "./sla-lists-manager";
+import { SlaTargetForm } from "./sla-target-form";
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,6 +34,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       </div>
       <ClientProjects clientId={client.id} projects={projects ?? []} />
       <ClientSites sites={sites ?? []} />
+      <SlaTargetForm clientId={client.id} initialHours={client.sla_target_hours} />
       <SlaListsManager clientId={client.id} fixtureTypes={fixtureTypes ?? []} reasons={reasons ?? []} />
     </div>
   );

@@ -314,6 +314,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          sla_target_hours: number | null
         }
         Insert: {
           contact_email?: string | null
@@ -324,6 +325,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          sla_target_hours?: number | null
         }
         Update: {
           contact_email?: string | null
@@ -334,6 +336,7 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          sla_target_hours?: number | null
         }
         Relationships: []
       }
