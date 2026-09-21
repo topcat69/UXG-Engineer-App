@@ -15,6 +15,7 @@ const NAV = [
   { href: "/office/qa", label: "Job Review" },
   { href: "/office/issues", label: "Issues" },
   { href: "/office/reports", label: "Completed Jobs" },
+  { href: "/office/report-generator", label: "Report Generator" },
   { href: "/damaged-equipment", label: "Damaged Equipment" },
 ];
 
