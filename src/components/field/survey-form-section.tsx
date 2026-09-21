@@ -439,6 +439,12 @@ function TextInput({ value, onChange, placeholder }: { value: string; onChange: 
   );
 }
 
+/**
+ * Every option list passed in here should end with an N/A entry (see
+ * ENVIRONMENT_OPTIONS etc. in survey-form.ts) — an engineer should never be
+ * forced to guess at a value that doesn't apply to this particular screen.
+ * Add one to any new list, not just the ones that already have it.
+ */
 function SelectInput({
   value,
   options,

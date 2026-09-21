@@ -128,12 +128,21 @@ export function surveyFormRowToValues(row: SurveyFormRow | undefined): SurveyFor
   };
 }
 
-export const ENVIRONMENT_OPTIONS = ["retail_floor", "reception", "window_facing", "external"];
-export const ORIENTATION_OPTIONS = ["landscape", "portrait"];
-export const BRIGHTNESS_TIER_OPTIONS = ["Standard (~350 nits)", "High-bright (700+ nits)", "Window/sun-facing (2,500+ nits)"];
-export const CONNECTION_METHOD_OPTIONS = ["wired", "wifi"];
-export const WIFI_SECURITY_OPTIONS = ["WPA2", "WPA3"];
-export const IP_MODE_OPTIONS = ["dhcp", "static"];
+// Every option list here ends with an N/A option, on purpose — same
+// convention as MOUNT_TYPES/POWER_SOURCES/etc. in install-form.ts. Add one
+// to any new list too, so an engineer is never forced to guess at a value
+// that genuinely doesn't apply to this screen.
+export const ENVIRONMENT_OPTIONS = ["retail_floor", "reception", "window_facing", "external", "na"];
+export const ORIENTATION_OPTIONS = ["landscape", "portrait", "na"];
+export const BRIGHTNESS_TIER_OPTIONS = [
+  "Standard (~350 nits)",
+  "High-bright (700+ nits)",
+  "Window/sun-facing (2,500+ nits)",
+  "N/A",
+];
+export const CONNECTION_METHOD_OPTIONS = ["wired", "wifi", "na"];
+export const WIFI_SECURITY_OPTIONS = ["WPA2", "WPA3", "N/A"];
+export const IP_MODE_OPTIONS = ["dhcp", "static", "na"];
 
 /** Empty (never-persisted) screen row — an "Add screen" tap fills in id/survey_form_id/position and hands this straight to upsertSurveyScreen. */
 export function emptySurveyScreen(id: string, surveyFormId: string, position: number): SurveyScreenRow {

@@ -268,7 +268,10 @@ export function JobWorkflow({
       parking_permit_drive_file_id: detailsRow?.parking_permit_drive_file_id ?? null,
       sla_requirement_detail: detailsRow?.sla_requirement_detail ?? null,
       fixture_type_id: detailsRow?.fixture_type_id ?? null,
-      reason_id: detailsValues.reason_id || null,
+      // "N/A" is a picker sentinel, not a real client_sla_reasons id — an
+      // engineer can explicitly say "none of these fit" without it being
+      // written to the (uuid, FK) column.
+      reason_id: detailsValues.reason_id && detailsValues.reason_id !== "N/A" ? detailsValues.reason_id : null,
       job_information: detailsRow?.job_information ?? null,
       parking_notified: detailsValues.parking_notified,
       parking_notes: detailsValues.parking_notes || null,
@@ -890,6 +893,7 @@ function JobDetailsSection({
                 {r.name}
               </option>
             ))}
+            <option value="N/A">N/A</option>
           </select>
         </Field>
       )}
@@ -1046,6 +1050,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+/**
+ * Every option list passed in here should end with an N/A entry (see
+ * install-form.ts's MOUNT_TYPES etc.) — an engineer should never be forced
+ * to guess at a value that doesn't apply on this particular job. Add one to
+ * any new list, not just the ones that already have it.
+ */
 function Select({
   value,
   options,
