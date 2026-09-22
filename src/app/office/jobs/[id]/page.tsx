@@ -47,6 +47,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: engineers },
     { data: projects },
     { data: allSites },
+    { data: jobSheet },
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -73,6 +74,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("users").select("id, name").in("role", ["engineer", "manager", "superadmin"]).eq("active", true).order("name"),
     supabase.from("projects").select("id, name, client_id").order("name"),
     supabase.from("sites").select("id, name, client_id").order("name"),
+    supabase.from("job_sheets").select("id, reference, status, po_number, job_description").eq("linked_job_id", id).maybeSingle(),
   ]);
 
   if (error || !job) notFound();
@@ -83,25 +85,35 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   // which isn't known until the main query above resolves. The SLA fixture
   // type/reason lists are fetched the same way, for the same reason —
   // they're scoped to the job's site's client, only known once job resolves.
-  const [{ data: parentJob }, { data: revisitChildren }, { data: fixtureTypes }, { data: reasons }, { data: surveyScreens }, { data: surveyActions }] =
-    await Promise.all([
-      job.parent_job_id
-        ? supabase.from("jobs").select("id, job_number").eq("id", job.parent_job_id).single()
-        : Promise.resolve({ data: null }),
-      supabase.from("jobs").select("id, job_number").eq("parent_job_id", id),
-      job.site?.client?.id
-        ? supabase.from("client_sla_fixture_types").select("id, name").eq("client_id", job.site.client.id).order("name")
-        : Promise.resolve({ data: [] }),
-      job.site?.client?.id
-        ? supabase.from("client_sla_reasons").select("id, name").eq("client_id", job.site.client.id).order("name")
-        : Promise.resolve({ data: [] }),
-      surveyForm
-        ? supabase.from("survey_screens").select("*").eq("survey_form_id", surveyForm.id).order("position")
-        : Promise.resolve({ data: [] }),
-      surveyForm
-        ? supabase.from("survey_actions").select("*").eq("survey_form_id", surveyForm.id).order("position")
-        : Promise.resolve({ data: [] }),
-    ]);
+  const [
+    { data: parentJob },
+    { data: revisitChildren },
+    { data: fixtureTypes },
+    { data: reasons },
+    { data: surveyScreens },
+    { data: surveyActions },
+    { data: jobSheetStockItems },
+  ] = await Promise.all([
+    job.parent_job_id
+      ? supabase.from("jobs").select("id, job_number").eq("id", job.parent_job_id).single()
+      : Promise.resolve({ data: null }),
+    supabase.from("jobs").select("id, job_number").eq("parent_job_id", id),
+    job.site?.client?.id
+      ? supabase.from("client_sla_fixture_types").select("id, name").eq("client_id", job.site.client.id).order("name")
+      : Promise.resolve({ data: [] }),
+    job.site?.client?.id
+      ? supabase.from("client_sla_reasons").select("id, name").eq("client_id", job.site.client.id).order("name")
+      : Promise.resolve({ data: [] }),
+    surveyForm
+      ? supabase.from("survey_screens").select("*").eq("survey_form_id", surveyForm.id).order("position")
+      : Promise.resolve({ data: [] }),
+    surveyForm
+      ? supabase.from("survey_actions").select("*").eq("survey_form_id", surveyForm.id).order("position")
+      : Promise.resolve({ data: [] }),
+    jobSheet
+      ? supabase.from("stock_items").select("id, manufacturer, model, serial_no, damaged").eq("job_sheet_id", jobSheet.id).order("received_at")
+      : Promise.resolve({ data: [] }),
+  ]);
 
   // Signed URLs so the office can actually see the photos/videos, not just
   // their slot placeholders — the Media section used to render an emoji box
@@ -185,6 +197,39 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <DeleteJobButton jobId={job.id} jobNumber={job.job_number} />
         </div>
       </div>
+
+      {jobSheet && (
+        <section className="flex flex-col gap-2 rounded-md border p-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-medium">
+              Job Sheet:{" "}
+              <Link href={`/office/job-sheets/${jobSheet.id}`} className="underline-offset-2 hover:underline">
+                {jobSheet.reference}
+              </Link>
+            </h2>
+            <Badge variant="secondary">{humanize(jobSheet.status)}</Badge>
+          </div>
+          {jobSheet.job_description && <p className="text-sm">{jobSheet.job_description}</p>}
+          {jobSheet.po_number && (
+            <p className="text-sm">
+              <span className="text-muted-foreground">PO number:</span> {jobSheet.po_number}
+            </p>
+          )}
+          {(jobSheetStockItems ?? []).length > 0 ? (
+            <ul className="list-disc pl-5 text-sm">
+              {(jobSheetStockItems ?? []).map((item) => (
+                <li key={item.id}>
+                  {[item.manufacturer, item.model].filter(Boolean).join(" ") || "Unlisted item"}
+                  {item.serial_no ? ` — ${item.serial_no}` : ""}
+                  {item.damaged && <span className="text-destructive"> (flagged damaged at goods-in)</span>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted-foreground text-sm">No stock recorded on this job sheet yet.</p>
+          )}
+        </section>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="flex flex-col gap-2">
