@@ -4,21 +4,27 @@ import { signOut } from "@/lib/auth/actions";
 import { roleLabel } from "@/lib/format/text";
 import { UxgLogo } from "@/components/branding/uxg-logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { AdminToolsNav } from "@/components/office/admin-tools-nav";
+import { NavDropdown } from "@/components/office/nav-dropdown";
 
-const NAV = [
-  { href: "/office/dashboard", label: "Dashboard" },
-  { href: "/office/jobs", label: "Jobs" },
-  { href: "/office/sla", label: "SLA" },
+const NAV_BEFORE_JOBS = [{ href: "/office/dashboard", label: "Dashboard" }];
+
+/** Grouped behind the "Jobs" dropdown (see NavDropdown) rather than four separate top-level entries — Customer Jobs/Customer SLA/Job Sheets/Job Review are all job-surface pages, distinct from Completed Jobs (the finished-job report pull), which stays its own top-level entry. */
+const JOBS_NAV = [
+  { href: "/office/jobs", label: "Customer Jobs" },
+  { href: "/office/sla", label: "Customer SLA" },
   { href: "/office/job-sheets", label: "Job Sheets" },
-  { href: "/office/scheduler", label: "Scheduler" },
   { href: "/office/qa", label: "Job Review" },
+];
+
+const NAV_AFTER_JOBS = [
+  { href: "/office/scheduler", label: "Scheduler" },
   { href: "/office/issues", label: "Issues" },
   { href: "/office/reports", label: "Completed Jobs" },
+  { href: "/office/report-generator", label: "Report Generator" },
   { href: "/damaged-equipment", label: "Damaged Equipment" },
 ];
 
-/** Low-frequency admin pages, tucked behind the "Admin Tools" dropdown (see AdminToolsNav) rather than cluttering the main nav bar. */
+/** Low-frequency admin pages, tucked behind the "Admin Tools" dropdown (see NavDropdown) rather than cluttering the main nav bar. */
 const ADMIN_TOOLS_NAV = [
   { href: "/office/clients", label: "Customers" },
   { href: "/office/sites", label: "Sites" },
@@ -46,12 +52,18 @@ export default async function OfficeLayout({ children }: { children: React.React
         <div className="flex items-center gap-6">
           <UxgLogo className="h-6 w-auto" />
           <nav className="flex items-center gap-4 text-sm">
-            {NAV.map((item) => (
+            {NAV_BEFORE_JOBS.map((item) => (
               <Link key={item.href} href={item.href} className="text-muted-foreground hover:text-foreground">
                 {item.label}
               </Link>
             ))}
-            <AdminToolsNav links={user.role === "superadmin" ? [...ADMIN_TOOLS_NAV, ...SUPERADMIN_ADMIN_TOOLS_NAV] : ADMIN_TOOLS_NAV} />
+            <NavDropdown label="Jobs" links={JOBS_NAV} />
+            {NAV_AFTER_JOBS.map((item) => (
+              <Link key={item.href} href={item.href} className="text-muted-foreground hover:text-foreground">
+                {item.label}
+              </Link>
+            ))}
+            <NavDropdown label="Admin Tools" links={user.role === "superadmin" ? [...ADMIN_TOOLS_NAV, ...SUPERADMIN_ADMIN_TOOLS_NAV] : ADMIN_TOOLS_NAV} />
           </nav>
         </div>
         <div className="flex items-center gap-3 text-sm">

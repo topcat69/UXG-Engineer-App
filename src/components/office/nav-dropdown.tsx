@@ -3,18 +3,18 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-export type AdminToolsLink = { href: string; label: string };
+export type NavDropdownLink = { href: string; label: string };
 
 /**
- * Groups the office nav's low-frequency admin pages (Customers, Sites,
- * Projects, Import, Templates, Users) behind one "Admin Tools" trigger,
- * so the main nav bar stays short — these aren't day-to-day items the
- * way Jobs/SLA/Scheduler are. Plain click-toggle + outside-click/Escape
- * to close, matching the rest of this office UI's convention of native
- * elements over a component library (no dropdown/menu primitive is used
- * anywhere else in the app).
+ * A labelled group of links behind one click-to-open trigger in the main
+ * office nav bar — used for "Admin Tools" (low-frequency admin pages) and
+ * "Jobs" (Customer Jobs/Customer SLA/Job Sheets/Job Review, grouped so the
+ * main bar doesn't grow one entry per job-related surface). Plain
+ * click-toggle + outside-click/Escape to close, matching the rest of this
+ * office UI's convention of native elements over a component library (no
+ * dropdown/menu primitive is used anywhere else in the app).
  */
-export function AdminToolsNav({ links }: { links: AdminToolsLink[] }) {
+export function NavDropdown({ label, links }: { label: string; links: NavDropdownLink[] }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -45,7 +45,7 @@ export function AdminToolsNav({ links }: { links: AdminToolsLink[] }) {
         aria-haspopup="menu"
         className="text-muted-foreground hover:text-foreground flex items-center gap-1 whitespace-nowrap"
       >
-        Admin Tools
+        {label}
         <span aria-hidden="true" className="text-xs">
           {open ? "▲" : "▼"}
         </span>

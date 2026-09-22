@@ -90,8 +90,8 @@ export default async function ProjectRollupReportPage({ searchParams }: { search
           </p>
         </div>
         <div className="flex gap-3 text-sm whitespace-nowrap">
-          <Link href="/office/reports" className="underline-offset-2 hover:underline">
-            Completed Jobs
+          <Link href="/office/report-generator" className="underline-offset-2 hover:underline">
+            Report Generator
           </Link>
           <Link href="/office/reports/sla-compliance" className="underline-offset-2 hover:underline">
             SLA compliance
