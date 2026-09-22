@@ -13,6 +13,7 @@ import {
   updateManufacturer,
   updateModel,
   updateSoftwareProvider,
+  type ManufacturerRow,
   type StockListRow,
   type StockModelRow,
 } from "./actions";
@@ -29,10 +30,12 @@ export function StockCatalogManager({
   initialManufacturers,
   initialModels,
   initialSoftwareProviders,
+  assetCategories,
 }: {
-  initialManufacturers: StockListRow[];
+  initialManufacturers: ManufacturerRow[];
   initialModels: StockModelRow[];
   initialSoftwareProviders: StockListRow[];
+  assetCategories: StockListRow[];
 }) {
   const [manufacturers, setManufacturers] = useState(initialManufacturers);
   const [models, setModels] = useState(initialModels);
@@ -50,19 +53,14 @@ export function StockCatalogManager({
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-2 gap-6">
-        <FlatListSection
-          title="Manufacturers"
-          helperText="Pick one to manage its models on the right."
-          items={manufacturers}
+        <ManufacturerSection
+          manufacturers={manufacturers}
+          assetCategories={assetCategories}
           selectedId={selectedId}
           onSelect={setSelectedId}
-          create={createManufacturer}
-          update={updateManufacturer}
-          remove={deleteManufacturer}
           onCreated={(item) => setManufacturers((prev) => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)))}
           onUpdated={(item) => setManufacturers((prev) => prev.map((m) => (m.id === item.id ? item : m)).sort((a, b) => a.name.localeCompare(b.name)))}
           onDeleted={handleManufacturerDeleted}
-          confirmDeleteText="Delete this manufacturer? This can't be undone."
         />
         <ModelSection
           manufacturer={selectedManufacturer}
@@ -85,6 +83,204 @@ export function StockCatalogManager({
         confirmDeleteText="Delete this software provider? This can't be undone."
       />
     </div>
+  );
+}
+
+/**
+ * Manufacturers, each optionally tagged with the Asset Register category
+ * its kit falls under — picking one here bulk-categorises every
+ * currently-uncategorised Asset Register row with a matching manufacturer
+ * (see createManufacturer/updateManufacturer). Bespoke rather than
+ * FlatListSection (used for Software Providers/Asset Categories) since
+ * this list carries that extra category field plus the row-select driving
+ * the Models section next to it.
+ */
+function ManufacturerSection({
+  manufacturers,
+  assetCategories,
+  selectedId,
+  onSelect,
+  onCreated,
+  onUpdated,
+  onDeleted,
+}: {
+  manufacturers: ManufacturerRow[];
+  assetCategories: StockListRow[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onCreated: (item: ManufacturerRow) => void;
+  onUpdated: (item: ManufacturerRow) => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCategoryId, setEditCategoryId] = useState("");
+
+  function categoryName(id: string | null) {
+    return assetCategories.find((c) => c.id === id)?.name ?? null;
+  }
+
+  function handleCreate() {
+    startTransition(async () => {
+      const result = await createManufacturer(name, categoryId || null);
+      if (result.ok) {
+        onCreated(result.item);
+        setName("");
+        setCategoryId("");
+        setMessage(null);
+      } else {
+        setMessage(result.message);
+      }
+    });
+  }
+
+  function handleSaveEdit(id: string) {
+    startTransition(async () => {
+      const result = await updateManufacturer(id, editName, editCategoryId || null);
+      if (result.ok) {
+        onUpdated(result.item);
+        setEditingId(null);
+      } else {
+        setMessage(result.message);
+      }
+    });
+  }
+
+  function handleDelete(id: string) {
+    if (!window.confirm("Delete this manufacturer? This can't be undone.")) return;
+    startTransition(async () => {
+      const result = await deleteManufacturer(id);
+      if (result.ok) {
+        onDeleted(id);
+      } else {
+        setMessage(result.message);
+      }
+    });
+  }
+
+  return (
+    <section className="flex flex-col gap-3 rounded-md border p-3">
+      <div>
+        <h2 className="font-medium">Manufacturers</h2>
+        <p className="text-muted-foreground text-sm">
+          Pick one to manage its models on the right. A category here bulk-fills any uncategorised Asset Register
+          entries for that manufacturer.
+        </p>
+      </div>
+
+      <table className="w-full text-sm">
+        <tbody>
+          {manufacturers.map((item) =>
+            editingId === item.id ? (
+              <tr key={item.id} className="border-b">
+                <td className="py-2">
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="border-input h-8 w-full rounded-md border bg-transparent px-2 text-sm"
+                  />
+                </td>
+                <td className="py-2">
+                  <select
+                    value={editCategoryId}
+                    onChange={(e) => setEditCategoryId(e.target.value)}
+                    className="border-input h-8 w-full rounded-md border bg-transparent px-2 text-sm"
+                  >
+                    <option value="">No category</option>
+                    {assetCategories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="py-2 text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" size="sm" disabled={isPending || !editName.trim()} onClick={() => handleSaveEdit(item.id)}>
+                      Save
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setEditingId(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              <tr key={item.id} className={`border-b ${item.id === selectedId ? "bg-muted/40" : ""}`}>
+                <td className="py-2">
+                  <button type="button" onClick={() => onSelect(item.id)} className="text-left hover:underline">
+                    {item.name}
+                  </button>
+                </td>
+                <td className="text-muted-foreground py-2">{categoryName(item.category_id) ?? "—"}</td>
+                <td className="py-2 text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={isPending}
+                      onClick={() => {
+                        setEditingId(item.id);
+                        setEditName(item.name);
+                        setEditCategoryId(item.category_id ?? "");
+                        setMessage(null);
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={() => handleDelete(item.id)}>
+                      Delete
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ),
+          )}
+          {manufacturers.length === 0 && (
+            <tr>
+              <td colSpan={3} className="text-muted-foreground py-4 text-center">
+                None yet.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+      {message && <p className="text-destructive text-sm">{message}</p>}
+
+      <div className="flex items-end gap-2">
+        <div className="flex flex-col gap-1">
+          <label className="text-muted-foreground text-xs">Name</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-muted-foreground text-xs">Asset category</label>
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+          >
+            <option value="">No category</option>
+            {assetCategories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Button type="button" size="sm" disabled={isPending || !name.trim()} onClick={handleCreate}>
+          Add
+        </Button>
+      </div>
+    </section>
   );
 }
 

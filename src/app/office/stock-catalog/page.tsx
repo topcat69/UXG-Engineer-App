@@ -10,10 +10,11 @@ import { StockCatalogManager } from "./stock-catalog-manager";
 export default async function StockCatalogPage() {
   const supabase = await createClient();
 
-  const [{ data: manufacturers, error }, { data: models }, { data: softwareProviders }] = await Promise.all([
-    supabase.from("stock_manufacturers").select("id, name").order("name"),
+  const [{ data: manufacturers, error }, { data: models }, { data: softwareProviders }, { data: assetCategories }] = await Promise.all([
+    supabase.from("stock_manufacturers").select("id, name, category_id").order("name"),
     supabase.from("stock_models").select("id, name, manufacturer_id, description").order("name"),
     supabase.from("stock_software_providers").select("id, name").order("name"),
+    supabase.from("asset_categories").select("id, name").order("name"),
   ]);
 
   if (error) {
@@ -33,6 +34,7 @@ export default async function StockCatalogPage() {
         initialManufacturers={manufacturers ?? []}
         initialModels={models ?? []}
         initialSoftwareProviders={softwareProviders ?? []}
+        assetCategories={assetCategories ?? []}
       />
     </div>
   );
