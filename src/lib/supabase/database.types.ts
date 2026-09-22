@@ -2094,21 +2094,32 @@ export type Database = {
       }
       stock_manufacturers: {
         Row: {
+          category_id: string | null
           created_at: string | null
           id: string
           name: string
         }
         Insert: {
+          category_id?: string | null
           created_at?: string | null
           id?: string
           name: string
         }
         Update: {
+          category_id?: string | null
           created_at?: string | null
           id?: string
           name?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "stock_manufacturers_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stock_models: {
         Row: {

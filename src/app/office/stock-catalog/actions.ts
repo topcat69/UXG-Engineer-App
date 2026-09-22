@@ -3,37 +3,70 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
 export type StockListRow = { id: string; name: string };
 type ItemResult = { ok: true; item: StockListRow } | { ok: false; message: string };
 type DeleteResult = { ok: true } | { ok: false; message: string };
 
-export async function createManufacturer(name: string): Promise<ItemResult> {
+export type ManufacturerRow = { id: string; name: string; category_id: string | null };
+type ManufacturerResult = { ok: true; item: ManufacturerRow } | { ok: false; message: string };
+
+/**
+ * Bulk-categorises Asset Register — every row still uncategorised
+ * (category_id is null) whose free-text manufacturer matches this
+ * manufacturer's name gets this category. Fill-only, same "whichever was
+ * set first wins" convention as PO number reconciliation elsewhere
+ * (assignJobSheetToJob) — an asset a manager already categorised by hand
+ * is left alone rather than silently overwritten every time this
+ * manufacturer's category changes.
+ */
+async function backfillAssetCategoryForManufacturer(supabase: SupabaseServerClient, manufacturerName: string, categoryId: string) {
+  await supabase.from("asset_register").update({ category_id: categoryId }).eq("manufacturer", manufacturerName).is("category_id", null);
+}
+
+export async function createManufacturer(name: string, categoryId: string | null): Promise<ManufacturerResult> {
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, message: "Name is required." };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from("stock_manufacturers").insert({ name: trimmed }).select("id, name").single();
+  const { data, error } = await supabase
+    .from("stock_manufacturers")
+    .insert({ name: trimmed, category_id: categoryId })
+    .select("id, name, category_id")
+    .single();
   if (error) {
     if (error.code === "23505") return { ok: false, message: "That manufacturer already exists." };
     return { ok: false, message: error.message };
   }
 
+  if (categoryId) await backfillAssetCategoryForManufacturer(supabase, trimmed, categoryId);
+
   revalidatePath("/office/stock-catalog");
+  revalidatePath("/office/asset-register");
   return { ok: true, item: data };
 }
 
-export async function updateManufacturer(id: string, name: string): Promise<ItemResult> {
+export async function updateManufacturer(id: string, name: string, categoryId: string | null): Promise<ManufacturerResult> {
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, message: "Name is required." };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from("stock_manufacturers").update({ name: trimmed }).eq("id", id).select("id, name").single();
+  const { data, error } = await supabase
+    .from("stock_manufacturers")
+    .update({ name: trimmed, category_id: categoryId })
+    .eq("id", id)
+    .select("id, name, category_id")
+    .single();
   if (error) {
     if (error.code === "23505") return { ok: false, message: "That manufacturer already exists." };
     return { ok: false, message: error.message };
   }
 
+  if (categoryId) await backfillAssetCategoryForManufacturer(supabase, trimmed, categoryId);
+
   revalidatePath("/office/stock-catalog");
+  revalidatePath("/office/asset-register");
   return { ok: true, item: data };
 }
 
