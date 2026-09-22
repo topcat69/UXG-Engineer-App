@@ -27,7 +27,7 @@ export default async function JobSheetsPage() {
       )
       .order("created_at", { ascending: false })
       .range(0, PAGE_SIZE - 1),
-    supabase.from("projects").select("id, name, client_id, archived_at").order("name"),
+    supabase.from("projects").select("id, name, client_id, archived_at, client:clients(name)").order("name"),
     supabase.from("sites").select("id, name, client_id").order("name"),
   ]);
 

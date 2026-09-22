@@ -9,7 +9,7 @@ export function CreateJobSheetForm({
   projects,
   sites,
 }: {
-  projects: { id: string; name: string; client_id: string | null }[];
+  projects: { id: string; name: string; client_id: string | null; client: { name: string } | null }[];
   sites: { id: string; name: string; client_id: string }[];
 }) {
   const router = useRouter();
@@ -88,6 +88,7 @@ export function CreateJobSheetForm({
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
+                {p.client ? ` — ${p.client.name}` : ""}
               </option>
             ))}
           </select>
