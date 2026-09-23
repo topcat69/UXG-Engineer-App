@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { humanize } from "@/lib/format/text";
 import { AssignToJobForm } from "./assign-to-job-form";
-import { ReassignStockItemControl } from "./reassign-stock-item-control";
+import { StockItemActions } from "./stock-item-actions";
 import { DeleteJobSheetButton } from "./delete-job-sheet-button";
 import { PoNumberControl } from "./po-number-control";
 
@@ -113,7 +113,7 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
               <TableHead>Tested</TableHead>
               <TableHead>Damaged</TableHead>
               <TableHead>Photo</TableHead>
-              <TableHead>Job sheet</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -141,7 +141,7 @@ export default async function JobSheetDetailPage({ params }: { params: Promise<{
                   )}
                 </TableCell>
                 <TableCell>
-                  <ReassignStockItemControl stockItemId={item.id} currentJobSheetId={jobSheet.id} otherJobSheets={otherJobSheets ?? []} />
+                  <StockItemActions stockItemId={item.id} currentJobSheetId={jobSheet.id} otherJobSheets={otherJobSheets ?? []} />
                 </TableCell>
               </TableRow>
             ))}

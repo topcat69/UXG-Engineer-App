@@ -137,3 +137,30 @@ export async function reassignStockItem(stockItemId: string, fromJobSheetId: str
   revalidatePath("/office/job-sheets");
   return { ok: true };
 }
+
+/**
+ * Permanently removes a Stock Item added in error — the counterpart to
+ * moving one (above): sometimes there's simply nowhere to move it to, but
+ * it still shouldn't sit on this sheet. Its Configuration row (see
+ * job_sheet_tests.stock_item_id) cascades with it; a linked Asset Register
+ * or Damaged Equipment row (traceability links only, never load-bearing)
+ * just loses that reference rather than being deleted too.
+ */
+export async function deleteStockItem(stockItemId: string, jobSheetId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const { data: item } = await supabase.from("stock_items").select("image_path").eq("id", stockItemId).single();
+
+  const { error } = await supabase.from("stock_items").delete().eq("id", stockItemId);
+  if (error) return { ok: false, message: error.message };
+
+  // Best-effort — an orphaned photo left in storage is harmless; the row
+  // is already gone either way, so a storage failure here shouldn't read
+  // back to the user as "delete failed".
+  if (item?.image_path) await supabase.storage.from("stock-item-photos").remove([item.image_path]);
+
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  revalidatePath("/office/job-sheets");
+  revalidatePath("/office/stock");
+  return { ok: true };
+}
