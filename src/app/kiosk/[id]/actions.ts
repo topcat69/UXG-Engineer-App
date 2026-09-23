@@ -473,6 +473,38 @@ export async function updateStockItem(
   return { ok: true };
 }
 
+/**
+ * Removes an item scanned or typed in by mistake — same "not gated on
+ * status" reasoning as everywhere else on this sheet (Decision 7):
+ * Warehouse needs this while still receiving/building the sheet just as
+ * much as Office needs it later (see the office-side counterpart in
+ * office/job-sheets/[id]/actions.ts). Its Configuration row cascades with
+ * it; a linked Asset Register or Damaged Equipment row (traceability
+ * only) just loses that reference.
+ */
+export async function deleteStockItem(stockItemId: string, jobSheetId: string): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, message: "Not signed in." };
+
+  const supabase = await createClient();
+
+  const { data: item } = await supabase.from("stock_items").select("image_path").eq("id", stockItemId).single();
+
+  const { error } = await supabase.from("stock_items").delete().eq("id", stockItemId);
+  if (error) return { ok: false, message: error.message };
+
+  // Best-effort — an orphaned photo left in storage is harmless; the row
+  // is already gone either way, so a storage failure here shouldn't read
+  // back to the user as "delete failed".
+  if (item?.image_path) await supabase.storage.from("stock-item-photos").remove([item.image_path]);
+
+  revalidatePath(`/kiosk/${jobSheetId}`);
+  revalidatePath(`/office/job-sheets/${jobSheetId}`);
+  revalidatePath("/office/job-sheets");
+  revalidatePath("/office/stock");
+  return { ok: true };
+}
+
 export type UploadStockItemPhotoResult = { ok: true; imagePath: string } | { ok: false; message: string };
 
 /**

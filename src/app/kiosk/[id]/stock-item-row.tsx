@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { updateStockItem } from "./actions";
+import { deleteStockItem, updateStockItem } from "./actions";
 import { StockItemPhotoControl } from "./stock-item-photo-control";
 import { StockItemTestedControl } from "./stock-item-tested-control";
 
@@ -83,6 +83,18 @@ export function StockItemRow({
     setFields(fieldsFrom(item, manufacturers, models));
     setMessage(null);
     setEditing(true);
+  }
+
+  function handleDelete() {
+    if (!window.confirm("Delete this stock item? This can't be undone.")) return;
+    startTransition(async () => {
+      const result = await deleteStockItem(item.id, jobSheetId);
+      if (result.ok) {
+        router.refresh();
+      } else {
+        setMessage(result.message);
+      }
+    });
   }
 
   function handleSave() {
@@ -280,9 +292,15 @@ export function StockItemRow({
         <StockItemPhotoControl stockItemId={item.id} jobSheetId={jobSheetId} imagePath={item.image_path} imageUrl={item.imageUrl} />
       </TableCell>
       <TableCell>
-        <Button type="button" size="sm" variant="outline" onClick={startEditing}>
-          Edit
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={startEditing}>
+            Edit
+          </Button>
+          <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={handleDelete}>
+            Delete
+          </Button>
+        </div>
+        {message && <p className="text-destructive text-xs">{message}</p>}
       </TableCell>
     </TableRow>
   );
