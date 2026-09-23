@@ -91,7 +91,7 @@ export default async function OfficeLayout({ children }: { children: React.React
             // proper cross-surface nav — managers can't use /kiosk, so it's
             // hidden for them rather than bouncing them to "/".
             <Link href="/kiosk" className="text-muted-foreground hover:text-foreground underline">
-              Kiosk (goods-in)
+              Goods In
             </Link>
           )}
           <ThemeSwitcher currentTheme={user.theme} />
