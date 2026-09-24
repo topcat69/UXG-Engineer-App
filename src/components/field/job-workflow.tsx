@@ -423,6 +423,14 @@ export function JobWorkflow({
     let validationErrors: string[];
     if (detailsMode) {
       const optionalKeys = new Set((optionalFieldRows ?? []).map((row) => row.field_key));
+      // A linked Job Sheet already captured these at goods-in (see
+      // stockItems above) — re-scanning them in the field is redundant, so
+      // they're automatically optional here regardless of the per-job
+      // manual override above.
+      if (jobSheet) {
+        optionalKeys.add("player_serial");
+        optionalKeys.add("screen_serial");
+      }
       validationErrors = validateJobDetails(jobType as JobDetailsType, detailsValues, capturedSlots, !!signature, optionalKeys);
     } else {
       validationErrors = validateSurveyForm(surveyValues, surveyScreens ?? []);
