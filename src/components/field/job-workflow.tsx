@@ -40,6 +40,7 @@ import {
 import {
   EMPTY_JOB_DETAILS,
   JOB_TYPE_LABELS,
+  YES_NO_NA,
   earlyPhotoSlotsFor,
   jobDetailsRowToValues,
   latePhotoSlotsFor,
@@ -278,6 +279,10 @@ export function JobWorkflow({
       reported_to_site_manager: detailsValues.reported_to_site_manager,
       site_manager_name: detailsValues.site_manager_name || null,
       site_manager_phone: detailsValues.site_manager_phone || null,
+      health_safety_checks_complete: (detailsValues.health_safety_checks_complete || null) as JobDetailsRow["health_safety_checks_complete"],
+      equipment_located: (detailsValues.equipment_located || null) as JobDetailsRow["equipment_located"],
+      working_order_check: (detailsValues.working_order_check || null) as JobDetailsRow["working_order_check"],
+      obvious_damage_check: (detailsValues.obvious_damage_check || null) as JobDetailsRow["obvious_damage_check"],
       arrival_notes: detailsValues.arrival_notes || null,
       revisit_required: detailsValues.revisit_required === "" ? null : detailsValues.revisit_required === "yes",
       issues_found: detailsValues.issues_found,
@@ -781,13 +786,47 @@ function JobDetailsSection({
       </Field>
 
       {showsAvFields(jobType) && (
-        <Field label="State of affairs on arrival">
-          <Textarea
-            value={values.arrival_notes}
-            onChange={(e) => setValues((v) => ({ ...v, arrival_notes: e.target.value }))}
-            placeholder="What did you find on arrival, before starting any work? e.g. existing damage, customer's own equipment, site condition."
-          />
-        </Field>
+        <>
+          <Field label="Health and safety checks complete">
+            <Select
+              value={values.health_safety_checks_complete}
+              options={YES_NO_NA}
+              onChange={(v) => setValues((prev) => ({ ...prev, health_safety_checks_complete: v }))}
+              labelFor={humanize}
+            />
+          </Field>
+          <Field label="Locate the equipment">
+            <Select
+              value={values.equipment_located}
+              options={YES_NO_NA}
+              onChange={(v) => setValues((prev) => ({ ...prev, equipment_located: v }))}
+              labelFor={humanize}
+            />
+          </Field>
+          <Field label="Is everything in working order">
+            <Select
+              value={values.working_order_check}
+              options={YES_NO_NA}
+              onChange={(v) => setValues((prev) => ({ ...prev, working_order_check: v }))}
+              labelFor={humanize}
+            />
+          </Field>
+          <Field label="Any obvious damage, disconnected cables, switched-off equipment">
+            <Select
+              value={values.obvious_damage_check}
+              options={YES_NO_NA}
+              onChange={(v) => setValues((prev) => ({ ...prev, obvious_damage_check: v }))}
+              labelFor={humanize}
+            />
+          </Field>
+          <Field label="State of affairs on arrival">
+            <Textarea
+              value={values.arrival_notes}
+              onChange={(e) => setValues((v) => ({ ...v, arrival_notes: e.target.value }))}
+              placeholder="Notes for the checklist above — what did you find on arrival, before starting any work? e.g. existing damage, customer's own equipment, site condition."
+            />
+          </Field>
+        </>
       )}
 
       {earlySlots.length > 0 && (

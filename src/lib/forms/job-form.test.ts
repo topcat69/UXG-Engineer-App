@@ -35,6 +35,10 @@ const completeAvValues: JobDetailsValues = {
   content_displaying: "pass",
   reported_to_site_manager: true,
   equipment_damage: "na",
+  health_safety_checks_complete: "yes",
+  equipment_located: "yes",
+  working_order_check: "yes",
+  obvious_damage_check: "no",
   arrival_notes: "Site tidy, no visible damage on arrival.",
 };
 
@@ -176,6 +180,29 @@ describe("validateJobDetails", () => {
     );
   });
 
+  it("requires the arrival checklist (health & safety, locate equipment, working order, damage check) wherever AV fields show, but not for delivery", () => {
+    const values = {
+      ...completeAvValues,
+      revisit_required: "no",
+      health_safety_checks_complete: "",
+      equipment_located: "",
+      working_order_check: "",
+      obvious_damage_check: "",
+    };
+    const errors = validateJobDetails("install", values, avSlots, true);
+    expect(errors).toContain("Health and safety checks complete is required.");
+    expect(errors).toContain("Locate the equipment is required.");
+    expect(errors).toContain("Is everything in working order is required.");
+    expect(errors).toContain("Any obvious damage, disconnected cables, switched-off equipment is required.");
+
+    const deliveryValues = { ...EMPTY_JOB_DETAILS, reported_to_site_manager: true, equipment_damage: "na" };
+    const deliveryErrors = validateJobDetails("delivery", deliveryValues, deliverySlots, true);
+    expect(deliveryErrors).not.toContain("Health and safety checks complete is required.");
+    expect(deliveryErrors).not.toContain("Locate the equipment is required.");
+    expect(deliveryErrors).not.toContain("Is everything in working order is required.");
+    expect(deliveryErrors).not.toContain("Any obvious damage, disconnected cables, switched-off equipment is required.");
+  });
+
   it("requires equipment_damage to be answered wherever the issues section shows", () => {
     const values = { ...completeAvValues, revisit_required: "no", equipment_damage: "" };
     expect(validateJobDetails("install", values, avSlots, true)).toContain("Equipment damage is required.");
@@ -234,6 +261,10 @@ describe("validateJobDetails", () => {
 describe("requirableFieldsFor", () => {
   it("includes AV fields plus reported-to-site-manager and revisit for install", () => {
     const keys = requirableFieldsFor("install").map((f) => f.key);
+    expect(keys).toContain("health_safety_checks_complete");
+    expect(keys).toContain("equipment_located");
+    expect(keys).toContain("working_order_check");
+    expect(keys).toContain("obvious_damage_check");
     expect(keys).toContain("arrival_notes");
     expect(keys).toContain("player_serial");
     expect(keys).toContain("network_port");
@@ -276,6 +307,14 @@ describe("validateJobDetails with optionalFields", () => {
     expect(validateJobDetails("install", values, avSlots, true, new Set(["player_serial"]))).not.toContain(
       "Player serial is required.",
     );
+  });
+
+  it("skips the arrival checklist's required-check once its keys are in optionalFields", () => {
+    const values = { ...completeAvValues, revisit_required: "no", health_safety_checks_complete: "", equipment_located: "" };
+    expect(validateJobDetails("install", values, avSlots, true)).toContain("Health and safety checks complete is required.");
+    expect(
+      validateJobDetails("install", values, avSlots, true, new Set(["health_safety_checks_complete", "equipment_located"])),
+    ).not.toContain("Health and safety checks complete is required.");
   });
 
   it("defaults to every field mandatory when optionalFields is omitted — no behavior change for existing jobs", () => {

@@ -50,7 +50,12 @@ export type JobDetailsValues = {
   reported_to_site_manager: boolean;
   site_manager_name: string;
   site_manager_phone: string;
-  /** What the engineer found on arrival, before any work starts — alongside the arrival photos (see earlyPhotoSlotsFor). */
+  /** Arrival checklist, answered before any work starts — "" | "yes" | "no" | "na", same tri-state pattern as revisit_required/equipment_damage. */
+  health_safety_checks_complete: string;
+  equipment_located: string;
+  working_order_check: string;
+  obvious_damage_check: string;
+  /** What the engineer found on arrival, before any work starts — notes made under the checklist above, alongside the arrival photos (see earlyPhotoSlotsFor). */
   arrival_notes: string;
   revisit_required: string; // "" | "yes" | "no" — tri-state so an unanswered question is distinguishable from "no"
   issues_found: boolean;
@@ -85,6 +90,10 @@ export const EMPTY_JOB_DETAILS: JobDetailsValues = {
   reported_to_site_manager: false,
   site_manager_name: "",
   site_manager_phone: "",
+  health_safety_checks_complete: "",
+  equipment_located: "",
+  working_order_check: "",
+  obvious_damage_check: "",
   arrival_notes: "",
   revisit_required: "",
   issues_found: false,
@@ -99,6 +108,7 @@ export const POWER_SOURCES = ["Existing socket", "New spur", "Requires electrici
 export const NETWORK_TYPES = ["WiFi", "Ethernet", "N/A"];
 export const WIFI_SIGNALS = ["Excellent", "Good", "Weak", "None", "N/A"];
 export const PASS_FAIL: readonly string[] = ["pass", "fail", "na"];
+export const YES_NO_NA: readonly string[] = ["yes", "no", "na"];
 
 /** Which sections a job type shows, per the spec's per-type section lists. */
 export function showsAvFields(jobType: JobDetailsType): boolean {
@@ -185,6 +195,10 @@ export function latePhotoSlotsFor(jobType: JobDetailsType): readonly string[] {
  * stay mandatory regardless of this override.
  */
 export type RequirableFieldKey =
+  | "health_safety_checks_complete"
+  | "equipment_located"
+  | "working_order_check"
+  | "obvious_damage_check"
   | "arrival_notes"
   | "player_serial"
   | "screen_serial"
@@ -208,6 +222,10 @@ export function requirableFieldsFor(jobType: JobDetailsType): RequirableField[] 
   const fields: RequirableField[] = [];
   if (showsAvFields(jobType)) {
     fields.push(
+      { key: "health_safety_checks_complete", label: "Health and safety checks complete" },
+      { key: "equipment_located", label: "Locate the equipment" },
+      { key: "working_order_check", label: "Is everything in working order" },
+      { key: "obvious_damage_check", label: "Any obvious damage, disconnected cables, switched-off equipment" },
       { key: "arrival_notes", label: "State of affairs on arrival" },
       { key: "player_serial", label: "Player serial" },
       { key: "screen_serial", label: "Screen serial" },
@@ -260,6 +278,10 @@ export function jobDetailsRowToValues(row: JobDetailsRow | undefined): JobDetail
     reported_to_site_manager: row.reported_to_site_manager ?? false,
     site_manager_name: row.site_manager_name ?? "",
     site_manager_phone: row.site_manager_phone ?? "",
+    health_safety_checks_complete: row.health_safety_checks_complete ?? "",
+    equipment_located: row.equipment_located ?? "",
+    working_order_check: row.working_order_check ?? "",
+    obvious_damage_check: row.obvious_damage_check ?? "",
     arrival_notes: row.arrival_notes ?? "",
     revisit_required: row.revisit_required === null ? "" : row.revisit_required ? "yes" : "no",
     issues_found: row.issues_found ?? false,
@@ -318,6 +340,16 @@ export function validateJobDetails(
   const requires = (key: RequirableFieldKey) => !optionalFields.has(key);
 
   if (showsAvFields(jobType)) {
+    if (requires("health_safety_checks_complete") && !values.health_safety_checks_complete) {
+      errors.push("Health and safety checks complete is required.");
+    }
+    if (requires("equipment_located") && !values.equipment_located) errors.push("Locate the equipment is required.");
+    if (requires("working_order_check") && !values.working_order_check) {
+      errors.push("Is everything in working order is required.");
+    }
+    if (requires("obvious_damage_check") && !values.obvious_damage_check) {
+      errors.push("Any obvious damage, disconnected cables, switched-off equipment is required.");
+    }
     if (requires("arrival_notes") && !values.arrival_notes.trim()) {
       errors.push("State of affairs on arrival is required.");
     }
