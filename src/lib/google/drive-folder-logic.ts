@@ -30,7 +30,7 @@ export type DriveFolderClientLike = {
 /**
  * Finds a folder named exactly `name` directly under `parentId`, creating
  * it if none exists. This is the one primitive every level of the
- * Customer Jobs New tree (client, project, and — from Phase 2 — site/job)
+ * "DO NOT USE - Customer Jobs New" tree (client, project, and — from Phase 2 — site/job)
  * is built from, so "does this folder already exist" only has to be
  * answered correctly once. Name match is exact, not fuzzy — two clients
  * that happen to share a name get two folders, same as they'd get two
