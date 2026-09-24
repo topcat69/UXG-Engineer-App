@@ -12,7 +12,9 @@ export { type DriveFolderClientLike, type DriveUploadClientLike };
 /**
  * One-way, this app → Drive only — same posture as calendar.ts, just a
  * different scope. This client only ever creates folders/files under
- * GOOGLE_DRIVE_ROOT_FOLDER_ID (the "Customer Jobs New" folder, created by
+ * GOOGLE_DRIVE_ROOT_FOLDER_ID (the "DO NOT USE - Customer Jobs New" folder,
+ * renamed from "Customer Jobs New" in Drive — the folder id it's
+ * addressed by didn't change, so the rename is cosmetic only — created by
  * hand once under Operations in the Shared Drive per the confirmed
  * scoping); it never reads back anything a human has edited, renamed, or
  * moved. `drive.file` (not the broader `drive`) scope is deliberate: it
@@ -49,7 +51,7 @@ function getDriveFolderClient(): drive_v3.Drive | null {
   return google.drive({ version: "v3", auth }) as unknown as drive_v3.Drive;
 }
 
-/** The pre-created "Customer Jobs New" folder everything else nests under. Unset means this integration isn't configured yet. */
+/** The pre-created "DO NOT USE - Customer Jobs New" folder everything else nests under. Unset means this integration isn't configured yet. */
 function driveRootFolderId(): string | null {
   return process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || null;
 }
@@ -67,7 +69,7 @@ export async function createOrFetchFolder(name: string, parentId: string): Promi
   return findOrCreateFolderImpl(getDriveFolderClient() as unknown as DriveFolderClientLike | null, name, parentId, driveSharedDriveId());
 }
 
-/** Returns the "Customer Jobs New" root folder id, or null if Drive isn't configured (no key, or no root folder id set). */
+/** Returns the "DO NOT USE - Customer Jobs New" root folder id, or null if Drive isn't configured (no key, or no root folder id set). */
 export function customerJobsRootFolderId(): string | null {
   if (!getDriveFolderClient()) return null;
   return driveRootFolderId();
