@@ -56,7 +56,17 @@ function sha256Hex(buffer: Buffer): string {
 function formatFieldValue(label: string, value: string | boolean | null): string | null {
   if (value === null || value === "") return null;
   if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (label === "Player boot test" || label === "Content displaying" || label === "Equipment damage") return humanize(value);
+  if (
+    label === "Player boot test" ||
+    label === "Content displaying" ||
+    label === "Equipment damage" ||
+    label === "Health and safety checks complete" ||
+    label === "Locate the equipment" ||
+    label === "Is everything in working order" ||
+    label === "Any obvious damage, disconnected cables, switched-off equipment"
+  ) {
+    return humanize(value);
+  }
   return value;
 }
 
@@ -232,6 +242,11 @@ export async function generateCompletionReport(supabase: AnySupabaseClient, jobI
           ["Network port", jobDetails.network_port],
           ["Player boot test", jobDetails.player_boot_test],
           ["Content displaying", jobDetails.content_displaying],
+          ["Health and safety checks complete", jobDetails.health_safety_checks_complete],
+          ["Locate the equipment", jobDetails.equipment_located],
+          ["Is everything in working order", jobDetails.working_order_check],
+          ["Any obvious damage, disconnected cables, switched-off equipment", jobDetails.obvious_damage_check],
+          ["State of affairs on arrival", jobDetails.arrival_notes],
           ["SLA requirement", jobDetails.sla_requirement_detail],
           ["Parking notified", jobDetails.parking_notified],
           ["Parking considerations / restrictions", jobDetails.parking_notes],

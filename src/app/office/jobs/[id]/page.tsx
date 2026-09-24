@@ -337,7 +337,22 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <FormField label="Site manager name" value={jobDetails.site_manager_name} />
               <FormField label="Site manager contact number" value={jobDetails.site_manager_phone} />
               {usesJobDetails(job.job_type) && showsAvFields(job.job_type) && (
-                <FormField label="State of affairs on arrival" value={jobDetails.arrival_notes} />
+                <>
+                  <FormField
+                    label="Health and safety checks complete"
+                    value={jobDetails.health_safety_checks_complete ? humanize(jobDetails.health_safety_checks_complete) : null}
+                  />
+                  <FormField label="Locate the equipment" value={jobDetails.equipment_located ? humanize(jobDetails.equipment_located) : null} />
+                  <FormField
+                    label="Is everything in working order"
+                    value={jobDetails.working_order_check ? humanize(jobDetails.working_order_check) : null}
+                  />
+                  <FormField
+                    label="Any obvious damage, disconnected cables, switched-off equipment"
+                    value={jobDetails.obvious_damage_check ? humanize(jobDetails.obvious_damage_check) : null}
+                  />
+                  <FormField label="State of affairs on arrival" value={jobDetails.arrival_notes} />
+                </>
               )}
               {jobDetails.revisit_required !== null && (
                 <FormField label="Revisit required" value={jobDetails.revisit_required ? "Yes" : "No"} />

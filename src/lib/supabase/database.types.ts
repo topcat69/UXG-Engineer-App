@@ -795,7 +795,11 @@ export type Database = {
           equipment_damage:
             | Database["public"]["Enums"]["equipment_damage_status"]
             | null
+          equipment_located: Database["public"]["Enums"]["yes_no_na"] | null
           fixture_type_id: string | null
+          health_safety_checks_complete:
+            | Database["public"]["Enums"]["yes_no_na"]
+            | null
           id: string
           issue_detail: string | null
           issues_found: boolean | null
@@ -804,6 +808,7 @@ export type Database = {
           mount_type: string | null
           network_port: string | null
           network_type: string | null
+          obvious_damage_check: Database["public"]["Enums"]["yes_no_na"] | null
           parking_notes: string | null
           parking_notified: boolean | null
           parking_permit_drive_file_id: string | null
@@ -824,6 +829,7 @@ export type Database = {
           sla_requirement_detail: string | null
           submitted_at: string | null
           wifi_signal: string | null
+          working_order_check: Database["public"]["Enums"]["yes_no_na"] | null
         }
         Insert: {
           arrival_notes?: string | null
@@ -835,7 +841,11 @@ export type Database = {
           equipment_damage?:
             | Database["public"]["Enums"]["equipment_damage_status"]
             | null
+          equipment_located?: Database["public"]["Enums"]["yes_no_na"] | null
           fixture_type_id?: string | null
+          health_safety_checks_complete?:
+            | Database["public"]["Enums"]["yes_no_na"]
+            | null
           id?: string
           issue_detail?: string | null
           issues_found?: boolean | null
@@ -844,6 +854,7 @@ export type Database = {
           mount_type?: string | null
           network_port?: string | null
           network_type?: string | null
+          obvious_damage_check?: Database["public"]["Enums"]["yes_no_na"] | null
           parking_notes?: string | null
           parking_notified?: boolean | null
           parking_permit_drive_file_id?: string | null
@@ -864,6 +875,7 @@ export type Database = {
           sla_requirement_detail?: string | null
           submitted_at?: string | null
           wifi_signal?: string | null
+          working_order_check?: Database["public"]["Enums"]["yes_no_na"] | null
         }
         Update: {
           arrival_notes?: string | null
@@ -875,7 +887,11 @@ export type Database = {
           equipment_damage?:
             | Database["public"]["Enums"]["equipment_damage_status"]
             | null
+          equipment_located?: Database["public"]["Enums"]["yes_no_na"] | null
           fixture_type_id?: string | null
+          health_safety_checks_complete?:
+            | Database["public"]["Enums"]["yes_no_na"]
+            | null
           id?: string
           issue_detail?: string | null
           issues_found?: boolean | null
@@ -884,6 +900,7 @@ export type Database = {
           mount_type?: string | null
           network_port?: string | null
           network_type?: string | null
+          obvious_damage_check?: Database["public"]["Enums"]["yes_no_na"] | null
           parking_notes?: string | null
           parking_notified?: boolean | null
           parking_permit_drive_file_id?: string | null
@@ -904,6 +921,7 @@ export type Database = {
           sla_requirement_detail?: string | null
           submitted_at?: string | null
           wifi_signal?: string | null
+          working_order_check?: Database["public"]["Enums"]["yes_no_na"] | null
         }
         Relationships: [
           {
@@ -2606,6 +2624,7 @@ export type Database = {
       qa_status: "pending" | "approved" | "rejected"
       stock_item_status: "received" | "configured" | "installed" | "returned"
       user_role: "superadmin" | "manager" | "engineer" | "warehouse" | "finance"
+      yes_no_na: "yes" | "no" | "na"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2777,6 +2796,7 @@ export const Constants = {
       qa_status: ["pending", "approved", "rejected"],
       stock_item_status: ["received", "configured", "installed", "returned"],
       user_role: ["superadmin", "manager", "engineer", "warehouse", "finance"],
+      yes_no_na: ["yes", "no", "na"],
     },
   },
 } as const

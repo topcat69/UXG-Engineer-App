@@ -61,6 +61,10 @@ test("manager pulls a job's PDF and zip report from /office/reports", async ({ p
   async function selectByLabel(labelText: string, optionText: string) {
     await page.locator("label", { hasText: labelText }).locator("select").selectOption({ label: optionText });
   }
+  await selectByLabel("Health and safety checks complete", "Yes");
+  await selectByLabel("Locate the equipment", "Yes");
+  await selectByLabel("Is everything in working order", "Yes");
+  await selectByLabel("Any obvious damage, disconnected cables, switched-off equipment", "No");
   await selectByLabel("Mount type", "Wall");
   await selectByLabel("Power source", "Existing socket");
   await selectByLabel("Network", "Ethernet");
