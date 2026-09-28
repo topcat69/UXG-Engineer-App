@@ -81,3 +81,37 @@ export async function allocateStockToJob(
   revalidatePath(`/office/job-sheets/${jobSheetId}`);
   return { ok: true };
 }
+
+/**
+ * Deletes `quantity` shelf units of one manufacturer/model outright — same
+ * "pick however many un-earmarked rows match, they're interchangeable"
+ * pattern as allocateStockToJob just above, deleting instead of
+ * reassigning. Only ever selects job_sheet_id-null rows, so stock already
+ * earmarked to a job sheet is never at risk from this.
+ */
+export async function deleteShelfStock(manufacturer: string | null, model: string | null, quantity: number): Promise<ActionResult> {
+  if (!Number.isInteger(quantity) || quantity < 1) return { ok: false, message: "Quantity must be at least 1." };
+
+  const supabase = await createClient();
+
+  let query = supabase.from("stock_items").select("id").is("job_sheet_id", null).limit(quantity);
+  query = manufacturer === null ? query.is("manufacturer", null) : query.eq("manufacturer", manufacturer);
+  query = model === null ? query.is("model", null) : query.eq("model", model);
+  const { data: rows, error: selectError } = await query;
+  if (selectError) return { ok: false, message: selectError.message };
+  if (!rows || rows.length < quantity) {
+    return { ok: false, message: `Only ${rows?.length ?? 0} on the shelf — refresh and try again.` };
+  }
+
+  const { error } = await supabase
+    .from("stock_items")
+    .delete()
+    .in(
+      "id",
+      rows.map((r) => r.id),
+    );
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/office/stock");
+  return { ok: true };
+}

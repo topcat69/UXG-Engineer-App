@@ -6,6 +6,7 @@ import { humanize } from "@/lib/format/text";
 import { groupEarmarkedStock, groupShelfStock, type EarmarkedStockRow, type ShelfStockRow } from "@/lib/stock/aggregate-stock";
 import { AddShelfStockForm } from "./add-shelf-stock-form";
 import { AllocateStockControl } from "./allocate-stock-control";
+import { DeleteShelfStockButton } from "./delete-shelf-stock-button";
 
 /**
  * Everything that's come through goods-in, in one place — see the
@@ -133,12 +134,13 @@ export default async function StockPage() {
               <TableHead>Item</TableHead>
               <TableHead className="text-right">Qty on shelf</TableHead>
               <TableHead>Allocate to job</TableHead>
+              <TableHead>Delete</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {shelfGroups.length === 0 && (
               <TableRow>
-                <TableCell colSpan={3} className="text-muted-foreground text-center">
+                <TableCell colSpan={4} className="text-muted-foreground text-center">
                   Nothing on the shelf.
                 </TableCell>
               </TableRow>
@@ -156,6 +158,9 @@ export default async function StockPage() {
                     maxQuantity={g.quantity}
                     jobSheets={jobSheets ?? []}
                   />
+                </TableCell>
+                <TableCell>
+                  <DeleteShelfStockButton manufacturer={g.manufacturer} model={g.model} quantity={g.quantity} />
                 </TableCell>
               </TableRow>
             ))}
