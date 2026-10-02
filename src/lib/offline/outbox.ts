@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { db, type MediaQueueItem, type OutboxOperation } from "./db";
+import { errorMessage } from "@/lib/errors";
 
 export type DrainResult = { succeeded: number; failed: number };
 
@@ -101,7 +102,7 @@ export async function drainOutbox(): Promise<DrainResult> {
       await db.outbox.update(op.id, {
         attempts: op.attempts + 1,
         lastAttemptAt: new Date().toISOString(),
-        lastError: error instanceof Error ? error.message : String(error),
+        lastError: errorMessage(error),
       });
     }
   }
@@ -311,7 +312,7 @@ export async function drainMediaQueue(): Promise<DrainResult> {
         status: "failed",
         attempts: item.attempts + 1,
         lastAttemptAt: new Date().toISOString(),
-        lastError: error instanceof Error ? error.message : String(error),
+        lastError: errorMessage(error),
       });
     }
   }

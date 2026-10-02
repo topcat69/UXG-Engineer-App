@@ -24,6 +24,7 @@ import {
   twoColumnRow,
 } from "./brand";
 import { fetchSiteMapImage } from "./site-map";
+import { errorMessage } from "@/lib/errors";
 
 const SITE_MAP_HEIGHT = 200;
 
@@ -340,6 +341,6 @@ export async function generateAndStoreCompletionReport(supabase: AnySupabaseClie
     if (error) return { error: error.message };
     return { path };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : String(error) };
+    return { error: errorMessage(error) };
   }
 }

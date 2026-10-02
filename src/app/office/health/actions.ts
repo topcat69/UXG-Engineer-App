@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireSuperadminUser } from "@/lib/auth/current-user";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runHealthCheckSweep } from "@/lib/health/run-health-check";
+import { errorMessage } from "@/lib/errors";
 
 export type RunHealthCheckNowResult = { ok: true } | { ok: false; message: string };
 
@@ -20,7 +21,7 @@ export async function runHealthCheckNow(): Promise<RunHealthCheckNowResult> {
   try {
     await runHealthCheckSweep(createAdminClient());
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    return { ok: false, message: errorMessage(error) };
   }
 
   revalidatePath("/office/health");

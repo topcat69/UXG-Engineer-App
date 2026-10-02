@@ -4,6 +4,7 @@ import { sendWeeklySummaryEmail } from "@/lib/email/send-job-emails";
 import { countWeekJobs } from "@/lib/email/weekly-summary";
 import { verifyWebhookSecret } from "@/lib/webhooks/verify-secret";
 import { recordCronHeartbeat, CRON_NAMES } from "@/lib/health/heartbeat";
+import { errorMessage } from "@/lib/errors";
 
 /** Same "external scheduler hits this weekly" contract as day-before-reminders — see that route's comment. */
 export async function POST(request: Request) {
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     await recordCronHeartbeat(supabase, CRON_NAMES.weeklySummary, true, `sent: ${sent}`);
     return NextResponse.json({ sent });
   } catch (error) {
-    await recordCronHeartbeat(supabase, CRON_NAMES.weeklySummary, false, error instanceof Error ? error.message : String(error));
+    await recordCronHeartbeat(supabase, CRON_NAMES.weeklySummary, false, errorMessage(error));
     throw error;
   }
 }
