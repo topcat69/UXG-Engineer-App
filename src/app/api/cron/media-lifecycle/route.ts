@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyWebhookSecret } from "@/lib/webhooks/verify-secret";
 import { selectLifecycleEligibleJobIds } from "@/lib/storage/media-lifecycle";
 import { recordCronHeartbeat, CRON_NAMES } from "@/lib/health/heartbeat";
+import { errorMessage } from "@/lib/errors";
 
 /**
  * Meant to be hit periodically by an external scheduler, same as the
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
       signaturesDeleted,
     });
   } catch (error) {
-    await recordCronHeartbeat(supabase, CRON_NAMES.mediaLifecycle, false, error instanceof Error ? error.message : String(error));
+    await recordCronHeartbeat(supabase, CRON_NAMES.mediaLifecycle, false, errorMessage(error));
     throw error;
   }
 }

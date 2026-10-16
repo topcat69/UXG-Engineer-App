@@ -4,6 +4,7 @@ import { sendDayBeforeEmail } from "@/lib/email/send-job-emails";
 import { isScheduledForTomorrow } from "@/lib/email/day-before";
 import { verifyWebhookSecret } from "@/lib/webhooks/verify-secret";
 import { recordCronHeartbeat, CRON_NAMES } from "@/lib/health/heartbeat";
+import { errorMessage } from "@/lib/errors";
 
 /**
  * Meant to be hit once a day by an external scheduler — this sandbox has no
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     await recordCronHeartbeat(supabase, CRON_NAMES.dayBeforeReminders, true, `sent: ${dueJobs.length}`);
     return NextResponse.json({ sent: dueJobs.length });
   } catch (error) {
-    await recordCronHeartbeat(supabase, CRON_NAMES.dayBeforeReminders, false, error instanceof Error ? error.message : String(error));
+    await recordCronHeartbeat(supabase, CRON_NAMES.dayBeforeReminders, false, errorMessage(error));
     throw error;
   }
 }

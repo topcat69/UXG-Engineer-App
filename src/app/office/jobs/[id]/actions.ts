@@ -15,6 +15,7 @@ import { syncCalendarForJob } from "@/lib/google/sync-job-calendar";
 import { syncJobDocumentToDrive } from "@/lib/google/drive-media-sync";
 import { sendJobAssignedEmail, sendJobCancelledEmail, sendJobScheduledEmail } from "@/lib/email/send-job-emails";
 import { recordIntegrationFailure } from "@/lib/health/integration-failures";
+import { errorMessage } from "@/lib/errors";
 import type { RequirableFieldKey } from "@/lib/forms/job-form";
 import type { ActionResult } from "../actions";
 
@@ -585,7 +586,7 @@ export async function assignAndScheduleJob(
       // was, which is exactly what made a real "no emails sending" report
       // indistinguishable from "nothing happened." Log it here instead.
       console.error(`Scheduled/assigned email failed for job ${jobId}`, error);
-      await recordIntegrationFailure("resend", error instanceof Error ? error.message : String(error));
+      await recordIntegrationFailure("resend", errorMessage(error));
     }
   });
 

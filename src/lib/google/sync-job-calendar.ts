@@ -4,6 +4,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { appBaseUrl } from "@/lib/app-url";
 import { deleteJobCalendarEvent, syncJobCalendarEvent } from "./calendar";
 import { recordIntegrationFailure } from "@/lib/health/integration-failures";
+import { errorMessage } from "@/lib/errors";
 
 type AnySupabaseClient = SupabaseClient<Database>;
 
@@ -48,7 +49,7 @@ export async function syncCalendarForJob(supabase: AnySupabaseClient, jobId: str
     }
   } catch (error) {
     console.error(`Calendar sync failed for job ${jobId}`, error);
-    await recordIntegrationFailure("calendar", error instanceof Error ? error.message : String(error));
+    await recordIntegrationFailure("calendar", errorMessage(error));
   }
 }
 
@@ -62,6 +63,6 @@ export async function removeCalendarForJob(supabase: AnySupabaseClient, jobId: s
     await supabase.from("jobs").update({ calendar_event_id: null }).eq("id", jobId);
   } catch (error) {
     console.error(`Calendar removal failed for job ${jobId}`, error);
-    await recordIntegrationFailure("calendar", error instanceof Error ? error.message : String(error));
+    await recordIntegrationFailure("calendar", errorMessage(error));
   }
 }
