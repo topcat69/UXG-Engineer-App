@@ -23,7 +23,7 @@
     "@base-ui/react": "^1.9.0",
     "@sentry/nextjs": "^10.74.0",
     "@supabase/ssr": "^0.12.4",
-    "@supabase/supabase-js": "^2.112.0",
+    "@supabase/supabase-js": "^2.117.3",
     "@vis.gl/react-google-maps": "^1.9.0",
     "@zxing/library": "^0.23.0",
     "browser-image-compression": "^2.0.2",
@@ -35,7 +35,7 @@
     "googleapis": "^174.0.0",
     "jszip": "^3.10.2",
     "lucide-react": "^1.28.0",
-    "next": "16.3.4",
+    "next": "16.3.8",
     "papaparse": "^5.7.0",
     "pdfkit": "^0.19.1",
     "react": "19.3.0",
@@ -69,7 +69,7 @@
     "supabase": "^2.111.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.5",
-    "typescript": "^5",
+    "typescript": "^6",
     "vitest": "^4.1.11"
   },
   "pnpm": {
@@ -79,7 +79,17 @@
       "js-yaml": ">=4.3.2",
       "qs": ">=6.16.0",
       "hono": ">=4.13.5",
-      "uuid": ">=11.1.1"
+      "uuid": ">=11.1.1",
+      "@modelcontextprotocol/sdk": ">=1.32.1",
+      "undici": ">=8.10.2",
+      "proxy-addr": ">=2.0.8",
+      "source-map-js": ">=1.2.2",
+      "sharp": ">=0.35.5"
+    },
+    "auditConfig": {
+      "ignoreCves": [
+        "CVE-2026-93687"
+      ]
     }
   }
 }
