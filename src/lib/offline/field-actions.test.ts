@@ -16,6 +16,7 @@ function jobRow(overrides: Partial<JobRow> = {}): JobRow {
     quickbooks_no: null,
     parent_job_id: null,
     source_issue_id: null,
+    source_ticket_id: null,
     scheduled_start: null,
     scheduled_end: null,
     actual_travel_start: null,

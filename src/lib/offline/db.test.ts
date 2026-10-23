@@ -32,6 +32,7 @@ describe("offline db", () => {
       quickbooks_no: null,
       parent_job_id: null,
       source_issue_id: null,
+      source_ticket_id: null,
       qa_status: "pending",
       qa_notes: null,
       calendar_event_id: null,
