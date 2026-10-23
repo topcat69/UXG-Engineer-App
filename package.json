@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
-    "@sentry/nextjs": "^10.74.0",
+    "@sentry/nextjs": "^10.76.2",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.117.3",
     "@vis.gl/react-google-maps": "^1.9.0",
@@ -35,7 +35,7 @@
     "googleapis": "^174.0.0",
     "jszip": "^3.10.2",
     "lucide-react": "^1.28.0",
-    "next": "16.3.8",
+    "next": "16.4.2",
     "papaparse": "^5.7.0",
     "pdfkit": "^0.19.1",
     "react": "19.3.0",
@@ -70,6 +70,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.5",
     "typescript": "^6",
+    "vite": "8.2.4",
     "vitest": "^4.1.11"
   },
   "pnpm": {

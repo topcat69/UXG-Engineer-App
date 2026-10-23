@@ -1385,6 +1385,7 @@ export type Database = {
           scheduled_start: string | null
           site_id: string
           source_issue_id: string | null
+          source_ticket_id: string | null
           status: Database["public"]["Enums"]["job_status"]
           travel_start_lat: number | null
           travel_start_lng: number | null
@@ -1419,6 +1420,7 @@ export type Database = {
           scheduled_start?: string | null
           site_id: string
           source_issue_id?: string | null
+          source_ticket_id?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           travel_start_lat?: number | null
           travel_start_lng?: number | null
@@ -1453,6 +1455,7 @@ export type Database = {
           scheduled_start?: string | null
           site_id?: string
           source_issue_id?: string | null
+          source_ticket_id?: string | null
           status?: Database["public"]["Enums"]["job_status"]
           travel_start_lat?: number | null
           travel_start_lng?: number | null
