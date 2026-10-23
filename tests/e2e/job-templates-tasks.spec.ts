@@ -166,6 +166,15 @@ test("template application, submit gating on incomplete tasks, and job duplicati
   // lands, the button is gone for good, and clicking into that void is
   // exactly what made an earlier, tighter retry loop here hang forever
   // waiting on a button that would never reappear.
+  //
+  // isVisible() and click() are still two separate round trips, though —
+  // the app can legitimately unmount the button in the gap between them
+  // (submission is fast), and when that happens click()'s own actionability
+  // wait has no way to tell "gone forever" from "about to reappear": it
+  // polls for the full default 90s regardless. A short explicit timeout on
+  // each retry click turns that race into a fast, harmless failure instead
+  // — the loop's own submitDeadline and the assertion below are what
+  // actually confirm success, not this click succeeding.
   const submitButton = fieldPage.getByRole("button", { name: /Check Out & Submit/ });
   await submitButton.click();
   const submitDeadline = Date.now() + 10_000;
@@ -176,7 +185,7 @@ test("template application, submit gating on incomplete tasks, and job duplicati
       .then(() => true)
       .catch(() => false);
     if (!stillBlocked || !(await submitButton.isVisible())) break;
-    await submitButton.click();
+    await submitButton.click({ timeout: 3_000 }).catch(() => {});
   }
   await expect(fieldPage.getByText("This job is submitted.")).toBeVisible({ timeout: 15_000 });
 
