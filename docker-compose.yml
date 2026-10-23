@@ -41,7 +41,20 @@ services:
       - caddy_config:/config
     depends_on:
       - app
+    # Lets this Caddy also reverse_proxy to the Service Desk stack's own
+    # container by name (see its docker-compose.yml) — that stack runs no
+    # Caddy of its own, since only one process can bind 80/443 on this
+    # VM. Tracked here (not just created by hand on the VM) so a reset
+    # to origin/main during deploy can't silently drop it again, the way
+    # the untracked version of this did when PR #44 merged.
+    networks:
+      - default
+      - caddy_shared
 
 volumes:
   caddy_data:
   caddy_config:
+
+networks:
+  caddy_shared:
+    external: true
