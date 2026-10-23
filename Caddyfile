@@ -18,3 +18,10 @@ www.appsuite.uxglobal.co.uk {
 appsuite.uxglobal.co.uk {
 	reverse_proxy app:3000
 }
+
+# Service Desk's own stack runs no Caddy of its own (see its
+# docker-compose.yml's comment) — this Caddy reaches its container by
+# name over the caddy_shared network both stacks join.
+service-desk.uxglobal.co.uk {
+	reverse_proxy service-desk-app:3000
+}
