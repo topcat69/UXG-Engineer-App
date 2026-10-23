@@ -41,7 +41,7 @@
     "react": "19.3.0",
     "react-dom": "19.2.4",
     "recharts": "^3.10.1",
-    "resend": "^6.18.1",
+    "resend": "^6.34.1",
     "server-only": "^0.0.1",
     "shadcn": "^4.21.0",
     "signature_pad": "^5.1.4",
