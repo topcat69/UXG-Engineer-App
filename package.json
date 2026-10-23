@@ -24,7 +24,7 @@
     "@sentry/nextjs": "^10.74.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.117.3",
-    "@vis.gl/react-google-maps": "^1.9.0",
+    "@vis.gl/react-google-maps": "^1.10.1",
     "@zxing/library": "^0.23.0",
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
