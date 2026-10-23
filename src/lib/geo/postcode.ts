@@ -32,7 +32,14 @@ export async function geocodePostcode(
 
 async function geocodeViaPostcodesIo(postcode: string): Promise<{ latitude: number; longitude: number } | null> {
   try {
-    const response = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode)}`);
+    const response = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode)}`, {
+      // Without this, a stalled (not even erroring — just never responding)
+      // postcodes.io request hangs handleSubmit forever: isSubmitting never
+      // flips back to false, so the submit button never re-enables, which
+      // from a caller's (or a Playwright test's) point of view looks like
+      // the button itself is stuck, not that a network call is.
+      signal: AbortSignal.timeout(8_000),
+    });
     if (!response.ok) return null;
     const body = await response.json();
     if (body?.status !== 200 || typeof body?.result?.latitude !== "number" || typeof body?.result?.longitude !== "number") {
