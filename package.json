@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
-    "@sentry/nextjs": "^10.74.0",
+    "@sentry/nextjs": "^11.8.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.117.3",
     "@vis.gl/react-google-maps": "^1.9.0",
