@@ -9,6 +9,7 @@ type DispatchBody = {
   ticketNumber?: number;
   siteId?: string;
   title?: string;
+  details?: string | null;
   priority?: "P1" | "P2" | "P3" | "P4";
 };
 
@@ -71,6 +72,18 @@ export async function POST(request: Request) {
     .select("id, job_number")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // The ticket's own "Details"/"Description" field (the actual reported
+  // problem, not just the title) — carried onto the same field the office
+  // fills in by hand for a manually-created SLA job (see
+  // office/jobs/[id]/actions.ts's updateSlaRequirement), so the engineer
+  // sees it the same way either path got here. Best-effort: a failure
+  // here shouldn't undo an already-created job.
+  if (body.details) {
+    await supabase
+      .from("job_details")
+      .upsert({ job_id: job.id, sla_requirement_detail: body.details }, { onConflict: "job_id" });
+  }
 
   return NextResponse.json({ jobId: job.id, jobNumber: job.job_number });
 }
