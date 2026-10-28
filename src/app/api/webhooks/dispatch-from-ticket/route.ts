@@ -95,21 +95,34 @@ export async function POST(request: Request) {
   // the same way an engineer's own capture would land, so whoever works
   // the job sees them without anyone forwarding manually. Best-effort per
   // file, same reasoning as the job_details upsert above: a dropped photo
-  // shouldn't undo an already-created job.
+  // shouldn't undo an already-created job. Outcomes are reported back
+  // (attachmentResults) rather than only logged here, since Service Desk
+  // staff — not whoever can read this app's own server logs — are the
+  // ones who'd notice a photo went missing.
+  const attachmentResults: { fileName: string; ok: boolean; reason?: string }[] = [];
   for (const attachment of body.attachments ?? []) {
-    if (!attachment.url || !attachment.fileName) continue;
+    if (!attachment.url || !attachment.fileName) {
+      attachmentResults.push({ fileName: attachment.fileName ?? "(unnamed)", ok: false, reason: "missing url or fileName" });
+      continue;
+    }
     try {
       const fileRes = await fetch(attachment.url);
-      if (!fileRes.ok) continue;
+      if (!fileRes.ok) {
+        attachmentResults.push({ fileName: attachment.fileName, ok: false, reason: `couldn't download from Service Desk (${fileRes.status})` });
+        continue;
+      }
       const bytes = await fileRes.arrayBuffer();
       const path = `jobs/${job.id}/${crypto.randomUUID()}-${attachment.fileName}`;
       const { error: uploadError } = await supabase.storage
         .from("media")
         .upload(path, Buffer.from(bytes), { contentType: attachment.mimeType || "application/octet-stream" });
-      if (uploadError) continue;
+      if (uploadError) {
+        attachmentResults.push({ fileName: attachment.fileName, ok: false, reason: `upload failed: ${uploadError.message}` });
+        continue;
+      }
 
       const now = new Date().toISOString();
-      await supabase.from("media_assets").insert({
+      const { error: insertError } = await supabase.from("media_assets").insert({
         job_id: job.id,
         slot: "from_service_desk",
         storage_path: path,
@@ -120,10 +133,16 @@ export async function POST(request: Request) {
         uploaded_at: now,
         caption: body.ticketNumber ? `From Service Desk ticket #${body.ticketNumber}` : "From Service Desk",
       });
+      if (insertError) {
+        attachmentResults.push({ fileName: attachment.fileName, ok: false, reason: `media_assets insert failed: ${insertError.message}` });
+        continue;
+      }
+      attachmentResults.push({ fileName: attachment.fileName, ok: true });
     } catch (err) {
       console.error("failed to forward a Service Desk attachment onto the job", err);
+      attachmentResults.push({ fileName: attachment.fileName, ok: false, reason: err instanceof Error ? err.message : String(err) });
     }
   }
 
-  return NextResponse.json({ jobId: job.id, jobNumber: job.job_number });
+  return NextResponse.json({ jobId: job.id, jobNumber: job.job_number, attachmentResults });
 }
