@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FlatListSection, type NamedListRow } from "@/components/office/flat-list-section";
@@ -11,10 +11,12 @@ import {
   createAssetManually,
   deleteAssetCategory,
   deleteAssetRegisterRow,
+  searchSites,
   updateAssetCategory,
   updateAssetRegister,
   type AssetFieldsInput,
   type AssetRegisterRow,
+  type SiteSearchResult,
 } from "@/app/office/asset-register/actions";
 
 type AssetStatus = Database["public"]["Enums"]["asset_status"];
@@ -117,6 +119,12 @@ export function AssetRegisterManager({
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFields, setEditFields] = useState<AssetFieldsInput>(EMPTY_FIELDS);
+  // The site search box's starting display text — sourced from this
+  // specific asset's own joined site (unaffected by the 1000-row cap on
+  // the `sites` prop below), not a lookup into that prop, so an asset
+  // already assigned to a site outside the first 1000 still shows its
+  // real site name rather than blanking it out.
+  const [editSiteLabel, setEditSiteLabel] = useState("");
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [addFields, setAddFields] = useState<AssetFieldsInput>(EMPTY_FIELDS);
@@ -152,9 +160,10 @@ export function AssetRegisterManager({
     return list;
   }, [assets, needsReviewOnly, search, categoryNameById, clientNameById, siteNameById]);
 
-  function handleStartEdit(asset: AssetRegisterRow) {
+  function handleStartEdit(asset: AssetWithJoins) {
     setEditingId(asset.id);
     setEditFields(assetToFields(asset));
+    setEditSiteLabel(asset.site ? (asset.site.client ? `${asset.site.name} — ${asset.site.client.name}` : asset.site.name) : "");
     setMessage(null);
   }
 
@@ -199,9 +208,8 @@ export function AssetRegisterManager({
   }
 
   const categoryOptions = categories;
-  const siteOptions = sites;
 
-  function renderFieldsForm(fields: AssetFieldsInput, setFields: (f: AssetFieldsInput) => void) {
+  function renderFieldsForm(fields: AssetFieldsInput, setFields: (f: AssetFieldsInput) => void, siteLabel: string) {
     return (
       <div className="flex flex-col gap-4">
         <FieldGroup title="Identification & device detail">
@@ -217,14 +225,11 @@ export function AssetRegisterManager({
         </FieldGroup>
 
         <FieldGroup title="Location">
-          <LabeledSelect
-            label="Site"
+          <SiteSearchSelect
             value={fields.siteId}
+            defaultLabel={siteLabel}
+            placeholder={fields.status === "spare" ? "Unassigned — search to assign a site" : "Search by name, store ID, address, town, or postcode…"}
             onChange={(v) => setFields({ ...fields, siteId: v })}
-            options={[
-              { id: "", name: fields.status === "spare" ? "Unassigned" : "Select…" },
-              ...siteOptions.map((s) => ({ id: s.id, name: s.client ? `${s.name} — ${s.client.name}` : s.name })),
-            ]}
           />
         </FieldGroup>
 
@@ -352,7 +357,7 @@ export function AssetRegisterManager({
             For an asset that&apos;s part of the estate but never went through goods-in — everything scanned in already gets
             its own row automatically.
           </p>
-          {renderFieldsForm(addFields, setAddFields)}
+          {renderFieldsForm(addFields, setAddFields, "")}
           <div className="flex gap-2">
             <Button type="button" disabled={isPending} onClick={handleAdd}>
               Add asset
@@ -367,7 +372,7 @@ export function AssetRegisterManager({
       {editingId && (
         <section className="flex flex-col gap-3 rounded-md border p-3">
           <h2 className="font-medium">Edit asset</h2>
-          {renderFieldsForm(editFields, setEditFields)}
+          {renderFieldsForm(editFields, setEditFields, editSiteLabel)}
           <div className="flex gap-2">
             <Button type="button" disabled={isPending} onClick={handleSaveEdit}>
               Save
@@ -504,6 +509,109 @@ function LabeledSelect({
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+/**
+ * Searches server-side (searchSites, same ilike fields as office/sites'
+ * own search box) instead of picking from a flat list loaded up front —
+ * that list hit PostgREST's default 1000-row cap with 1195 sites on
+ * file, so a plain <select> here could never reach ~195 of them no
+ * matter how far you scrolled. defaultLabel seeds the visible text from
+ * the asset's own already-joined site (see handleStartEdit) so opening
+ * an edit shows the real current site even if it's one of those ~195 —
+ * it's then just local display text, uncontrolled past mount.
+ */
+function SiteSearchSelect({
+  value,
+  defaultLabel,
+  placeholder,
+  onChange,
+}: {
+  value: string;
+  defaultLabel: string;
+  placeholder?: string;
+  onChange: (siteId: string) => void;
+}) {
+  const [query, setQuery] = useState(defaultLabel);
+  const [results, setResults] = useState<SiteSearchResult[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function runSearch(q: string) {
+    setIsSearching(true);
+    searchSites(q).then((rows) => {
+      setResults(rows);
+      setIsSearching(false);
+    });
+  }
+
+  function handleInputChange(v: string) {
+    setQuery(v);
+    setIsOpen(true);
+    if (value) onChange(""); // typing again means the previous pick no longer applies
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => runSearch(v), 300);
+  }
+
+  function handleFocus() {
+    setIsOpen(true);
+    if (results.length === 0) runSearch(query);
+  }
+
+  function handleSelect(site: SiteSearchResult) {
+    setQuery(site.client ? `${site.name} — ${site.client.name}` : site.name);
+    onChange(site.id);
+    setIsOpen(false);
+  }
+
+  function handleClear() {
+    setQuery("");
+    onChange("");
+    setResults([]);
+  }
+
+  return (
+    <div className="relative flex flex-col gap-1">
+      <label className="text-muted-foreground text-xs">Site</label>
+      <div className="flex items-center gap-1">
+        <input
+          value={query}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onFocus={handleFocus}
+          onBlur={() => setTimeout(() => setIsOpen(false), 150)}
+          placeholder={placeholder}
+          className="border-input h-9 w-64 rounded-md border bg-transparent px-2 text-sm"
+        />
+        {value && (
+          <button type="button" onClick={handleClear} className="text-muted-foreground text-xs underline">
+            Clear
+          </button>
+        )}
+      </div>
+      {isOpen && (
+        <div className="bg-popover absolute top-full z-10 mt-1 max-h-64 w-64 overflow-y-auto rounded-md border shadow-md">
+          {isSearching ? (
+            <p className="text-muted-foreground p-2 text-xs">Searching…</p>
+          ) : results.length === 0 ? (
+            <p className="text-muted-foreground p-2 text-xs">No matching sites.</p>
+          ) : (
+            results.map((site) => (
+              <button
+                key={site.id}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleSelect(site)}
+                className="hover:bg-accent block w-full px-2 py-1.5 text-left text-sm"
+              >
+                {site.client ? `${site.name} — ${site.client.name}` : site.name}
+              </button>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
