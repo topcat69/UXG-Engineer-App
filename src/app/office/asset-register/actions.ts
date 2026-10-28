@@ -176,6 +176,41 @@ export async function updateAssetRegister(id: string, input: AssetFieldsInput): 
   return { ok: true, item: data };
 }
 
+export type SiteSearchResult = { id: string; name: string; client: { name: string } | null };
+
+// Same comma/paren stripping as office/sites/page.tsx's own sanitizeTerm —
+// PostgREST's or() filter syntax uses both as separators, so either one
+// typed into a site search would otherwise break the query outright.
+function sanitizeSiteQuery(raw: string): string {
+  return raw.replace(/[,()]/g, " ").trim();
+}
+
+/**
+ * The asset register's own Site picker used to load every site into the
+ * browser as a plain <select> — capped at PostgREST's default 1000-row
+ * limit, same cap office/sites' own unfiltered view hits (1195 sites on
+ * file, 195 of them simply unreachable from that dropdown no matter how
+ * far you scrolled). Search happens server-side instead, same ilike
+ * fields as office/sites' own search box, capped at 25 matches — plenty
+ * to pick the right one, never silently truncating the real result set
+ * the way loading everything upfront did.
+ */
+export async function searchSites(query: string): Promise<SiteSearchResult[]> {
+  const supabase = await createClient();
+  const trimmed = sanitizeSiteQuery(query);
+
+  let sitesQuery = supabase.from("sites").select("id, name, client:clients(name)").order("name").limit(25);
+  if (trimmed) {
+    const like = `%${trimmed}%`;
+    sitesQuery = sitesQuery.or(
+      `name.ilike.${like},store_id.ilike.${like},address_line1.ilike.${like},town.ilike.${like},postcode.ilike.${like}`,
+    );
+  }
+
+  const { data } = await sitesQuery;
+  return data ?? [];
+}
+
 export async function deleteAssetRegisterRow(id: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.from("asset_register").delete().eq("id", id);
