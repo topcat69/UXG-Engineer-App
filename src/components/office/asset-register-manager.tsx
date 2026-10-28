@@ -18,6 +18,7 @@ import {
   type AssetRegisterRow,
   type SiteSearchResult,
 } from "@/app/office/asset-register/actions";
+import { SITE_SEARCH_LIMIT } from "@/lib/forms/site-search";
 
 type AssetStatus = Database["public"]["Enums"]["asset_status"];
 const ASSET_STATUSES: AssetStatus[] = ["spare", "in_use", "faulty", "in_repair", "retired"];
@@ -101,12 +102,14 @@ export function AssetRegisterManager({
   initialAssets,
   categories: initialCategories,
   sites,
+  clients,
   canManageCategories = true,
   canDelete = true,
 }: {
   initialAssets: AssetWithJoins[];
   categories: NamedListRow[];
   sites: SiteOption[];
+  clients: { id: string; name: string }[];
   canManageCategories?: boolean;
   canDelete?: boolean;
 }) {
@@ -230,6 +233,7 @@ export function AssetRegisterManager({
             defaultLabel={siteLabel}
             placeholder={fields.status === "spare" ? "Unassigned — search to assign a site" : "Search by name, store ID, address, town, or postcode…"}
             onChange={(v) => setFields({ ...fields, siteId: v })}
+            clients={clients}
           />
         </FieldGroup>
 
@@ -528,22 +532,31 @@ function SiteSearchSelect({
   defaultLabel,
   placeholder,
   onChange,
+  clients,
 }: {
   value: string;
   defaultLabel: string;
   placeholder?: string;
   onChange: (siteId: string) => void;
+  /** Narrows the search, same as office/sites' own Customer filter — several
+   * customers often have similarly-named sites (e.g. multiple "Aberdeen"
+   * stores across different retailers), so picking the customer first
+   * narrows the list before typing a single character. */
+  clients: { id: string; name: string }[];
 }) {
   const [query, setQuery] = useState(defaultLabel);
+  const [clientId, setClientId] = useState("");
   const [results, setResults] = useState<SiteSearchResult[]>([]);
+  const [truncated, setTruncated] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function runSearch(q: string) {
+  function runSearch(q: string, forClientId: string) {
     setIsSearching(true);
-    searchSites(q).then((rows) => {
-      setResults(rows);
+    searchSites(q, forClientId || undefined).then((rows) => {
+      setTruncated(rows.length > SITE_SEARCH_LIMIT);
+      setResults(rows.slice(0, SITE_SEARCH_LIMIT));
       setIsSearching(false);
     });
   }
@@ -553,12 +566,18 @@ function SiteSearchSelect({
     setIsOpen(true);
     if (value) onChange(""); // typing again means the previous pick no longer applies
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => runSearch(v), 300);
+    debounceRef.current = setTimeout(() => runSearch(v, clientId), 300);
+  }
+
+  function handleClientChange(v: string) {
+    setClientId(v);
+    setIsOpen(true);
+    runSearch(query, v);
   }
 
   function handleFocus() {
     setIsOpen(true);
-    if (results.length === 0) runSearch(query);
+    if (results.length === 0) runSearch(query, clientId);
   }
 
   function handleSelect(site: SiteSearchResult) {
@@ -574,44 +593,68 @@ function SiteSearchSelect({
   }
 
   return (
-    <div className="relative flex flex-col gap-1">
-      <label className="text-muted-foreground text-xs">Site</label>
-      <div className="flex items-center gap-1">
-        <input
-          value={query}
-          onChange={(e) => handleInputChange(e.target.value)}
-          onFocus={handleFocus}
-          onBlur={() => setTimeout(() => setIsOpen(false), 150)}
-          placeholder={placeholder}
-          className="border-input h-9 w-64 rounded-md border bg-transparent px-2 text-sm"
-        />
-        {value && (
-          <button type="button" onClick={handleClear} className="text-muted-foreground text-xs underline">
-            Clear
-          </button>
-        )}
+    <div className="flex flex-wrap items-end gap-2">
+      <div className="flex flex-col gap-1">
+        <label className="text-muted-foreground text-xs">Customer</label>
+        <select
+          value={clientId}
+          onChange={(e) => handleClientChange(e.target.value)}
+          className="border-input h-9 w-40 rounded-md border bg-transparent px-2 text-sm"
+        >
+          <option value="">All</option>
+          {clients.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
       </div>
-      {isOpen && (
-        <div className="bg-popover absolute top-full z-10 mt-1 max-h-64 w-64 overflow-y-auto rounded-md border shadow-md">
-          {isSearching ? (
-            <p className="text-muted-foreground p-2 text-xs">Searching…</p>
-          ) : results.length === 0 ? (
-            <p className="text-muted-foreground p-2 text-xs">No matching sites.</p>
-          ) : (
-            results.map((site) => (
-              <button
-                key={site.id}
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => handleSelect(site)}
-                className="hover:bg-accent block w-full px-2 py-1.5 text-left text-sm"
-              >
-                {site.client ? `${site.name} — ${site.client.name}` : site.name}
-              </button>
-            ))
+      <div className="relative flex flex-col gap-1">
+        <label className="text-muted-foreground text-xs">Site</label>
+        <div className="flex items-center gap-1">
+          <input
+            value={query}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onFocus={handleFocus}
+            onBlur={() => setTimeout(() => setIsOpen(false), 150)}
+            placeholder={placeholder}
+            className="border-input h-9 w-64 rounded-md border bg-transparent px-2 text-sm"
+          />
+          {value && (
+            <button type="button" onClick={handleClear} className="text-muted-foreground text-xs underline">
+              Clear
+            </button>
           )}
         </div>
-      )}
+        {isOpen && (
+          <div className="bg-popover absolute top-full z-10 mt-1 max-h-64 w-64 overflow-y-auto rounded-md border shadow-md">
+            {isSearching ? (
+              <p className="text-muted-foreground p-2 text-xs">Searching…</p>
+            ) : results.length === 0 ? (
+              <p className="text-muted-foreground p-2 text-xs">No matching sites.</p>
+            ) : (
+              <>
+                {results.map((site) => (
+                  <button
+                    key={site.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleSelect(site)}
+                    className="hover:bg-accent block w-full px-2 py-1.5 text-left text-sm"
+                  >
+                    {site.client ? `${site.name} — ${site.client.name}` : site.name}
+                  </button>
+                ))}
+                {truncated && (
+                  <p className="text-muted-foreground border-t p-2 text-xs">
+                    Showing the first {SITE_SEARCH_LIMIT} matches — keep typing to narrow further.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

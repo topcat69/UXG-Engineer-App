@@ -14,7 +14,7 @@ import { AssetRegisterManager } from "@/components/office/asset-register-manager
 export default async function AssetRegisterPage() {
   const supabase = await createClient();
 
-  const [{ data: assets, error }, { data: categories }, { data: sites }] = await Promise.all([
+  const [{ data: assets, error }, { data: categories }, { data: sites }, { data: clients }] = await Promise.all([
     supabase
       .from("asset_register")
       .select(
@@ -28,6 +28,7 @@ export default async function AssetRegisterPage() {
       .order("created_at", { ascending: false }),
     supabase.from("asset_categories").select("id, name").order("name"),
     supabase.from("sites").select("id, name, client:clients(name)").order("name"),
+    supabase.from("clients").select("id, name").order("name"),
   ]);
 
   if (error) {
@@ -57,7 +58,7 @@ export default async function AssetRegisterPage() {
           </Link>
         </div>
       </div>
-      <AssetRegisterManager initialAssets={assets ?? []} categories={categories ?? []} sites={sites ?? []} />
+      <AssetRegisterManager initialAssets={assets ?? []} categories={categories ?? []} sites={sites ?? []} clients={clients ?? []} />
     </div>
   );
 }

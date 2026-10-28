@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { buildCategoryLookup, buildSiteLookup, parseAssetRegisterCsv, resolveAssetRegisterRows } from "@/lib/csv/asset-register";
 import type { Database } from "@/lib/supabase/database.types";
 import type { NamedItemResult, NamedDeleteResult } from "@/components/office/flat-list-section";
+import { SITE_SEARCH_LIMIT } from "@/lib/forms/site-search";
 
 type AssetStatus = Database["public"]["Enums"]["asset_status"];
 
@@ -191,15 +192,22 @@ function sanitizeSiteQuery(raw: string): string {
  * limit, same cap office/sites' own unfiltered view hits (1195 sites on
  * file, 195 of them simply unreachable from that dropdown no matter how
  * far you scrolled). Search happens server-side instead, same ilike
- * fields as office/sites' own search box, capped at 25 matches — plenty
- * to pick the right one, never silently truncating the real result set
- * the way loading everything upfront did.
+ * fields as office/sites' own search box. A large retailer (Curry's,
+ * Halfords) can have hundreds of sites on its own, so picking just that
+ * customer with no search text yet still needs a real cap — 100 rather
+ * than returning everything, with the extra row past SITE_SEARCH_LIMIT
+ * signalling "narrow further" rather than this being the whole list.
  */
-export async function searchSites(query: string): Promise<SiteSearchResult[]> {
+export async function searchSites(query: string, clientId?: string): Promise<SiteSearchResult[]> {
   const supabase = await createClient();
   const trimmed = sanitizeSiteQuery(query);
 
-  let sitesQuery = supabase.from("sites").select("id, name, client:clients(name)").order("name").limit(25);
+  let sitesQuery = supabase
+    .from("sites")
+    .select("id, name, client:clients(name)")
+    .order("name")
+    .limit(SITE_SEARCH_LIMIT + 1);
+  if (clientId) sitesQuery = sitesQuery.eq("client_id", clientId);
   if (trimmed) {
     const like = `%${trimmed}%`;
     sitesQuery = sitesQuery.or(
