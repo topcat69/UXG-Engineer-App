@@ -4,6 +4,8 @@ import { verifyWebhookSecret } from "@/lib/webhooks/verify-secret";
 import { nextJobNumber } from "@/lib/jobs/job-number";
 import { maxJobSequenceForYear } from "@/lib/jobs/next-job-number";
 
+type DispatchAttachment = { url?: string; fileName?: string; mimeType?: string };
+
 type DispatchBody = {
   ticketId?: string;
   ticketNumber?: number;
@@ -11,6 +13,7 @@ type DispatchBody = {
   title?: string;
   details?: string | null;
   priority?: "P1" | "P2" | "P3" | "P4";
+  attachments?: DispatchAttachment[];
 };
 
 /**
@@ -83,6 +86,43 @@ export async function POST(request: Request) {
     await supabase
       .from("job_details")
       .upsert({ job_id: job.id, sla_requirement_detail: body.details }, { onConflict: "job_id" });
+  }
+
+  // Any photos the customer or staff attached to the ticket (Service
+  // Desk's ticket_attachments, resolved there to short-lived signed URLs
+  // since this app has no access to that project's storage bucket
+  // directly) — downloaded here and re-uploaded into this job's own media
+  // the same way an engineer's own capture would land, so whoever works
+  // the job sees them without anyone forwarding manually. Best-effort per
+  // file, same reasoning as the job_details upsert above: a dropped photo
+  // shouldn't undo an already-created job.
+  for (const attachment of body.attachments ?? []) {
+    if (!attachment.url || !attachment.fileName) continue;
+    try {
+      const fileRes = await fetch(attachment.url);
+      if (!fileRes.ok) continue;
+      const bytes = await fileRes.arrayBuffer();
+      const path = `jobs/${job.id}/${crypto.randomUUID()}-${attachment.fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from("media")
+        .upload(path, Buffer.from(bytes), { contentType: attachment.mimeType || "application/octet-stream" });
+      if (uploadError) continue;
+
+      const now = new Date().toISOString();
+      await supabase.from("media_assets").insert({
+        job_id: job.id,
+        slot: "from_service_desk",
+        storage_path: path,
+        media_type: attachment.mimeType?.startsWith("video") ? "video" : "image",
+        mime: attachment.mimeType ?? null,
+        bytes: bytes.byteLength,
+        captured_at: now,
+        uploaded_at: now,
+        caption: body.ticketNumber ? `From Service Desk ticket #${body.ticketNumber}` : "From Service Desk",
+      });
+    } catch (err) {
+      console.error("failed to forward a Service Desk attachment onto the job", err);
+    }
   }
 
   return NextResponse.json({ jobId: job.id, jobNumber: job.job_number });
