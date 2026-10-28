@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { buildCategoryLookup, buildSiteLookup, parseAssetRegisterCsv, resolveAssetRegisterRows } from "@/lib/csv/asset-register";
 import type { Database } from "@/lib/supabase/database.types";
 import type { NamedItemResult, NamedDeleteResult } from "@/components/office/flat-list-section";
+import { SITE_SEARCH_LIMIT } from "@/lib/forms/site-search";
 
 type AssetStatus = Database["public"]["Enums"]["asset_status"];
 
@@ -184,10 +185,6 @@ export type SiteSearchResult = { id: string; name: string; client: { name: strin
 function sanitizeSiteQuery(raw: string): string {
   return raw.replace(/[,()]/g, " ").trim();
 }
-
-// One over the cap, so the caller can tell "exactly 100 matches" apart
-// from "100+ matches, truncated" without a separate count query.
-export const SITE_SEARCH_LIMIT = 100;
 
 /**
  * The asset register's own Site picker used to load every site into the

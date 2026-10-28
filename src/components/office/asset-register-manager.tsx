@@ -14,11 +14,11 @@ import {
   searchSites,
   updateAssetCategory,
   updateAssetRegister,
-  SITE_SEARCH_LIMIT,
   type AssetFieldsInput,
   type AssetRegisterRow,
   type SiteSearchResult,
 } from "@/app/office/asset-register/actions";
+import { SITE_SEARCH_LIMIT } from "@/lib/forms/site-search";
 
 type AssetStatus = Database["public"]["Enums"]["asset_status"];
 const ASSET_STATUSES: AssetStatus[] = ["spare", "in_use", "faulty", "in_repair", "retired"];
