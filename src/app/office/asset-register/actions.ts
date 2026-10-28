@@ -185,21 +185,31 @@ function sanitizeSiteQuery(raw: string): string {
   return raw.replace(/[,()]/g, " ").trim();
 }
 
+// One over the cap, so the caller can tell "exactly 100 matches" apart
+// from "100+ matches, truncated" without a separate count query.
+export const SITE_SEARCH_LIMIT = 100;
+
 /**
  * The asset register's own Site picker used to load every site into the
  * browser as a plain <select> — capped at PostgREST's default 1000-row
  * limit, same cap office/sites' own unfiltered view hits (1195 sites on
  * file, 195 of them simply unreachable from that dropdown no matter how
  * far you scrolled). Search happens server-side instead, same ilike
- * fields as office/sites' own search box, capped at 25 matches — plenty
- * to pick the right one, never silently truncating the real result set
- * the way loading everything upfront did.
+ * fields as office/sites' own search box. A large retailer (Curry's,
+ * Halfords) can have hundreds of sites on its own, so picking just that
+ * customer with no search text yet still needs a real cap — 100 rather
+ * than returning everything, with the extra row past SITE_SEARCH_LIMIT
+ * signalling "narrow further" rather than this being the whole list.
  */
 export async function searchSites(query: string, clientId?: string): Promise<SiteSearchResult[]> {
   const supabase = await createClient();
   const trimmed = sanitizeSiteQuery(query);
 
-  let sitesQuery = supabase.from("sites").select("id, name, client:clients(name)").order("name").limit(25);
+  let sitesQuery = supabase
+    .from("sites")
+    .select("id, name, client:clients(name)")
+    .order("name")
+    .limit(SITE_SEARCH_LIMIT + 1);
   if (clientId) sitesQuery = sitesQuery.eq("client_id", clientId);
   if (trimmed) {
     const like = `%${trimmed}%`;

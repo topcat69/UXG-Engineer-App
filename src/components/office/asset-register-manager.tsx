@@ -14,6 +14,7 @@ import {
   searchSites,
   updateAssetCategory,
   updateAssetRegister,
+  SITE_SEARCH_LIMIT,
   type AssetFieldsInput,
   type AssetRegisterRow,
   type SiteSearchResult,
@@ -546,6 +547,7 @@ function SiteSearchSelect({
   const [query, setQuery] = useState(defaultLabel);
   const [clientId, setClientId] = useState("");
   const [results, setResults] = useState<SiteSearchResult[]>([]);
+  const [truncated, setTruncated] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -553,7 +555,8 @@ function SiteSearchSelect({
   function runSearch(q: string, forClientId: string) {
     setIsSearching(true);
     searchSites(q, forClientId || undefined).then((rows) => {
-      setResults(rows);
+      setTruncated(rows.length > SITE_SEARCH_LIMIT);
+      setResults(rows.slice(0, SITE_SEARCH_LIMIT));
       setIsSearching(false);
     });
   }
@@ -630,17 +633,24 @@ function SiteSearchSelect({
             ) : results.length === 0 ? (
               <p className="text-muted-foreground p-2 text-xs">No matching sites.</p>
             ) : (
-              results.map((site) => (
-                <button
-                  key={site.id}
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => handleSelect(site)}
-                  className="hover:bg-accent block w-full px-2 py-1.5 text-left text-sm"
-                >
-                  {site.client ? `${site.name} — ${site.client.name}` : site.name}
-                </button>
-              ))
+              <>
+                {results.map((site) => (
+                  <button
+                    key={site.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleSelect(site)}
+                    className="hover:bg-accent block w-full px-2 py-1.5 text-left text-sm"
+                  >
+                    {site.client ? `${site.name} — ${site.client.name}` : site.name}
+                  </button>
+                ))}
+                {truncated && (
+                  <p className="text-muted-foreground border-t p-2 text-xs">
+                    Showing the first {SITE_SEARCH_LIMIT} matches — keep typing to narrow further.
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}
