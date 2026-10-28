@@ -195,11 +195,12 @@ function sanitizeSiteQuery(raw: string): string {
  * to pick the right one, never silently truncating the real result set
  * the way loading everything upfront did.
  */
-export async function searchSites(query: string): Promise<SiteSearchResult[]> {
+export async function searchSites(query: string, clientId?: string): Promise<SiteSearchResult[]> {
   const supabase = await createClient();
   const trimmed = sanitizeSiteQuery(query);
 
   let sitesQuery = supabase.from("sites").select("id, name, client:clients(name)").order("name").limit(25);
+  if (clientId) sitesQuery = sitesQuery.eq("client_id", clientId);
   if (trimmed) {
     const like = `%${trimmed}%`;
     sitesQuery = sitesQuery.or(
