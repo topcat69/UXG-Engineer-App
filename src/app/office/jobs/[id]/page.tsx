@@ -416,6 +416,26 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             ))}
           </div>
         )}
+        {/* Photos the ticket's customer or a Service Desk staff member attached
+            before this job existed (dispatch-from-ticket/route.ts) — not one of
+            the fixed checklist slots above (there can be any number of them,
+            not one-per-slot), so they get their own flexible gallery instead of
+            being invisible inside PhotoThumbnailGrid's fixed-slot lookup. */}
+        {mediaWithUrls.some((m) => m.slot === "from_service_desk") && (
+          <div className="mt-2 flex flex-col gap-2">
+            <h3 className="text-muted-foreground text-sm font-medium">From Service Desk</h3>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {mediaWithUrls
+                .filter((m) => m.slot === "from_service_desk")
+                .map((asset) => (
+                  <div key={asset.id} className="flex flex-col gap-1 rounded-md border p-2 text-xs">
+                    <MediaThumbnail asset={asset} />
+                    <span className="font-medium">{asset.caption ?? "Photo"}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="flex flex-col gap-3">
