@@ -46,18 +46,27 @@ type JobDetailsData = {
  * types that don't use job_details (survey) rather than the caller needing
  * to guard every render site.
  */
+type ForwardedAttachment = { id: string; url: string | null; media_type: string; caption: string | null };
+
 export function JobDetailsPanel({
   jobId,
   jobType,
   jobDetails,
   equipment: initialEquipment,
   fixtureTypes,
+  forwardedAttachments,
 }: {
   jobId: string;
   jobType: JobDetailsType | string;
   jobDetails: JobDetailsData;
   equipment: JobEquipmentRow[];
   fixtureTypes: { id: string; name: string }[];
+  /** Photos a customer or Service Desk staff attached to the ticket this
+   * job was dispatched from (dispatch-from-ticket/route.ts) — shown right
+   * under the SLA requirement, since that's the context they're actually
+   * evidence for, rather than lost in the general Media section further
+   * down the page alongside the engineer's own checklist photos. */
+  forwardedAttachments: ForwardedAttachment[];
 }) {
   const [equipment, setEquipment] = useState(initialEquipment);
   const [model, setModel] = useState("");
@@ -166,6 +175,7 @@ export function JobDetailsPanel({
           <Button type="button" size="sm" disabled={isPending} onClick={handleSaveSla} className="self-start">
             Save
           </Button>
+          <ForwardedAttachmentsGallery attachments={forwardedAttachments} />
         </div>
       )}
 
@@ -334,6 +344,34 @@ export function JobDetailsPanel({
 
       {message && <p className="text-muted-foreground text-sm">{message}</p>}
     </section>
+  );
+}
+
+function ForwardedAttachmentsGallery({ attachments }: { attachments: ForwardedAttachment[] }) {
+  if (attachments.length === 0) return null;
+  return (
+    <div className="mt-1 flex flex-col gap-2">
+      <span className="text-muted-foreground text-xs">From Service Desk</span>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {attachments.map((asset) => (
+          <div key={asset.id} className="flex flex-col gap-1 rounded-md border p-2 text-xs">
+            {asset.url ? (
+              <a href={asset.url} target="_blank" rel="noreferrer" className="block h-20 overflow-hidden rounded">
+                {asset.media_type === "video" ? (
+                  <div className="bg-muted flex h-full items-center justify-center text-muted-foreground">🎥 View video</div>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element -- signed, time-limited storage URL; not worth Next/Image's remote-pattern config for this.
+                  <img src={asset.url} alt="" className="h-full w-full object-cover" />
+                )}
+              </a>
+            ) : (
+              <div className="bg-muted flex h-20 items-center justify-center rounded text-muted-foreground">📷</div>
+            )}
+            <span className="font-medium">{asset.caption ?? "Photo"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
