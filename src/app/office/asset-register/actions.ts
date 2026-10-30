@@ -13,7 +13,7 @@ type AssetStatus = Database["public"]["Enums"]["asset_status"];
 export type AssetRegisterRow = Database["public"]["Tables"]["asset_register"]["Row"];
 
 const ASSET_SELECT =
-  "id, category_id, manufacturer, model, serial_number, site_id, purchase_date, supplier, po_or_invoice_number, purchase_cost, depreciation_method, useful_life_years, residual_value, warranty_start, warranty_end, warranty_provider, support_contract_ref, support_sla, status, install_date, expected_replacement_date, decommission_date, disposal_date, weee_reference, stock_item_id, source, needs_review, created_at, created_by, updated_at, updated_by";
+  "id, category_id, manufacturer, model, serial_number, fixture, site_id, purchase_date, supplier, po_or_invoice_number, purchase_cost, depreciation_method, useful_life_years, residual_value, warranty_start, warranty_end, warranty_provider, support_contract_ref, support_sla, status, install_date, expected_replacement_date, decommission_date, disposal_date, weee_reference, stock_item_id, source, needs_review, created_at, created_by, updated_at, updated_by";
 
 export type AssetResult = { ok: true; item: AssetRegisterRow } | { ok: false; message: string };
 export type ActionResult = { ok: true } | { ok: false; message: string };
@@ -69,6 +69,7 @@ export type AssetFieldsInput = {
   manufacturer: string;
   model: string;
   serialNumber: string;
+  fixture: string;
   siteId: string;
   purchaseDate: string;
   supplier: string;
@@ -114,6 +115,7 @@ function fieldsToUpdate(input: AssetFieldsInput): Database["public"]["Tables"]["
     manufacturer: input.manufacturer.trim() || null,
     model: input.model.trim() || null,
     serial_number: input.serialNumber.trim() || null,
+    fixture: input.fixture.trim() || null,
     site_id: input.siteId || null,
     purchase_date: input.purchaseDate || null,
     supplier: input.supplier.trim() || null,

@@ -76,6 +76,7 @@ export type Database = {
           depreciation_method: string | null
           disposal_date: string | null
           expected_replacement_date: string | null
+          fixture: string | null
           id: string
           install_date: string | null
           manufacturer: string | null
@@ -109,6 +110,7 @@ export type Database = {
           depreciation_method?: string | null
           disposal_date?: string | null
           expected_replacement_date?: string | null
+          fixture?: string | null
           id?: string
           install_date?: string | null
           manufacturer?: string | null
@@ -142,6 +144,7 @@ export type Database = {
           depreciation_method?: string | null
           disposal_date?: string | null
           expected_replacement_date?: string | null
+          fixture?: string | null
           id?: string
           install_date?: string | null
           manufacturer?: string | null
