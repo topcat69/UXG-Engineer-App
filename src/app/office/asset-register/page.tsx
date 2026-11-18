@@ -18,7 +18,7 @@ export default async function AssetRegisterPage() {
     supabase
       .from("asset_register")
       .select(
-        `id, category_id, manufacturer, model, serial_number, site_id, purchase_date, supplier, po_or_invoice_number,
+        `id, category_id, manufacturer, model, serial_number, fixture, site_id, purchase_date, supplier, po_or_invoice_number,
          purchase_cost, depreciation_method, useful_life_years, residual_value, warranty_start, warranty_end,
          warranty_provider, support_contract_ref, support_sla, status, install_date, expected_replacement_date,
          decommission_date, disposal_date, weee_reference, stock_item_id, source, needs_review, created_at,

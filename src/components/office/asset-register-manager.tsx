@@ -35,6 +35,7 @@ const EMPTY_FIELDS: AssetFieldsInput = {
   manufacturer: "",
   model: "",
   serialNumber: "",
+  fixture: "",
   siteId: "",
   purchaseDate: "",
   supplier: "",
@@ -62,6 +63,7 @@ function assetToFields(asset: AssetRegisterRow): AssetFieldsInput {
     manufacturer: asset.manufacturer ?? "",
     model: asset.model ?? "",
     serialNumber: asset.serial_number ?? "",
+    fixture: asset.fixture ?? "",
     siteId: asset.site_id ?? "",
     purchaseDate: asset.purchase_date ?? "",
     supplier: asset.supplier ?? "",
@@ -153,7 +155,7 @@ export function AssetRegisterManager({
         const categoryName = (a.category_id && categoryNameById.get(a.category_id)) || "";
         const clientName = (a.site_id && clientNameById.get(a.site_id)) || "";
         const siteName = (a.site_id && siteNameById.get(a.site_id)) || "";
-        const haystack = [a.manufacturer, a.model, a.serial_number, categoryName, clientName, siteName]
+        const haystack = [a.manufacturer, a.model, a.serial_number, a.fixture, categoryName, clientName, siteName]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -225,6 +227,12 @@ export function AssetRegisterManager({
           <LabeledInput label="Manufacturer" value={fields.manufacturer} onChange={(v) => setFields({ ...fields, manufacturer: v })} />
           <LabeledInput label="Model" value={fields.model} onChange={(v) => setFields({ ...fields, model: v })} />
           <LabeledInput label="Serial number" value={fields.serialNumber} onChange={(v) => setFields({ ...fields, serialNumber: v })} />
+          <LabeledInput
+            label="Fixture"
+            value={fields.fixture}
+            onChange={(v) => setFields({ ...fields, fixture: v })}
+            placeholder="e.g. Reception screen, Till 3"
+          />
         </FieldGroup>
 
         <FieldGroup title="Location">
@@ -398,6 +406,7 @@ export function AssetRegisterManager({
             <th className="py-2 font-medium">Serial no.</th>
             <th className="py-2 font-medium">Client</th>
             <th className="py-2 font-medium">Site</th>
+            <th className="py-2 font-medium">Fixture</th>
             <th className="py-2 font-medium">Status</th>
             <th className="py-2 font-medium">Install date</th>
             <th className="py-2 font-medium">Review</th>
@@ -407,7 +416,7 @@ export function AssetRegisterManager({
         <tbody>
           {visibleAssets.length === 0 && (
             <tr>
-              <td colSpan={9} className="text-muted-foreground py-6 text-center">
+              <td colSpan={10} className="text-muted-foreground py-6 text-center">
                 {search.trim()
                   ? "No assets match this search."
                   : needsReviewOnly
@@ -425,6 +434,7 @@ export function AssetRegisterManager({
               <td className="py-2 text-muted-foreground">{asset.serial_number ?? "—"}</td>
               <td className="py-2 text-muted-foreground">{(asset.site_id && clientNameById.get(asset.site_id)) || "—"}</td>
               <td className="py-2 text-muted-foreground">{(asset.site_id && siteNameById.get(asset.site_id)) ?? "Unassigned"}</td>
+              <td className="py-2 text-muted-foreground">{asset.fixture ?? "—"}</td>
               <td className="py-2">
                 <Badge variant="secondary">{humanize(asset.status)}</Badge>
               </td>
