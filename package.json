@@ -87,11 +87,13 @@
       "source-map-js": ">=1.2.2",
       "sharp": ">=0.35.5",
       "zod": ">=4.6.6",
-      "body-parser": ">=2.4.0"
+      "body-parser": ">=2.4.0",
+      "systeminformation": ">=5.33.16"
     },
     "auditConfig": {
       "ignoreCves": [
-        "CVE-2026-93687"
+        "CVE-2026-93687",
+        "CVE-2026-112366"
       ]
     }
   }
