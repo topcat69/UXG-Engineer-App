@@ -44,6 +44,7 @@ const nextConfig: NextConfig = {
     // without this every one of them 403s the moment the app's reached via
     // a domain that isn't explicitly allow-listed here.
     serverActions: { bodySizeLimit: "20mb", allowedOrigins: ["appsuite.uxglobal.co.uk"] },
+    agentUpgrade: "security",
   },
 };
 
