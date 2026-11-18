@@ -25,3 +25,9 @@ appsuite.uxglobal.co.uk {
 service-desk.uxglobal.co.uk {
 	reverse_proxy service-desk-app:3000
 }
+
+# Checkly's own stack runs no Caddy of its own either, same reasoning —
+# this Caddy reaches its container by name over caddy_shared.
+checkly.uxglobal.co.uk {
+	reverse_proxy checkly-app:3000
+}
