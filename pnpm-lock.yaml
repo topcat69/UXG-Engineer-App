@@ -119,8 +119,8 @@ importers:
         specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.4(react@19.3.1))(react@19.3.1)
       '@types/google.maps':
-        specifier: ^3.66.1
-        version: 3.66.1
+        specifier: ^3.67.0
+        version: 3.67.0
       '@types/node':
         specifier: ^20
         version: 20.19.43
@@ -1820,8 +1820,8 @@ packages:
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
-  '@types/google.maps@3.66.1':
-    resolution: {integrity: sha512-UtnC1f4l6jSfw1WZD8nwP2XTLm5GKsL95Yk1a3etzFpKxJL4ZzO53k96IRipedIJGRLhV1z4lGlTTrP6FMyGww==}
+  '@types/google.maps@3.67.0':
+    resolution: {integrity: sha512-LQ+kWi0BOWeEUpcMaag/cqOMI3DmOPCE34aST1jpeCw5mjoS0hI0P7eV1PUk+8PwpqXeO31Cy+HzBN3dSz103g==}
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
@@ -5800,7 +5800,7 @@ snapshots:
 
   '@googlemaps/js-api-loader@2.1.1':
     dependencies:
-      '@types/google.maps': 3.66.1
+      '@types/google.maps': 3.67.0
 
   '@hono/node-server@2.0.12(hono@4.13.7)':
     dependencies:
@@ -6693,7 +6693,7 @@ snapshots:
 
   '@types/estree@1.0.9': {}
 
-  '@types/google.maps@3.66.1': {}
+  '@types/google.maps@3.67.0': {}
 
   '@types/json-schema@7.0.15': {}
 
@@ -6889,7 +6889,7 @@ snapshots:
   '@vis.gl/react-google-maps@1.9.0(react-dom@19.2.4(react@19.3.1))(react@19.3.1)':
     dependencies:
       '@googlemaps/js-api-loader': 2.1.1
-      '@types/google.maps': 3.66.1
+      '@types/google.maps': 3.67.0
       fast-equals: 6.0.2
       react: 19.3.1
       react-dom: 19.2.4(react@19.3.1)
