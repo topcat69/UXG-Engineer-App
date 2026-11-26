@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import type { SlaJobRow } from "@/lib/reports/sla-compliance-data";
 import type { ProjectRollupJobRow } from "@/lib/reports/project-rollup-data";
+import type { AssetRegisterAssetRow } from "@/lib/reports/asset-register-data";
 
 export type JobExportRow = {
   job_number: string;
@@ -95,4 +96,34 @@ export function projectRollupToCsv(rows: ProjectRollupJobRow[]): string {
     scheduled_start: r.scheduledStart,
   }));
   return Papa.unparse({ fields: PROJECT_ROLLUP_COLUMNS, data });
+}
+
+const ASSET_REGISTER_COLUMNS = [
+  "item",
+  "serial_number",
+  "category",
+  "customer",
+  "site",
+  "status",
+  "install_date",
+  "purchase_date",
+  "purchase_cost",
+  "warranty_end",
+];
+
+/** Flat per-asset line list, matching the report page's own "Assets" table. */
+export function assetRegisterToCsv(rows: AssetRegisterAssetRow[]): string {
+  const data = rows.map((r) => ({
+    item: r.itemLabel,
+    serial_number: r.serialNumber,
+    category: r.categoryName,
+    customer: r.clientName,
+    site: r.siteName,
+    status: r.status,
+    install_date: r.installDate,
+    purchase_date: r.purchaseDate,
+    purchase_cost: r.purchaseCost,
+    warranty_end: r.warrantyEnd,
+  }));
+  return Papa.unparse({ fields: ASSET_REGISTER_COLUMNS, data });
 }

@@ -13,6 +13,12 @@ const REPORTS = [
     description:
       "Cross-job view of a single project, or every project belonging to one customer rolled up together — status, throughput, time, and issues — with PDF, Excel, CSV, and zip export.",
   },
+  {
+    href: "/office/reports/asset-register",
+    title: "Asset Register",
+    description:
+      "Every asset on file, filterable by customer, site, category, or status — status and category breakdowns plus the full asset list — with PDF, Excel, CSV, and zip export.",
+  },
 ];
 
 /**

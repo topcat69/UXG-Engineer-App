@@ -2,7 +2,9 @@ import "server-only";
 import ExcelJS from "exceljs";
 import { complianceRate, type SlaComplianceReportData } from "@/lib/reports/sla-compliance-data";
 import type { ProjectRollupReportData } from "@/lib/reports/project-rollup-data";
+import type { AssetRegisterReportData } from "@/lib/reports/asset-register-data";
 import { humanize } from "@/lib/format/text";
+import { formatGbp } from "@/lib/format/currency";
 
 function formatMinutes(minutes: number): string {
   const h = Math.floor(minutes / 60);
@@ -81,6 +83,71 @@ export async function slaComplianceToXlsx(data: SlaComplianceReportData): Promis
     })),
   );
   jobsSheet.getRow(1).font = { bold: true };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+/**
+ * Multi-sheet workbook for the Asset Register report — Summary, By status,
+ * By category, then an Assets sheet with the full per-asset line list.
+ * Same shared-data-source guarantee as the other two reports: built from
+ * fetchAssetRegisterReportData's result, the exact thing the on-screen
+ * page and every other export format use.
+ */
+export async function assetRegisterToXlsx(data: AssetRegisterReportData): Promise<Buffer> {
+  const { totalAssets, statusCounts, categoryBreakdown, totalPurchaseCost, costedCount, rows } = data;
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "UXG Engineer App";
+  workbook.created = new Date();
+
+  const summary = workbook.addWorksheet("Summary");
+  summary.columns = [{ header: "Metric", key: "metric", width: 28 }, { header: "Value", key: "value", width: 24 }];
+  summary.addRows([
+    { metric: "Total assets", value: totalAssets },
+    { metric: "Total purchase cost", value: formatGbp(totalPurchaseCost) },
+    { metric: "Assets costed", value: `${costedCount} of ${totalAssets}` },
+  ]);
+  summary.getRow(1).font = { bold: true };
+
+  const statusSheet = workbook.addWorksheet("By status");
+  statusSheet.columns = [{ header: "Status", key: "label", width: 20 }, { header: "Assets", key: "count", width: 10 }];
+  statusSheet.addRows(statusCounts.map((s) => ({ label: s.label, count: s.count })));
+  statusSheet.getRow(1).font = { bold: true };
+
+  const categorySheet = workbook.addWorksheet("By category");
+  categorySheet.columns = [{ header: "Category", key: "label", width: 24 }, { header: "Assets", key: "count", width: 10 }];
+  categorySheet.addRows(categoryBreakdown.map((c) => ({ label: c.label, count: c.count })));
+  categorySheet.getRow(1).font = { bold: true };
+
+  const assetsSheet = workbook.addWorksheet("Assets");
+  assetsSheet.columns = [
+    { header: "Item", key: "item", width: 24 },
+    { header: "Serial number", key: "serial_number", width: 20 },
+    { header: "Category", key: "category", width: 18 },
+    { header: "Customer", key: "customer", width: 18 },
+    { header: "Site", key: "site", width: 18 },
+    { header: "Status", key: "status", width: 14 },
+    { header: "Install date", key: "install_date", width: 14 },
+    { header: "Purchase date", key: "purchase_date", width: 14 },
+    { header: "Purchase cost", key: "purchase_cost", width: 14 },
+    { header: "Warranty end", key: "warranty_end", width: 14 },
+  ];
+  assetsSheet.addRows(
+    rows.map((r) => ({
+      item: r.itemLabel,
+      serial_number: r.serialNumber,
+      category: r.categoryName,
+      customer: r.clientName,
+      site: r.siteName,
+      status: humanize(r.status),
+      install_date: r.installDate,
+      purchase_date: r.purchaseDate,
+      purchase_cost: r.purchaseCost,
+      warranty_end: r.warrantyEnd,
+    })),
+  );
+  assetsSheet.getRow(1).font = { bold: true };
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
