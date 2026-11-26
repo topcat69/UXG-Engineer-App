@@ -176,7 +176,8 @@ export function ImportWizard({
         <p className="text-muted-foreground text-sm">
           For legacy assets that never went through goods-in. Columns: <code>category</code>, <code>manufacturer</code>,{" "}
           <code>model</code>, <code>serial_number</code>, <code>site</code>, <code>client</code> (only needed if two sites
-          share a name), <code>purchase_date</code>, <code>supplier</code>, <code>po_or_invoice_number</code>,{" "}
+          share a name), <code>install_date</code> (if known — these rows have no linked job to ever set one
+          automatically), <code>purchase_date</code>, <code>supplier</code>, <code>po_or_invoice_number</code>,{" "}
           <code>purchase_cost</code>, <code>depreciation_method</code>, <code>useful_life_years</code>,{" "}
           <code>residual_value</code>, <code>warranty_start</code>, <code>warranty_end</code>, <code>warranty_provider</code>,{" "}
           <code>support_contract_ref</code>, <code>support_sla</code>, <code>status</code> (defaults to Spare),{" "}

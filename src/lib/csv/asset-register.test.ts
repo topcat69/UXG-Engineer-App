@@ -59,6 +59,12 @@ Displays,Samsung,QM75,SN-1,Head Office,2024-01-15,1234.56,5,2026-01-15,in_use`;
     expect(errors.some((e) => e.includes('invalid useful_life_years "x"'))).toBe(true);
     expect(errors.some((e) => e.includes('invalid purchase_date "also-not-a-date"'))).toBe(true);
   });
+
+  it("parses an optional install_date, the only trustworthy source for a row with no linked job", () => {
+    const { rows, errors } = parseAssetRegisterCsv("manufacturer,install_date\nSamsung,2023-06-01");
+    expect(errors).toEqual([]);
+    expect(rows[0].installDate).toBe("2023-06-01");
+  });
 });
 
 describe("resolveAssetRegisterRows", () => {
@@ -126,5 +132,12 @@ describe("resolveAssetRegisterRows", () => {
     const { rows: resolved, errors } = resolveAssetRegisterRows(rows, buildCategoryLookup([]), siteLookup);
     expect(resolved).toEqual([]);
     expect(errors).toEqual(['Row 2: no site named "Head Office" for client "Ghost Client"']);
+  });
+
+  it("carries install_date straight through to the resolved row", () => {
+    const { rows } = parseAssetRegisterCsv("manufacturer,install_date\nSamsung,2023-06-01");
+    const { rows: resolved, errors } = resolveAssetRegisterRows(rows, buildCategoryLookup([]), buildSiteLookup([]));
+    expect(errors).toEqual([]);
+    expect(resolved[0].install_date).toBe("2023-06-01");
   });
 });

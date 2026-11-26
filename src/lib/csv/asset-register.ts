@@ -14,6 +14,7 @@ export type AssetRegisterImportRow = {
   serialNumber?: string;
   siteName?: string;
   clientName?: string;
+  installDate?: string;
   purchaseDate?: string;
   supplier?: string;
   poOrInvoiceNumber?: string;
@@ -74,12 +75,11 @@ function optionalInt(value: string | undefined, field: string, rowNumber: number
  * foreign keys afterwards, once the caller has looked up (and, for
  * category, created on the fly) matching rows from the database.
  *
- * There's no `install_date` column, same as the manual "Add asset
- * manually" form — it's only ever set automatically, once, when the job
- * an asset is actually part of gets submitted (see
- * api/webhooks/status-submitted). A legacy asset with no job behind it
- * simply has no install_date; there's nowhere else for a trustworthy one
- * to come from.
+ * `install_date` is optional here, same as the manual "Add asset manually"
+ * form — an imported row never has a stock_item_id, so there's no
+ * job-submission event to ever stamp one automatically (see
+ * api/webhooks/status-submitted), and typing in the real, known install
+ * date is the only way one of these rows gets a trustworthy value at all.
  */
 export function parseAssetRegisterCsv(text: string): ParsedAssetRegisterCsv {
   const parsed = Papa.parse<Record<string, string>>(text, {
@@ -121,6 +121,7 @@ export function parseAssetRegisterCsv(text: string): ParsedAssetRegisterCsv {
       serialNumber: optionalText(raw.serial_number),
       siteName,
       clientName: optionalText(raw.client),
+      installDate: optionalDate(raw.install_date, "install_date", rowNumber, errors),
       purchaseDate: optionalDate(raw.purchase_date, "purchase_date", rowNumber, errors),
       supplier: optionalText(raw.supplier),
       poOrInvoiceNumber: optionalText(raw.po_or_invoice_number),
@@ -231,6 +232,7 @@ export function resolveAssetRegisterRows(
       model: row.model,
       serial_number: row.serialNumber,
       site_id: siteId,
+      install_date: row.installDate,
       purchase_date: row.purchaseDate,
       supplier: row.supplier,
       po_or_invoice_number: row.poOrInvoiceNumber,

@@ -48,6 +48,13 @@ export async function POST(request: Request) {
  * a revisit job), and status only moves spare -> in_use, never
  * overriding a status a manager has already set to faulty/in_repair/
  * retired.
+ *
+ * Extended since: a manually-added or imported asset never has a
+ * stock_item_id, so it was never going to get an install_date from this
+ * flow at all — office/asset-register/actions.ts now lets install_date be
+ * typed in directly for exactly those rows, guarded server-side on
+ * stock_item_id being null. An asset this webhook can reach (has one)
+ * still only ever gets its install_date from here.
  */
 async function bumpInstalledAssets(supabase: ReturnType<typeof createAdminClient>, jobId: string): Promise<void> {
   const { data: jobSheets } = await supabase.from("job_sheets").select("id").eq("linked_job_id", jobId);

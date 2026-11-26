@@ -84,6 +84,7 @@ export type AssetFieldsInput = {
   supportContractRef: string;
   supportSla: string;
   status: AssetStatus;
+  installDate: string;
   expectedReplacementDate: string;
   decommissionDate: string;
   disposalDate: string;
@@ -130,6 +131,7 @@ function fieldsToUpdate(input: AssetFieldsInput): Database["public"]["Tables"]["
     support_contract_ref: input.supportContractRef.trim() || null,
     support_sla: input.supportSla.trim() || null,
     status: input.status,
+    install_date: input.installDate || null,
     expected_replacement_date: input.expectedReplacementDate || null,
     decommission_date: input.decommissionDate || null,
     disposal_date: input.disposalDate || null,
@@ -138,7 +140,13 @@ function fieldsToUpdate(input: AssetFieldsInput): Database["public"]["Tables"]["
   };
 }
 
-/** Manual add — the third of the three entry doors (goods-in, import, manual). install_date is never set here: it's stamped automatically the moment the linked job is actually submitted (see api/webhooks/status-submitted), not typed in. */
+/**
+ * Manual add — the third of the three entry doors (goods-in, import,
+ * manual). A manually-added asset never has a stock_item_id, so there's no
+ * job-submission event to ever stamp its install_date automatically (see
+ * api/webhooks/status-submitted) — typing it in here, if known, is the only
+ * way one of these rows gets a trustworthy value at all.
+ */
 export async function createAssetManually(input: AssetFieldsInput): Promise<AssetResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Not signed in." };
@@ -158,7 +166,15 @@ export async function createAssetManually(input: AssetFieldsInput): Promise<Asse
   return { ok: true, item: data };
 }
 
-/** Edits everything a manager fills in — category, device detail, location, procurement, warranty, and the manual half of lifecycle. install_date/source/stock_item_id are never touched here. */
+/**
+ * Edits everything a manager fills in — category, device detail, location,
+ * procurement, warranty, and the manual half of lifecycle. source/
+ * stock_item_id are never touched here. install_date can be, but only for
+ * an asset with no stock_item_id (manual/imported) — one that does (goods-
+ * in) keeps the system-stamped value decision 10 guarantees, regardless of
+ * what the form sends, since a client-side disabled input is a courtesy,
+ * not a guarantee.
+ */
 export async function updateAssetRegister(id: string, input: AssetFieldsInput): Promise<AssetResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Not signed in." };
@@ -167,6 +183,10 @@ export async function updateAssetRegister(id: string, input: AssetFieldsInput): 
   if ("error" in fields) return { ok: false, message: fields.error };
 
   const supabase = await createClient();
+
+  const { data: existing } = await supabase.from("asset_register").select("stock_item_id").eq("id", id).single();
+  if (existing?.stock_item_id) delete fields.install_date;
+
   const { data, error } = await supabase
     .from("asset_register")
     .update({ ...fields, updated_by: user.id })

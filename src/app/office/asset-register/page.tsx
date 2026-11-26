@@ -43,7 +43,8 @@ export default async function AssetRegisterPage() {
           <p className="text-muted-foreground text-sm">
             Every item scanned in through goods-in gets a row here automatically, flagged for review until its category,
             procurement, and warranty details are filled in. Install date is set automatically once the job it&apos;s
-            part of is actually completed — it&apos;s never typed in.
+            part of is actually completed — for a manually-added or imported asset, with no job behind it, it can be
+            typed in directly instead.
           </p>
         </div>
         <div className="flex flex-wrap gap-3 text-sm whitespace-nowrap">

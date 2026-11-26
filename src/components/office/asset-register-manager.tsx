@@ -50,6 +50,7 @@ const EMPTY_FIELDS: AssetFieldsInput = {
   supportContractRef: "",
   supportSla: "",
   status: "spare",
+  installDate: "",
   expectedReplacementDate: "",
   decommissionDate: "",
   disposalDate: "",
@@ -78,6 +79,7 @@ function assetToFields(asset: AssetRegisterRow): AssetFieldsInput {
     supportContractRef: asset.support_contract_ref ?? "",
     supportSla: asset.support_sla ?? "",
     status: asset.status,
+    installDate: asset.install_date ?? "",
     expectedReplacementDate: asset.expected_replacement_date ?? "",
     decommissionDate: asset.decommission_date ?? "",
     disposalDate: asset.disposal_date ?? "",
@@ -130,6 +132,11 @@ export function AssetRegisterManager({
   // already assigned to a site outside the first 1000 still shows its
   // real site name rather than blanking it out.
   const [editSiteLabel, setEditSiteLabel] = useState("");
+  // Locked when the asset being edited has a stock_item_id — a goods-in
+  // asset's install_date is system-stamped (see decision 10) and must stay
+  // that way; a manually-added or imported one has no such source, so it's
+  // the only place a real value can ever come from.
+  const [editInstallDateLocked, setEditInstallDateLocked] = useState(false);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [addFields, setAddFields] = useState<AssetFieldsInput>(EMPTY_FIELDS);
@@ -169,6 +176,7 @@ export function AssetRegisterManager({
     setEditingId(asset.id);
     setEditFields(assetToFields(asset));
     setEditSiteLabel(asset.site ? (asset.site.client ? `${asset.site.name} — ${asset.site.client.name}` : asset.site.name) : "");
+    setEditInstallDateLocked(asset.stock_item_id != null);
     setMessage(null);
   }
 
@@ -214,7 +222,12 @@ export function AssetRegisterManager({
 
   const categoryOptions = categories;
 
-  function renderFieldsForm(fields: AssetFieldsInput, setFields: (f: AssetFieldsInput) => void, siteLabel: string) {
+  function renderFieldsForm(
+    fields: AssetFieldsInput,
+    setFields: (f: AssetFieldsInput) => void,
+    siteLabel: string,
+    installDateLocked: boolean,
+  ) {
     return (
       <div className="flex flex-col gap-4">
         <FieldGroup title="Identification & device detail">
@@ -302,6 +315,16 @@ export function AssetRegisterManager({
             onChange={(v) => setFields({ ...fields, status: v as AssetStatus })}
             options={ASSET_STATUSES.map((s) => ({ id: s, name: humanize(s) }))}
           />
+          <div className="flex flex-col gap-1">
+            <LabeledInput
+              label="Install date"
+              type="date"
+              value={fields.installDate}
+              onChange={(v) => setFields({ ...fields, installDate: v })}
+              disabled={installDateLocked}
+            />
+            {installDateLocked && <span className="text-muted-foreground text-xs">Set automatically on job submission</span>}
+          </div>
           <LabeledInput
             label="Expected replacement date"
             type="date"
@@ -369,7 +392,7 @@ export function AssetRegisterManager({
             For an asset that&apos;s part of the estate but never went through goods-in — everything scanned in already gets
             its own row automatically.
           </p>
-          {renderFieldsForm(addFields, setAddFields, "")}
+          {renderFieldsForm(addFields, setAddFields, "", false)}
           <div className="flex gap-2">
             <Button type="button" disabled={isPending} onClick={handleAdd}>
               Add asset
@@ -384,7 +407,7 @@ export function AssetRegisterManager({
       {editingId && (
         <section className="flex flex-col gap-3 rounded-md border p-3">
           <h2 className="font-medium">Edit asset</h2>
-          {renderFieldsForm(editFields, setEditFields, editSiteLabel)}
+          {renderFieldsForm(editFields, setEditFields, editSiteLabel, editInstallDateLocked)}
           <div className="flex gap-2">
             <Button type="button" disabled={isPending} onClick={handleSaveEdit}>
               Save
@@ -477,12 +500,14 @@ function LabeledInput({
   onChange,
   type = "text",
   placeholder,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -491,8 +516,9 @@ function LabeledInput({
         type={type}
         value={value}
         placeholder={placeholder}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="border-input h-9 w-44 rounded-md border bg-transparent px-2 text-sm"
+        className="border-input h-9 w-44 rounded-md border bg-transparent px-2 text-sm disabled:opacity-50"
       />
     </div>
   );
