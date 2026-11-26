@@ -158,8 +158,8 @@ importers:
         specifier: ^2.4.5
         version: 2.4.5
       supabase:
-        specifier: ^2.111.0
-        version: 2.111.0
+        specifier: ^3.3.0
+        version: 3.3.0
       tailwindcss:
         specifier: ^4
         version: 4.3.3
@@ -1571,47 +1571,47 @@ packages:
     resolution: {integrity: sha512-XOZV+jllcU2Hzij8SwgM78zl0lOEr6BTjzi2MYkBb39nOAQzb5AelGpMUvVj7lwGSB11JmpAs/FEQroAyFzWEA==}
     engines: {node: '>=22.0.0'}
 
-  '@supabase/cli-darwin-arm64@2.111.0':
-    resolution: {integrity: sha512-H1ucZ+9Z37Ha7uqYrKHfAy1vXWMVsN4gNlKaOpjKUYoHwDEbueEHVIDA1/PBIUd4HX+usJfpq+R+gWqzM/FKqQ==}
+  '@supabase/cli-darwin-arm64@3.3.0':
+    resolution: {integrity: sha512-ePg+/9ZK+ywjmgX8MWwnlhRfipAlX2ohlWNEEWyvsoATYVEoViH724NpI7hCUAt/7tPvu5mAcyHsg+ayVb3qmw==}
     cpu: [arm64]
     os: [darwin]
 
-  '@supabase/cli-darwin-x64@2.111.0':
-    resolution: {integrity: sha512-4iMYm/XaAZJ8YzdJ2HBRVc7i9SRIwE6VQrnSt968WTt83M1y6knC7UENCKjMtO+As4QeZkICpUk50CeathqxbA==}
+  '@supabase/cli-darwin-x64@3.3.0':
+    resolution: {integrity: sha512-UADIlr3hiAPbxuiLukjM/+FwSqymFKL4pR0Map8REnx8K5j4TPWyoWJhHHm8KtX9b/1Cw2Q0bVSdU/w5k5V8LA==}
     cpu: [x64]
     os: [darwin]
 
-  '@supabase/cli-linux-arm64-musl@2.111.0':
-    resolution: {integrity: sha512-RnvbVlJ4TX/UIwLiglBVQ2eL4GAl9SfWZmM5LENXyIaohBcRZHDva5t2OyK+BPGBtngjVGpb3QyfLdvkt9yJcw==}
+  '@supabase/cli-linux-arm64-musl@3.3.0':
+    resolution: {integrity: sha512-U0cgrlngmcBoovmdqD/VR3i0UrKtKd/ccs7Z4CcODc7Uf/xtun+euabR6rPEVdoQKFYyAob/i4GhWSsTWrhvzA==}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@supabase/cli-linux-arm64@2.111.0':
-    resolution: {integrity: sha512-2KSHITFMXe2u5yALupBWHGeQ1IY4C8GkcIWPWgNFdtAPo03pgs1hLWgL1eeqSh/a0wB/6rgUlM1fQR/hAgCyCA==}
+  '@supabase/cli-linux-arm64@3.3.0':
+    resolution: {integrity: sha512-I6+Xmf7N+N+vkKWOiHh10Yo5JFYBVk3kbfbAyRPdIgyR8yke957NtetFxA6ITV3flwi9pIt4NpWxNfpgHiuQJw==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@supabase/cli-linux-x64-musl@2.111.0':
-    resolution: {integrity: sha512-2QVpsy/3v+TzqE5GgTCPruoxTlF3d8QPGirjcnah8hP66nxXStB9yTvxmJq+LtO3gwMt1Kpm7is0roZVkV55Pw==}
+  '@supabase/cli-linux-x64-musl@3.3.0':
+    resolution: {integrity: sha512-TuwignxFsxLhIaDGgujZGwyg0QpOQlnmZp4sqsTb3UW14QD6rPOFa0PfGBNo7um4cSqYQo6VZe18HLWe5CdHdA==}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@supabase/cli-linux-x64@2.111.0':
-    resolution: {integrity: sha512-NwwNhiZZT4WYEPDXAbgZL+l77z/hoJ+w5t+52WBN1VlmoxwDmf2NP+UERM8wuCGFe/tmBlUuFE1eJYZfab0/qA==}
+  '@supabase/cli-linux-x64@3.3.0':
+    resolution: {integrity: sha512-5bVWEI9ysK3D40+tx1EYhGwhfe2sQ3wuNkK7RvKgrsANlriH39jP7zHLGtAArQ91EUQctkx++VqIEVr0NcfgDw==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@supabase/cli-windows-arm64@2.111.0':
-    resolution: {integrity: sha512-twawKY5xfU2dNOnZrKDmrudxRG/XIKcBxOb6X2lMGJU3N1Hd+8oWpI9TwM5Qv+eXehtlsKDmUvbitStXvJr/xQ==}
+  '@supabase/cli-windows-arm64@3.3.0':
+    resolution: {integrity: sha512-Hy6NnCpohlqvXzN/GOdpAMaXq0c2ZpDvTyb8IJtHV+r3miu5EUqD+1/yBJp62BfsRXMTGizGowL4qsbAcpYQSw==}
     cpu: [arm64]
     os: [win32]
 
-  '@supabase/cli-windows-x64@2.111.0':
-    resolution: {integrity: sha512-1F+X5tAYxAGx93ZZoIQBnIQ2Q2NnplKqjpigAS/zpTsNaWAjNi7EnxmuQKaEoAdqOHKbLhegVVDiw1+us3ZVpA==}
+  '@supabase/cli-windows-x64@3.3.0':
+    resolution: {integrity: sha512-3jSKk6W9hAr3R9LKxrfDKCkv+VFii3ydsdhAm8+yF039NEDeNq95D8NwsokQMmYPeXgr3si33gWaHqlQWNQfZg==}
     cpu: [x64]
     os: [win32]
 
@@ -3623,8 +3623,8 @@ packages:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
 
-  jose@6.2.8:
-    resolution: {integrity: sha512-Bsdjwm3Qsd/P0jR+BHDe3LytDfY7WBq2HmCCLIwuVRHMuEC9ae7/R474GIUdF1NgCyZjzVo/A9DOiOBtXq8ZoQ==}
+  jose@6.2.18:
+    resolution: {integrity: sha512-doV4thUwgkrycJH4yLeqwTGIIZphHl+pk7CPReuMIhYhncmgzdko85MaCG4YQFTxqMFr1/oEH32tZuKKovcDEg==}
 
   js-md5@0.8.3:
     resolution: {integrity: sha512-qR0HB5uP6wCuRMrWPTrkMaev7MJZwJuuw4fnwAzRgP4J4/F8RwtodOKpGp4XpqsLBFzzgqIO42efFAyz2Et6KQ==}
@@ -4850,8 +4850,8 @@ packages:
       babel-plugin-macros:
         optional: true
 
-  supabase@2.111.0:
-    resolution: {integrity: sha512-0cjCRdYNV1h2XXa0wm04mdct7QuDU7sMul/NwETRJmN3+HCsdEu6u5n0oygL97fdf6sDrGmnAdBh8E4wsv1ayg==}
+  supabase@3.3.0:
+    resolution: {integrity: sha512-r0duXpzkwrQ3tT+3HgwK3sJ4tmANpnrMkokZoysitUpPVshXHQhpPNKhGA55OrpAcl0JrZgC2prsGRGDbv8AfQ==}
     hasBin: true
 
   supports-color@7.2.0:
@@ -5969,7 +5969,7 @@ snapshots:
       express: 5.2.1
       express-rate-limit: 8.6.1(express@5.2.1)
       hono: 4.13.7
-      jose: 6.2.8
+      jose: 6.2.18
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
@@ -6479,28 +6479,28 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@supabase/cli-darwin-arm64@2.111.0':
+  '@supabase/cli-darwin-arm64@3.3.0':
     optional: true
 
-  '@supabase/cli-darwin-x64@2.111.0':
+  '@supabase/cli-darwin-x64@3.3.0':
     optional: true
 
-  '@supabase/cli-linux-arm64-musl@2.111.0':
+  '@supabase/cli-linux-arm64-musl@3.3.0':
     optional: true
 
-  '@supabase/cli-linux-arm64@2.111.0':
+  '@supabase/cli-linux-arm64@3.3.0':
     optional: true
 
-  '@supabase/cli-linux-x64-musl@2.111.0':
+  '@supabase/cli-linux-x64-musl@3.3.0':
     optional: true
 
-  '@supabase/cli-linux-x64@2.111.0':
+  '@supabase/cli-linux-x64@3.3.0':
     optional: true
 
-  '@supabase/cli-windows-arm64@2.111.0':
+  '@supabase/cli-windows-arm64@3.3.0':
     optional: true
 
-  '@supabase/cli-windows-x64@2.111.0':
+  '@supabase/cli-windows-x64@3.3.0':
     optional: true
 
   '@supabase/functions-js@2.117.3':
@@ -8735,7 +8735,7 @@ snapshots:
 
   jiti@2.7.0: {}
 
-  jose@6.2.8: {}
+  jose@6.2.18: {}
 
   js-md5@0.8.3: {}
 
@@ -10028,19 +10028,19 @@ snapshots:
     optionalDependencies:
       '@babel/core': 7.29.7
 
-  supabase@2.111.0:
+  supabase@3.3.0:
     dependencies:
       eciesjs: 0.5.0
-      jose: 6.2.8
+      jose: 6.2.18
     optionalDependencies:
-      '@supabase/cli-darwin-arm64': 2.111.0
-      '@supabase/cli-darwin-x64': 2.111.0
-      '@supabase/cli-linux-arm64': 2.111.0
-      '@supabase/cli-linux-arm64-musl': 2.111.0
-      '@supabase/cli-linux-x64': 2.111.0
-      '@supabase/cli-linux-x64-musl': 2.111.0
-      '@supabase/cli-windows-arm64': 2.111.0
-      '@supabase/cli-windows-x64': 2.111.0
+      '@supabase/cli-darwin-arm64': 3.3.0
+      '@supabase/cli-darwin-x64': 3.3.0
+      '@supabase/cli-linux-arm64': 3.3.0
+      '@supabase/cli-linux-arm64-musl': 3.3.0
+      '@supabase/cli-linux-x64': 3.3.0
+      '@supabase/cli-linux-x64-musl': 3.3.0
+      '@supabase/cli-windows-arm64': 3.3.0
+      '@supabase/cli-windows-x64': 3.3.0
 
   supports-color@7.2.0:
     dependencies:
