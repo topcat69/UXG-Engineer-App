@@ -7,6 +7,7 @@ import { buildCategoryLookup, buildSiteLookup, parseAssetRegisterCsv, resolveAss
 import type { Database } from "@/lib/supabase/database.types";
 import type { NamedItemResult, NamedDeleteResult } from "@/components/office/flat-list-section";
 import { SITE_SEARCH_LIMIT } from "@/lib/forms/site-search";
+import { fetchAllSites } from "@/lib/sites/fetch-all-sites";
 
 type AssetStatus = Database["public"]["Enums"]["asset_status"];
 
@@ -312,8 +313,8 @@ export async function importAssetRegisterCsv(formData: FormData): Promise<Import
     }
   }
 
-  const { data: sites } = await supabase.from("sites").select("id, name, client:clients(name)");
-  const siteLookup = buildSiteLookup((sites ?? []).map((s) => ({ id: s.id, name: s.name, clientName: s.client?.name ?? null })));
+  const sites = await fetchAllSites(supabase);
+  const siteLookup = buildSiteLookup(sites.map((s) => ({ id: s.id, name: s.name, clientName: s.client?.name ?? null })));
 
   const { rows: resolvedRows, errors: resolveErrors } = resolveAssetRegisterRows(parsedRows, categoryLookup, siteLookup);
   const errors = [...parseErrors, ...resolveErrors];

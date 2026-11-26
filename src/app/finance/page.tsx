@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { AssetRegisterManager } from "@/components/office/asset-register-manager";
+import { fetchAllSites } from "@/lib/sites/fetch-all-sites";
 
 /**
  * Finance's whole app surface — the Asset Register, minus category
@@ -10,7 +11,7 @@ import { AssetRegisterManager } from "@/components/office/asset-register-manager
 export default async function FinancePage() {
   const supabase = await createClient();
 
-  const [{ data: assets, error }, { data: categories }, { data: sites }, { data: clients }] = await Promise.all([
+  const [{ data: assets, error }, { data: categories }, sites, { data: clients }] = await Promise.all([
     supabase
       .from("asset_register")
       .select(
@@ -23,7 +24,7 @@ export default async function FinancePage() {
       )
       .order("created_at", { ascending: false }),
     supabase.from("asset_categories").select("id, name").order("name"),
-    supabase.from("sites").select("id, name, client:clients(name)").order("name"),
+    fetchAllSites(supabase),
     supabase.from("clients").select("id, name").order("name"),
   ]);
 
@@ -56,7 +57,7 @@ export default async function FinancePage() {
       <AssetRegisterManager
         initialAssets={assets ?? []}
         categories={categories ?? []}
-        sites={sites ?? []}
+        sites={sites}
         clients={clients ?? []}
         canManageCategories={false}
         canDelete={false}

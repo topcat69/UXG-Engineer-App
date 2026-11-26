@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { AssetRegisterManager } from "@/components/office/asset-register-manager";
+import { fetchAllSites } from "@/lib/sites/fetch-all-sites";
 
 /**
  * Phase 1 of the Asset Register (see the "Asset Register Scope" design
@@ -14,7 +15,7 @@ import { AssetRegisterManager } from "@/components/office/asset-register-manager
 export default async function AssetRegisterPage() {
   const supabase = await createClient();
 
-  const [{ data: assets, error }, { data: categories }, { data: sites }, { data: clients }] = await Promise.all([
+  const [{ data: assets, error }, { data: categories }, sites, { data: clients }] = await Promise.all([
     supabase
       .from("asset_register")
       .select(
@@ -27,7 +28,7 @@ export default async function AssetRegisterPage() {
       )
       .order("created_at", { ascending: false }),
     supabase.from("asset_categories").select("id, name").order("name"),
-    supabase.from("sites").select("id, name, client:clients(name)").order("name"),
+    fetchAllSites(supabase),
     supabase.from("clients").select("id, name").order("name"),
   ]);
 
@@ -59,7 +60,7 @@ export default async function AssetRegisterPage() {
           </Link>
         </div>
       </div>
-      <AssetRegisterManager initialAssets={assets ?? []} categories={categories ?? []} sites={sites ?? []} clients={clients ?? []} />
+      <AssetRegisterManager initialAssets={assets ?? []} categories={categories ?? []} sites={sites} clients={clients ?? []} />
     </div>
   );
 }
